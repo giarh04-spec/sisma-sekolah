@@ -1,0 +1,8 @@
+{
+  "name": "Sistem Informasi Sekolah",
+  "description": "Aplikasi manajemen sekolah terlengkap: Database Siswa/Guru/Staf, Absensi Harian & Mapel, CBT Ujian & Template Soal, Administrasi Guru (Modul Ajar, ATP, CP, Jurnal, Prota, Prosem, Kaldik, Jadwal), Keuangan (SPP, UKT, Ekskul), dan Ekspor Spreadsheet Google Drive.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
