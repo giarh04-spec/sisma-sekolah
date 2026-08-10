@@ -44,7 +44,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     const password = passwordInput.trim();
 
     if (!inputIdOrEmail) {
-      setErrorMessage('Silakan masukkan Email Gmail atau Username akun Anda.');
+      setErrorMessage('Silakan masukkan Username atau Email akun Anda.');
       return;
     }
     if (!password) {
@@ -59,14 +59,28 @@ export const LoginView: React.FC<LoginViewProps> = ({
       // 1. Check Admin
       if (selectedRole === 'admin') {
         const adminEmails = (schoolSettings.adminEmails || []).map(e => e.toLowerCase());
-        if (
+        const isAdminUser = 
+          inputIdOrEmail === 'admin' ||
+          inputIdOrEmail === 'giar.hermawan4' ||
+          inputIdOrEmail === 'giar.hermawan4@guru.smp.belajar.id' ||
           adminEmails.includes(inputIdOrEmail) ||
-          inputIdOrEmail.includes('admin') ||
-          inputIdOrEmail.includes('giarh0410') ||
-          ['admin123', '123456', 'admin', '12345', 'password', 'password123'].includes(password) ||
-          password.length >= 3
-        ) {
-          onLoginSuccess(emailInput.trim(), 'gmail_oauth_token_active', 'admin');
+          inputIdOrEmail.includes('giarh0410');
+
+        if (isAdminUser) {
+          const isValidAdminPassword = 
+            password === 'admin' ||
+            password === 'admin123' || 
+            password === 'password' || 
+            password === 'password123' ||
+            password === '123456';
+
+          if (!isValidAdminPassword) {
+            setErrorMessage('Kata sandi salah untuk akun Admin Sekolah ini. Silakan gunakan password "admin" atau "admin123".');
+            setLoading(false);
+            return;
+          }
+
+          onLoginSuccess('giar.hermawan4@guru.smp.belajar.id', 'gmail_oauth_token_active', 'admin');
           setLoading(false);
           return;
         }
@@ -74,68 +88,68 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
       // 2. Check Guru list
       const foundGuru = guruList.find(g => 
-        (g.email && g.email.toLowerCase() === inputIdOrEmail) ||
         (g.username && g.username.toLowerCase() === inputIdOrEmail) ||
-        g.nama.toLowerCase().includes(inputIdOrEmail)
+        (g.email && g.email.toLowerCase() === inputIdOrEmail) ||
+        (g.nama && g.nama.toLowerCase() === inputIdOrEmail) ||
+        (g.nama && g.nama.toLowerCase().includes(inputIdOrEmail))
       );
       if (foundGuru) {
-        const isValidPassword = !foundGuru.password || 
-          foundGuru.password === password || 
-          ['password', 'password123', 'admin', 'admin123', '12345', '123456'].includes(password) ||
-          password.length >= 3;
+        const expectedPassword = foundGuru.password || 'password';
+        const isValidPassword = password === expectedPassword || 
+          ['password', 'password123', 'admin123', '123456'].includes(password);
 
         if (!isValidPassword) {
           setErrorMessage('Kata sandi salah untuk akun Guru ini.');
           setLoading(false);
           return;
         }
-        onLoginSuccess(foundGuru.email || emailInput.trim(), 'gmail_oauth_token_active', 'guru');
+        onLoginSuccess(foundGuru.email || `${foundGuru.username || 'guru'}@guru.sch.id`, 'gmail_oauth_token_active', 'guru');
         setLoading(false);
         return;
       }
 
       // 3. Check Staf list
       const foundStaf = stafList.find(st => 
-        (st.email && st.email.toLowerCase() === inputIdOrEmail) ||
         (st.username && st.username.toLowerCase() === inputIdOrEmail) ||
-        st.nama.toLowerCase().includes(inputIdOrEmail)
+        (st.email && st.email.toLowerCase() === inputIdOrEmail) ||
+        (st.nama && st.nama.toLowerCase() === inputIdOrEmail) ||
+        (st.nama && st.nama.toLowerCase().includes(inputIdOrEmail))
       );
       if (foundStaf) {
-        const isValidPassword = !foundStaf.password || 
-          foundStaf.password === password || 
-          ['password', 'password123', 'admin', 'admin123', '12345', '123456'].includes(password) ||
-          password.length >= 3;
+        const expectedPassword = foundStaf.password || 'password';
+        const isValidPassword = password === expectedPassword || 
+          ['password', 'password123', 'admin123', '123456'].includes(password);
 
         if (!isValidPassword) {
           setErrorMessage('Kata sandi salah untuk akun Staf TU ini.');
           setLoading(false);
           return;
         }
-        onLoginSuccess(foundStaf.email || emailInput.trim(), 'gmail_oauth_token_active', 'staf');
+        onLoginSuccess(foundStaf.email || `${foundStaf.username || 'staf'}@staf.sch.id`, 'gmail_oauth_token_active', 'staf');
         setLoading(false);
         return;
       }
 
       // 4. Check Siswa list
       const foundSiswa = siswaList.find(s => 
-        (s.email && s.email.toLowerCase() === inputIdOrEmail) ||
         (s.username && s.username.toLowerCase() === inputIdOrEmail) ||
-        s.nis.toLowerCase() === inputIdOrEmail ||
-        s.nisn.toLowerCase() === inputIdOrEmail ||
-        s.nama.toLowerCase().includes(inputIdOrEmail)
+        (s.email && s.email.toLowerCase() === inputIdOrEmail) ||
+        (s.nis && s.nis.toLowerCase() === inputIdOrEmail) ||
+        (s.nisn && s.nisn.toLowerCase() === inputIdOrEmail) ||
+        (s.nama && s.nama.toLowerCase() === inputIdOrEmail) ||
+        (s.nama && s.nama.toLowerCase().includes(inputIdOrEmail))
       );
       if (foundSiswa) {
-        const isValidPassword = !foundSiswa.password || 
-          foundSiswa.password === password || 
-          ['password', 'password123', 'admin', 'admin123', '12345', '123456'].includes(password) ||
-          password.length >= 3;
+        const expectedPassword = foundSiswa.password || 'password';
+        const isValidPassword = password === expectedPassword || 
+          ['password', 'password123', 'admin123', '123456'].includes(password);
 
         if (!isValidPassword) {
           setErrorMessage('Kata sandi salah untuk akun Siswa ini.');
           setLoading(false);
           return;
         }
-        onLoginSuccess(foundSiswa.email || `${foundSiswa.nis}@siswa.sch.id`, 'gmail_oauth_token_active', 'siswa');
+        onLoginSuccess(foundSiswa.email || `${foundSiswa.nis || foundSiswa.id}@siswa.sch.id`, 'gmail_oauth_token_active', 'siswa');
         setLoading(false);
         return;
       }
@@ -147,7 +161,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
         return;
       }
 
-      setErrorMessage('Akses Ditolak: Akun dengan Email/Username tersebut tidak ditemukan di database.');
+      setErrorMessage('Akses Ditolak: Akun dengan Username/Email tersebut tidak ditemukan di database.');
       setLoading(false);
     }, 400);
   };
@@ -278,14 +292,14 @@ export const LoginView: React.FC<LoginViewProps> = ({
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
                 <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
-                  LOGIN AKUN GMAIL
+                  LOGIN PORTAL AKADEMIK
                 </span>
               </div>
               <h3 className="text-xl font-bold text-white mt-1">
                 Masuk ke Dashboard Sekolah
               </h3>
               <p className="text-xs text-slate-400 mt-1">
-                Gunakan akun Google Gmail resmi yang terdaftar di database sekolah untuk masuk otomatis sesuai hak akses peran Anda.
+                Gunakan Username, Email, atau akun Gmail resmi Anda yang terdaftar di database sekolah untuk masuk sesuai hak akses peran Anda.
               </p>
             </div>
 
@@ -350,16 +364,51 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   </div>
                 </div>
 
+                {/* Dynamic Credentials Helper Hint */}
+                <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl flex items-start gap-2.5">
+                  <span className="text-sm mt-0.5 shrink-0">💡</span>
+                  <div className="text-[11px] leading-relaxed text-slate-300">
+                    {selectedRole === 'admin' && (
+                      <>
+                        <span className="font-bold text-blue-400 block mb-0.5">Kredensial Admin Sekolah:</span>
+                        Username: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">admin</code> atau <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">giar.hermawan4</code> <br/>
+                        Password: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">admin</code> atau <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">admin123</code>
+                      </>
+                    )}
+                    {selectedRole === 'guru' && (
+                      <>
+                        <span className="font-bold text-purple-400 block mb-0.5">Kredensial Guru / Pendidik:</span>
+                        Username: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">budi</code> atau Email Guru Anda <br/>
+                        Password: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">password123</code>
+                      </>
+                    )}
+                    {selectedRole === 'staf' && (
+                      <>
+                        <span className="font-bold text-amber-400 block mb-0.5">Kredensial Staf TU / Keuangan:</span>
+                        Username: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">nurhidayati</code> atau Email Staf Anda <br/>
+                        Password: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">password</code>
+                      </>
+                    )}
+                    {selectedRole === 'siswa' && (
+                      <>
+                        <span className="font-bold text-emerald-400 block mb-0.5">Kredensial Siswa / Wali:</span>
+                        Username: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">bayu</code> atau NISN / NIS Siswa Anda <br/>
+                        Password: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">password123</code>
+                      </>
+                    )}
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Alamat Email Gmail Anda:
+                    Username atau Email Anda:
                   </label>
                   <div className="relative">
                     <input
-                      type="email"
+                      type="text"
                       value={emailInput}
                       onChange={(e) => setEmailInput(e.target.value)}
-                      placeholder="contoh: namapribadi@gmail.com"
+                      placeholder="Masukkan Username atau Email"
                       className="w-full bg-[#181818] border border-slate-700 rounded-xl px-3.5 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
@@ -385,14 +434,14 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   disabled={loading || !emailInput.trim() || !passwordInput.trim()}
                   className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs sm:text-sm transition-all shadow-lg active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  <span>{loading ? 'Memproses Akses...' : 'Masuk dengan Akun Gmail'}</span>
+                  <span>{loading ? 'Memproses Akses...' : 'Masuk ke Dashboard'}</span>
                 </button>
               </form>
 
               <div className="p-3 bg-blue-950/40 border border-blue-800/40 rounded-xl text-[11px] text-blue-300 leading-relaxed flex items-start gap-2">
                 <Lock className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                 <span>
-                  <strong>Keamanan Akun Gmail:</strong> Sistem mengizinkan login menggunakan akun Gmail aktif dengan hak akses peran yang Anda pilih di atas.
+                  <strong>Keamanan Akun:</strong> Masuk menggunakan Username/Email dan password yang didaftarkan oleh Admin, atau gunakan integrasi Google Workspace yang aktif.
                 </span>
               </div>
 
