@@ -432,31 +432,88 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     return [];
   });
 
-  // Sync state changes to localStorage on studentKey change or updates
+  // Sync state changes to localStorage on studentKey change or updates, merging with global transactions as the primary source of truth
   React.useEffect(() => {
+    if (!selectedSiswa) {
+      setStudentTransactions([]);
+      setPaidMonthsState({});
+      setBebasTerbayarMap({});
+      return;
+    }
+
     try {
-      const savedTx = localStorage.getItem(`edu_student_tx_${studentKey}`);
-      if (savedTx !== null) {
-        setStudentTransactions(JSON.parse(savedTx));
-      } else {
-        setStudentTransactions([]);
-      }
+      const studentName = selectedSiswa.nama;
+      const normName = studentName.trim().toLowerCase();
 
-      const savedPaid = localStorage.getItem(`edu_student_paid_${studentKey}`);
-      if (savedPaid !== null) {
-        setPaidMonthsState(JSON.parse(savedPaid));
-      } else {
-        setPaidMonthsState({});
-      }
+      // 1. Transactions List
+      const studentTxs = transaksiList.filter(tx => 
+        tx && tx.siswaNama && (tx.siswaNama || '').trim().toLowerCase() === normName
+      );
 
-      const savedBebas = localStorage.getItem(`edu_student_bebas_${studentKey}`);
-      if (savedBebas !== null) {
-        setBebasTerbayarMap(JSON.parse(savedBebas));
-      } else {
-        setBebasTerbayarMap({});
-      }
-    } catch (e) {}
-  }, [studentKey, tahunAjaran, selectedSiswa]);
+      const derivedTxs = studentTxs.map(tx => ({
+        id: tx.id,
+        pembayaran: tx.pembayaran || (tx.tipe === 'spp' ? `Pembayaran SPP` : `Pembayaran ${tx.tipe.toUpperCase()}`),
+        tagihan: tx.nominal,
+        tanggal: tx.tanggal,
+        type: tx.tipe === 'spp' ? ('spp' as const) : ('bebas' as const),
+        itemId: tx.tagihanId
+      }));
+
+      const savedTxStr = localStorage.getItem(`edu_student_tx_${studentKey}`);
+      const savedTx = savedTxStr ? JSON.parse(savedTxStr) : [];
+      // Combine and unique by transaction ID
+      const txMap = new Map();
+      derivedTxs.forEach(t => txMap.set(t.id, t));
+      savedTx.forEach((t: any) => {
+        if (t && t.id) txMap.set(t.id, t);
+      });
+      const finalTxs = Array.from(txMap.values());
+      setStudentTransactions(finalTxs);
+
+      // 2. Paid Months State
+      const derivedPaid: Record<string, string> = {};
+      studentTxs.forEach(tx => {
+        if (tx.tipe === 'spp') {
+          allMonths.forEach(m => {
+            if (tx.pembayaran && tx.pembayaran.toLowerCase().includes(m.toLowerCase())) {
+              derivedPaid[m] = tx.tanggal;
+            }
+          });
+        }
+      });
+
+      tagihanList.forEach(t => {
+        if (t && t.siswaNama && (t.siswaNama || '').trim().toLowerCase() === normName && t.tipe === 'spp' && t.status === 'Lunas') {
+          allMonths.forEach(m => {
+            if (t.namaTagihan && t.namaTagihan.toLowerCase().includes(m.toLowerCase())) {
+              derivedPaid[m] = t.tanggalBayar || '09/08/2026';
+            }
+          });
+        }
+      });
+
+      const savedPaidStr = localStorage.getItem(`edu_student_paid_${studentKey}`);
+      const savedPaid = savedPaidStr ? JSON.parse(savedPaidStr) : {};
+      const finalPaid = { ...savedPaid, ...derivedPaid };
+      setPaidMonthsState(finalPaid);
+
+      // 3. Bebas Terbayar Map
+      const derivedBebas: Record<string, number> = {};
+      studentTxs.forEach(tx => {
+        if (tx.tipe !== 'spp' && tx.tagihanId) {
+          derivedBebas[tx.tagihanId] = (derivedBebas[tx.tagihanId] || 0) + tx.nominal;
+        }
+      });
+
+      const savedBebasStr = localStorage.getItem(`edu_student_bebas_${studentKey}`);
+      const savedBebas = savedBebasStr ? JSON.parse(savedBebasStr) : {};
+      const finalBebas = { ...savedBebas, ...derivedBebas };
+      setBebasTerbayarMap(finalBebas);
+
+    } catch (e) {
+      console.error('Error syncing student finance data:', e);
+    }
+  }, [studentKey, selectedSiswa, transaksiList, tagihanList]);
 
   React.useEffect(() => {
     try {
@@ -533,6 +590,28 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     if (setTransaksiList) {
       setTransaksiList(prev => prev.filter(t => t.id !== targetTx.id));
     }
+
+    // 5. Update corresponding bill in global tagihanList if callback exists
+    if (setTagihanList) {
+      setTagihanList(prev => {
+        return prev.map(t => {
+          const isMatch = t.id === targetTx.itemId || 
+            (t.siswaNama && selectedSiswa && 
+             (t.siswaNama.toLowerCase() === selectedSiswa.nama.toLowerCase()) &&
+             (t.tipe === (targetTx.type === 'spp' || targetTx.pembayaran.toLowerCase().startsWith('spp') ? 'spp' : 'ukt')));
+          if (isMatch) {
+            const remainingTerbayar = Math.max(0, (t.terbayar || 0) - targetTx.tagihan);
+            const isLunas = remainingTerbayar >= t.nominal && t.nominal > 0;
+            return {
+              ...t,
+              terbayar: remainingTerbayar,
+              status: isLunas ? 'Lunas' : (remainingTerbayar > 0 ? 'Dicicil' : 'Belum Lunas')
+            };
+          }
+          return t;
+        });
+      });
+    }
   };
 
 
@@ -552,6 +631,14 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       setBebasTerbayarMap({});
       if (setTransaksiList) {
         setTransaksiList([]);
+      }
+      if (setTagihanList) {
+        setTagihanList(prev => prev.map(t => ({
+          ...t,
+          terbayar: 0,
+          status: 'Belum Lunas',
+          tanggalBayar: ''
+        })));
       }
       try {
         localStorage.setItem(`edu_student_tx_${studentKey}`, JSON.stringify([]));
