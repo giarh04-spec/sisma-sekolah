@@ -209,9 +209,23 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         const key = `${sNameNorm}-${tipe}`;
         const synId = `syn-${tipe}-${siswa.id}`;
         if (!existingKeySet.has(key) && !deletedTagihanIds.includes(synId)) {
-          // Find tariff if available
-          const matchingTarif = tarifList.find(tr => tr && (tr.tipe || '').toLowerCase() === tipe && tr.status === 'Aktif');
-          let defaultNominal = 500000;
+          // Find tariff if available (class-specific for SPP)
+          const matchingTarif = tarifList.find(tr => {
+            if (!tr || (tr.tipe || '').toLowerCase() !== tipe || tr.status !== 'Aktif') return false;
+            if (tipe === 'spp' && siswa.kelas) {
+              const k = siswa.kelas.toLowerCase();
+              const tk = tr.tingkatKelas.toLowerCase();
+              if ((k.includes('7') || k.includes('vii')) && (tk.includes('7') || tk.includes('vii'))) return true;
+              if ((k.includes('8') || k.includes('viii')) && (tk.includes('8') || tk.includes('viii'))) return true;
+              if ((k.includes('9') || k.includes('ix')) && (tk.includes('9') || tk.includes('ix'))) return true;
+              if ((k.includes('10') || k.includes('x')) && (tk.includes('10') || tk.includes('x'))) return true;
+              if ((k.includes('11') || k.includes('xi')) && (tk.includes('11') || tk.includes('xi'))) return true;
+              if ((k.includes('12') || k.includes('xii')) && (tk.includes('12') || tk.includes('xii'))) return true;
+              return false;
+            }
+            return true;
+          });
+          let defaultNominal = 350000;
           let defaultNama = 'SPP Bulanan Kelas 7 (Agustus 2026)';
 
           if (tipe === 'ukt') {
@@ -221,7 +235,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             defaultNominal = matchingTarif ? matchingTarif.nominal : 100000;
             defaultNama = matchingTarif ? `${matchingTarif.namaBiaya} (T.A ${tahunAjaran})` : `Kegiatan Ekstrakurikuler & Pramuka (T.A ${tahunAjaran})`;
           } else if (tipe === 'spp') {
-            defaultNominal = matchingTarif ? matchingTarif.nominal : 500000;
+            defaultNominal = matchingTarif ? matchingTarif.nominal : 350000;
             defaultNama = matchingTarif ? `${matchingTarif.namaBiaya} (Agustus 2026)` : `SPP Bulanan Kelas 7 (Agustus 2026)`;
           }
 
@@ -293,9 +307,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       }
 
       // Calculate status for filtering
+      const isSynthesized = t.id && String(t.id).startsWith('syn-');
       const txsForTagihan = transaksiList.filter(tx => 
         tx.tagihanId === t.id || 
-        (tx && tx.siswaNama && t && t.siswaNama && (tx.siswaNama || '').trim().toLowerCase() === (t.siswaNama || '').trim().toLowerCase() && (tx.tipe || '').toLowerCase() === (t.tipe || '').toLowerCase())
+        (isSynthesized && tx && tx.siswaNama && t && t.siswaNama && (tx.siswaNama || '').trim().toLowerCase() === (t.siswaNama || '').trim().toLowerCase() && (tx.tipe || '').toLowerCase() === (t.tipe || '').toLowerCase())
       );
       const totalTerbayarFromTx = txsForTagihan.reduce((sum, tx) => sum + tx.nominal, 0);
       let totalTerbayar = Math.max(t.terbayar || 0, totalTerbayarFromTx);
@@ -1068,12 +1083,14 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     jatuhTempo: string;
     tanggalBayar: string;
     status: 'Lunas' | 'Belum Lunas' | 'Dicicil';
+    terbayar?: number;
   }>({
     namaTagihan: '',
     nominal: 0,
     jatuhTempo: '',
     tanggalBayar: '',
-    status: 'Belum Lunas'
+    status: 'Belum Lunas',
+    terbayar: 0
   });
 
   // Search Submit Handler
@@ -1104,18 +1121,42 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     let targetTagihanId = `tag-${Date.now()}`;
     setTagihanList(prev => {
       const normName = sName.trim().toLowerCase();
-      const existingIndex = prev.findIndex(
-        t => (t.siswaId === sId || (t.siswaNama && t.siswaNama.trim().toLowerCase() === normName)) &&
-             (t.tipe === tipe || t.namaTagihan.toLowerCase().includes(title.toLowerCase()) || title.toLowerCase().includes(t.namaTagihan.toLowerCase()))
-      );
+      const existingIndex = prev.findIndex(t => {
+        const isSameStudent = t.siswaId === sId || (t.siswaNama && t.siswaNama.trim().toLowerCase() === normName);
+        if (!isSameStudent) return false;
+
+        // Must match exact same type
+        if (t.tipe !== tipe) return false;
+
+        // For SPP (monthly), we should match the specific month
+        if (tipe === 'spp') {
+          const months = [
+            'juli', 'agustus', 'september', 'oktober', 'november', 'desember',
+            'januari', 'februari', 'maret', 'april', 'mei', 'juni'
+          ];
+          const matchedMonthInTitle = months.find(m => title.toLowerCase().includes(m));
+          const matchedMonthInTagihan = months.find(m => t.namaTagihan.toLowerCase().includes(m));
+          
+          if (matchedMonthInTitle && matchedMonthInTagihan) {
+            return matchedMonthInTitle === matchedMonthInTagihan;
+          }
+        }
+
+        // Default title matching for non-SPP or fallback
+        return t.namaTagihan.toLowerCase().includes(title.toLowerCase()) || 
+               title.toLowerCase().includes(t.namaTagihan.toLowerCase());
+      });
 
       if (existingIndex >= 0) {
         const existing = prev[existingIndex];
         targetTagihanId = existing.id;
-        const newTerbayar = Math.min(existing.nominal, (existing.terbayar || 0) + bayar);
-        const isLunas = newTerbayar >= existing.nominal;
+        // Correct nominal if it differs from the official tariff nominal being processed
+        const finalNominal = existing.nominal !== nominal ? nominal : existing.nominal;
+        const newTerbayar = Math.min(finalNominal, (existing.terbayar || 0) + bayar);
+        const isLunas = newTerbayar >= finalNominal;
         const updatedItem: TagihanKeuangan = {
           ...existing,
+          nominal: finalNominal,
           terbayar: newTerbayar,
           status: isLunas ? 'Lunas' : (newTerbayar > 0 ? 'Dicicil' : 'Belum Lunas'),
           tanggalBayar: payDate
@@ -1241,7 +1282,9 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         };
 
         setPrintReceiptData(receipt);
-        setShowPrintModal(true);
+        // Jangan tampilkan kuitansi secara otomatis sesuai permintaan user
+        // setShowPrintModal(true);
+        alert(`Pembayaran ${itemTitle} sebesar Rp ${inputDibayar.toLocaleString('id-ID')} berhasil diproses!`);
 
         if (selectedSiswa && selectedSiswa.teleponWali) {
           const msg = `Yth. Ibu/Bapak Wali dari ${studentName},\n\nTerima kasih! Pembayaran ${itemTitle} sebesar Rp ${inputDibayar.toLocaleString('id-ID')} telah DITERIMA oleh Kasir Sekolah pada ${todayFormatted}.\n\n_Tata Usaha & Keuangan Sekolah_`;
@@ -1327,7 +1370,9 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         };
 
         setPrintReceiptData(receipt);
-        setShowPrintModal(true);
+        // Jangan tampilkan kuitansi secara otomatis sesuai permintaan user
+        // setShowPrintModal(true);
+        alert(`Pembayaran ${itemTitle} sebesar Rp ${inputDibayar.toLocaleString('id-ID')} berhasil diproses!`);
 
         if (selectedSiswa && selectedSiswa.teleponWali) {
           const msg = `Yth. Ibu/Bapak Wali dari ${studentName},\n\nTerima kasih! Pembayaran ${itemTitle} sebesar Rp ${inputDibayar.toLocaleString('id-ID')} telah DITERIMA oleh Kasir Sekolah pada ${todayFormatted}.\n\n_Tata Usaha & Keuangan Sekolah_`;
@@ -2630,9 +2675,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 <tbody className="divide-y divide-slate-800/60">
                   {filteredGlobalTagihanList.length > 0 ? (
                     filteredGlobalTagihanList.map(t => {
+                      const isSynthesized = t.id && String(t.id).startsWith('syn-');
                       const txsForTagihan = transaksiList.filter(tx => 
                         tx.tagihanId === t.id || 
-                        (tx && tx.siswaNama && t && t.siswaNama && (tx.siswaNama || '').trim().toLowerCase() === (t.siswaNama || '').trim().toLowerCase() && (tx.tipe || '').toLowerCase() === (t.tipe || '').toLowerCase())
+                        (isSynthesized && tx && tx.siswaNama && t && t.siswaNama && (tx.siswaNama || '').trim().toLowerCase() === (t.siswaNama || '').trim().toLowerCase() && (tx.tipe || '').toLowerCase() === (t.tipe || '').toLowerCase())
                       );
                       const totalTerbayarFromTx = txsForTagihan.reduce((sum, tx) => sum + tx.nominal, 0);
                       
@@ -2667,9 +2713,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                                   setEditTagihanForm({
                                     namaTagihan: t.namaTagihan,
                                     nominal: t.nominal,
+                                    terbayar: totalTerbayar,
                                     jatuhTempo: t.jatuhTempo || '',
                                     tanggalBayar: effectiveTanggalBayar,
-                                    status: t.status || 'Lunas'
+                                    status: isLunas ? 'Lunas' : (isDicicil ? 'Dicicil' : 'Belum Lunas')
                                   });
                                   setShowEditTagihanModal(true);
                                 }}
@@ -2688,9 +2735,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                                   setEditTagihanForm({
                                     namaTagihan: t.namaTagihan,
                                     nominal: t.nominal,
+                                    terbayar: totalTerbayar,
                                     jatuhTempo: t.jatuhTempo || '',
                                     tanggalBayar: new Date().toISOString().slice(0, 10),
-                                    status: t.status || 'Belum Lunas'
+                                    status: isLunas ? 'Lunas' : (isDicicil ? 'Dicicil' : 'Belum Lunas')
                                   });
                                   setShowEditTagihanModal(true);
                                 }}
@@ -2730,9 +2778,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                                  setEditTagihanForm({
                                    namaTagihan: t.namaTagihan,
                                    nominal: t.nominal,
+                                   terbayar: totalTerbayar,
                                    jatuhTempo: t.jatuhTempo || '',
                                    tanggalBayar: effectiveTanggalBayar,
-                                   status: t.status || 'Belum Lunas'
+                                   status: isLunas ? 'Lunas' : (isDicicil ? 'Dicicil' : 'Belum Lunas')
                                  });
                                  setShowEditTagihanModal(true);
                                }}
@@ -3286,6 +3335,17 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   <option value="Lunas">Lunas</option>
                 </select>
               </div>
+              {editTagihanForm.status === 'Dicicil' && (
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1">Jumlah Terbayar (Rp)</label>
+                  <input
+                    type="number"
+                    value={editTagihanForm.terbayar !== undefined ? editTagihanForm.terbayar : 0}
+                    onChange={e => setEditTagihanForm({ ...editTagihanForm, terbayar: Number(e.target.value) })}
+                    className="w-full bg-[#181818] border border-slate-700/80 text-white font-mono font-bold rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              )}
               <div>
                 <label className="text-slate-300 font-bold block mb-1 flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-emerald-400" />
@@ -3313,17 +3373,42 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               <button
                 onClick={() => {
                   if (!editingTagihan) return;
+                  
+                  // Validasi Input
+                  if (!editTagihanForm.namaTagihan.trim()) {
+                    alert('Nama tagihan tidak boleh kosong!');
+                    return;
+                  }
+                  if (isNaN(editTagihanForm.nominal) || editTagihanForm.nominal <= 0) {
+                    alert('Nominal tagihan harus berupa angka dan lebih besar dari 0!');
+                    return;
+                  }
+
                   setTagihanList(prev => {
                     const exists = prev.some(t => t.id === editingTagihan.id);
+                    
+                    let finalStatus = editTagihanForm.status;
                     let updatedTerbayar = editingTagihan.terbayar || 0;
-                    if (editTagihanForm.status === 'Lunas' && updatedTerbayar < editTagihanForm.nominal) {
+                    
+                    if (finalStatus === 'Lunas') {
                       updatedTerbayar = editTagihanForm.nominal;
-                    } else if (editTagihanForm.status === 'Belum Lunas') {
+                    } else if (finalStatus === 'Belum Lunas') {
                       updatedTerbayar = 0;
+                    } else if (finalStatus === 'Dicicil') {
+                      updatedTerbayar = editTagihanForm.terbayar !== undefined ? editTagihanForm.terbayar : (editingTagihan.terbayar || 0);
+                      if (updatedTerbayar >= editTagihanForm.nominal) {
+                        // Jika jumlah bayar menyamai atau melebihi nominal, otomatis ubah status jadi Lunas
+                        finalStatus = 'Lunas';
+                        updatedTerbayar = editTagihanForm.nominal;
+                      } else if (updatedTerbayar <= 0) {
+                        // Jika dicicil tetapi nominal terbayar <= 0, ubah ke Belum Lunas
+                        finalStatus = 'Belum Lunas';
+                        updatedTerbayar = 0;
+                      }
                     }
                     
                     let finalTanggalBayar = editTagihanForm.tanggalBayar;
-                    if (editTagihanForm.status === 'Lunas' && !finalTanggalBayar) {
+                    if (finalStatus === 'Lunas' && !finalTanggalBayar) {
                       finalTanggalBayar = new Date().toLocaleDateString('id-ID');
                     }
 
@@ -3333,9 +3418,44 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                       nominal: editTagihanForm.nominal,
                       jatuhTempo: editTagihanForm.jatuhTempo,
                       tanggalBayar: finalTanggalBayar,
-                      status: editTagihanForm.status,
+                      status: finalStatus,
                       terbayar: updatedTerbayar
                     };
+
+                    // Sync corresponding transaction(s) in transaksiList
+                    if (setTransaksiList) {
+                      setTransaksiList(prevTx => {
+                        // Filter out existing transactions associated with this bill
+                        const isSynthesized = editingTagihan.id && String(editingTagihan.id).startsWith('syn-');
+                        const baseTx = prevTx.filter(tx => {
+                          const isMatch = tx.tagihanId === editingTagihan.id || 
+                            (isSynthesized && tx && tx.siswaNama && editingTagihan && editingTagihan.siswaNama && 
+                             (tx.siswaNama || '').trim().toLowerCase() === (editingTagihan.siswaNama || '').trim().toLowerCase() && 
+                             (tx.tipe || '').toLowerCase() === (editingTagihan.tipe || '').toLowerCase());
+                          return !isMatch;
+                        });
+
+                        if (finalStatus === 'Belum Lunas') {
+                          // No transaction record
+                          return baseTx;
+                        } else {
+                          // Create/update a single corresponding transaction matching the new status and payment
+                          const txId = `tx-${Date.now()}`;
+                          const newTx: TransaksiKeuangan = {
+                            id: txId,
+                            tagihanId: editingTagihan.id,
+                            siswaNama: editingTagihan.siswaNama || 'Siswa',
+                            pembayaran: editTagihanForm.namaTagihan,
+                            tipe: editingTagihan.tipe || 'spp',
+                            nominal: updatedTerbayar,
+                            tanggal: finalTanggalBayar || new Date().toLocaleDateString('id-ID'),
+                            metodePembayaran: 'Cash / Kasir',
+                            penerima: 'Kasir / Bendahara Sekolah'
+                          };
+                          return [newTx, ...baseTx];
+                        }
+                      });
+                    }
 
                     if (exists) {
                       return prev.map(t => t.id === editingTagihan.id ? updatedItem : t);
@@ -3343,6 +3463,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                       return [updatedItem, ...prev];
                     }
                   });
+
+                  alert('Perubahan tagihan berhasil disimpan!');
                   setShowEditTagihanModal(false);
                 }}
                 className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-xl text-xs transition-all shadow-md shadow-blue-600/30"

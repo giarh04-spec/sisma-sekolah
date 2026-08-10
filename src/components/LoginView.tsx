@@ -37,6 +37,22 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [passwordInput, setPasswordInput] = useState('');
   const [selectedRole, setSelectedRole] = useState<Role>('admin');
 
+  // Dynamic demo helpers based on current lists
+  const activeStafKeuangan = stafList.find(s => s.bagian === 'Bendahara / Keuangan') || stafList[0];
+  const demoStafUser = activeStafKeuangan?.username || 'nurhidayati';
+  const demoStafEmail = activeStafKeuangan?.email || 'nurhidayati.s106@admin.smp.belajar.id';
+  const demoStafPass = activeStafKeuangan?.password || 'password';
+
+  const activeGuru = guruList[0];
+  const demoGuruUser = activeGuru?.username || 'budi';
+  const demoGuruEmail = activeGuru?.email || 'budi@guru.sch.id';
+  const demoGuruPass = activeGuru?.password || 'password123';
+
+  const activeSiswa = siswaList[0];
+  const demoSiswaUser = activeSiswa?.username || 'bayu';
+  const demoSiswaEmail = activeSiswa?.email || 'bayu@siswa.sch.id';
+  const demoSiswaPass = activeSiswa?.password || 'password123';
+
   // Handle Gmail Login Form Submit
   const handleManualLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,49 +72,72 @@ export const LoginView: React.FC<LoginViewProps> = ({
     setErrorMessage(null);
 
     setTimeout(() => {
-      // 1. Check Admin
-      if (selectedRole === 'admin') {
-        const adminEmails = (schoolSettings.adminEmails || []).map(e => e.toLowerCase());
-        const isAdminUser = 
-          inputIdOrEmail === 'admin' ||
-          inputIdOrEmail === 'giar.hermawan4' ||
-          inputIdOrEmail === 'giar.hermawan4@guru.smp.belajar.id' ||
-          adminEmails.includes(inputIdOrEmail) ||
-          inputIdOrEmail.includes('giarh0410');
+      // Find user across lists to see where they belong
+      
+      // A. Check Admin
+      const adminEmails = (schoolSettings.adminEmails || []).map(e => e.toLowerCase());
+      const isAdminUser = 
+        inputIdOrEmail === 'admin' ||
+        inputIdOrEmail === 'giar.hermawan4' ||
+        inputIdOrEmail === 'giar.hermawan4@guru.smp.belajar.id' ||
+        adminEmails.includes(inputIdOrEmail) ||
+        inputIdOrEmail.includes('giarh0410');
 
-        if (isAdminUser) {
-          const isValidAdminPassword = 
-            password === 'admin' ||
-            password === 'admin123' || 
-            password === 'password' || 
-            password === 'password123' ||
-            password === '123456';
+      // B. Check Staf
+      const foundStaf = stafList.find(st => 
+        (st.username && st.username.toLowerCase() === inputIdOrEmail) ||
+        (st.email && st.email.toLowerCase() === inputIdOrEmail)
+      );
 
-          if (!isValidAdminPassword) {
-            setErrorMessage('Kata sandi salah untuk akun Admin Sekolah ini. Silakan gunakan password "admin" atau "admin123".');
-            setLoading(false);
-            return;
-          }
+      // C. Check Guru
+      const foundGuru = guruList.find(g => 
+        (g.username && g.username.toLowerCase() === inputIdOrEmail) ||
+        (g.email && g.email.toLowerCase() === inputIdOrEmail)
+      );
 
-          onLoginSuccess('giar.hermawan4@guru.smp.belajar.id', 'gmail_oauth_token_active', 'admin');
+      // D. Check Siswa
+      const foundSiswa = siswaList.find(s => 
+        (s.username && s.username.toLowerCase() === inputIdOrEmail) ||
+        (s.email && s.email.toLowerCase() === inputIdOrEmail) ||
+        (s.nis && s.nis.toLowerCase() === inputIdOrEmail) ||
+        (s.nisn && s.nisn.toLowerCase() === inputIdOrEmail)
+      );
+
+      // Now validate based on who was found and enforce strict password matching
+      if (isAdminUser) {
+        const isValidAdminPassword = 
+          password === 'admin' ||
+          password === 'admin123' || 
+          password === 'password' || 
+          password === 'password123' ||
+          password === '123456';
+
+        if (!isValidAdminPassword) {
+          setErrorMessage('Kata sandi salah untuk akun Admin Sekolah ini.');
           setLoading(false);
           return;
         }
+
+        onLoginSuccess('giar.hermawan4@guru.smp.belajar.id', 'gmail_oauth_token_active', 'admin');
+        setLoading(false);
+        return;
       }
 
-      // 2. Check Guru list
-      const foundGuru = guruList.find(g => 
-        (g.username && g.username.toLowerCase() === inputIdOrEmail) ||
-        (g.email && g.email.toLowerCase() === inputIdOrEmail) ||
-        (g.nama && g.nama.toLowerCase() === inputIdOrEmail) ||
-        (g.nama && g.nama.toLowerCase().includes(inputIdOrEmail))
-      );
-      if (foundGuru) {
-        const expectedPassword = foundGuru.password || 'password';
-        const isValidPassword = password === expectedPassword || 
-          ['password', 'password123', 'admin123', '123456'].includes(password);
+      if (foundStaf) {
+        const expectedPassword = foundStaf.password || 'password';
+        if (password !== expectedPassword) {
+          setErrorMessage('Kata sandi salah untuk akun Staf TU / Keuangan ini.');
+          setLoading(false);
+          return;
+        }
+        onLoginSuccess(foundStaf.email || `${foundStaf.username || 'staf'}@staf.sch.id`, 'gmail_oauth_token_active', 'staf');
+        setLoading(false);
+        return;
+      }
 
-        if (!isValidPassword) {
+      if (foundGuru) {
+        const expectedPassword = foundGuru.password || 'password123';
+        if (password !== expectedPassword) {
           setErrorMessage('Kata sandi salah untuk akun Guru ini.');
           setLoading(false);
           return;
@@ -108,43 +147,9 @@ export const LoginView: React.FC<LoginViewProps> = ({
         return;
       }
 
-      // 3. Check Staf list
-      const foundStaf = stafList.find(st => 
-        (st.username && st.username.toLowerCase() === inputIdOrEmail) ||
-        (st.email && st.email.toLowerCase() === inputIdOrEmail) ||
-        (st.nama && st.nama.toLowerCase() === inputIdOrEmail) ||
-        (st.nama && st.nama.toLowerCase().includes(inputIdOrEmail))
-      );
-      if (foundStaf) {
-        const expectedPassword = foundStaf.password || 'password';
-        const isValidPassword = password === expectedPassword || 
-          ['password', 'password123', 'admin123', '123456'].includes(password);
-
-        if (!isValidPassword) {
-          setErrorMessage('Kata sandi salah untuk akun Staf TU ini.');
-          setLoading(false);
-          return;
-        }
-        onLoginSuccess(foundStaf.email || `${foundStaf.username || 'staf'}@staf.sch.id`, 'gmail_oauth_token_active', 'staf');
-        setLoading(false);
-        return;
-      }
-
-      // 4. Check Siswa list
-      const foundSiswa = siswaList.find(s => 
-        (s.username && s.username.toLowerCase() === inputIdOrEmail) ||
-        (s.email && s.email.toLowerCase() === inputIdOrEmail) ||
-        (s.nis && s.nis.toLowerCase() === inputIdOrEmail) ||
-        (s.nisn && s.nisn.toLowerCase() === inputIdOrEmail) ||
-        (s.nama && s.nama.toLowerCase() === inputIdOrEmail) ||
-        (s.nama && s.nama.toLowerCase().includes(inputIdOrEmail))
-      );
       if (foundSiswa) {
-        const expectedPassword = foundSiswa.password || 'password';
-        const isValidPassword = password === expectedPassword || 
-          ['password', 'password123', 'admin123', '123456'].includes(password);
-
-        if (!isValidPassword) {
+        const expectedPassword = foundSiswa.password || 'password123';
+        if (password !== expectedPassword) {
           setErrorMessage('Kata sandi salah untuk akun Siswa ini.');
           setLoading(false);
           return;
@@ -154,7 +159,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
         return;
       }
 
-      // 5. If general Gmail format or default fallback
+      // If general Gmail format or default fallback
       if (inputIdOrEmail.includes('@')) {
         onLoginSuccess(emailInput.trim(), 'gmail_oauth_token_active', selectedRole);
         setLoading(false);
@@ -377,23 +382,23 @@ export const LoginView: React.FC<LoginViewProps> = ({
                     )}
                     {selectedRole === 'guru' && (
                       <>
-                        <span className="font-bold text-purple-400 block mb-0.5">Kredensial Guru / Pendidik:</span>
-                        Username: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">budi</code> atau Email Guru Anda <br/>
-                        Password: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">password123</code>
+                        <span className="font-bold text-purple-400 block mb-0.5">Kredensial Guru / Pendidik (Terdaftar):</span>
+                        Username: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">{demoGuruUser}</code> atau Email: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">{demoGuruEmail}</code> <br/>
+                        Password: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">{demoGuruPass}</code>
                       </>
                     )}
                     {selectedRole === 'staf' && (
                       <>
-                        <span className="font-bold text-amber-400 block mb-0.5">Kredensial Staf TU / Keuangan:</span>
-                        Username: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">nurhidayati</code> atau Email Staf Anda <br/>
-                        Password: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">password</code>
+                        <span className="font-bold text-amber-400 block mb-0.5">Kredensial Staf TU / Keuangan (Terdaftar):</span>
+                        Username: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">{demoStafUser}</code> atau Email: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">{demoStafEmail}</code> <br/>
+                        Password: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">{demoStafPass}</code>
                       </>
                     )}
                     {selectedRole === 'siswa' && (
                       <>
-                        <span className="font-bold text-emerald-400 block mb-0.5">Kredensial Siswa / Wali:</span>
-                        Username: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">bayu</code> atau NISN / NIS Siswa Anda <br/>
-                        Password: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">password123</code>
+                        <span className="font-bold text-emerald-400 block mb-0.5">Kredensial Siswa / Wali (Terdaftar):</span>
+                        Username: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">{demoSiswaUser}</code> atau Email: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">{demoSiswaEmail}</code> <br/>
+                        Password: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">{demoSiswaPass}</code>
                       </>
                     )}
                   </div>
