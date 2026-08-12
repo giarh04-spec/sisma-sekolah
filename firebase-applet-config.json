@@ -1,11 +1,12 @@
 {
-  "projectId": "applied-monolith-307pf",
-  "appId": "1:815644909465:web:7615b2ec4266f896cffd08",
-  "apiKey": "AIzaSyC284vtuwa2bd2V2IwsS0w1RDcGZD880UM",
-  "authDomain": "applied-monolith-307pf.firebaseapp.com",
-  "storageBucket": "applied-monolith-307pf.firebasestorage.app",
-  "messagingSenderId": "815644909465",
+  "projectId": "gen-lang-client-0797719783",
+  "appId": "1:404343288227:web:d9132e5e9643dc0a462a16",
+  "apiKey": "AIzaSyB0T_95pHJGkXCbiz_Jq-lNFYDobLAt99E",
+  "authDomain": "gen-lang-client-0797719783.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-databasesekolah-a952823f-0d68-4ba5-83ec-d8d1867c0ed7",
+  "storageBucket": "gen-lang-client-0797719783.firebasestorage.app",
+  "messagingSenderId": "404343288227",
   "measurementId": "",
-  "oAuthClientId": "815644909465-0mien3tgrk7745hph8jsvativrbj7euc.apps.googleusercontent.com",
+  "oAuthClientId": "404343288227-c47pj55fem1akcgkd26m7gn93gis3hag.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

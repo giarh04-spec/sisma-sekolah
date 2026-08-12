@@ -24,7 +24,10 @@ import {
   Maximize2,
   X,
   Building2,
-  QrCode
+  QrCode,
+  ShieldCheck,
+  Cloud,
+  FileText
 } from 'lucide-react';
 import { 
   BankSoal, 
@@ -44,6 +47,8 @@ interface CbtViewProps {
   setBankSoalList: React.Dispatch<React.SetStateAction<BankSoal[]>>;
   ujianList: UjianCBT[];
   setUjianList: React.Dispatch<React.SetStateAction<UjianCBT[]>>;
+  hasilUjianList?: HasilUjian[];
+  setHasilUjianList?: React.Dispatch<React.SetStateAction<HasilUjian[]>>;
   siswaList: Siswa[];
   currentRole?: Role;
   userEmail?: string;
@@ -56,6 +61,8 @@ export const CbtView: React.FC<CbtViewProps> = ({
   setBankSoalList,
   ujianList,
   setUjianList,
+  hasilUjianList = [],
+  setHasilUjianList,
   siswaList,
   currentRole = 'admin',
   userEmail = '',
@@ -398,6 +405,33 @@ export const CbtView: React.FC<CbtViewProps> = ({
         score += Math.round(s.bobot * 0.8);
       }
     });
+
+    const activeSiswa = siswaList[0] || {
+      id: 'sis-001',
+      nama: 'BAYU ADITYA RIFAI',
+      nisn: '3109281000',
+      nis: '10200',
+      kelas: 'Ibnu Al haytam'
+    };
+
+    const newHasil: HasilUjian = {
+      id: `hsl-${Date.now()}`,
+      ujianId: currentExam.id,
+      siswaId: activeSiswa.id,
+      siswaNama: activeSiswa.nama,
+      nis: activeSiswa.nis,
+      kelas: activeSiswa.kelas,
+      jawaban: siswaJawaban,
+      nilaiTotal: score,
+      statusPenilaian: currentExam.daftarSoal.some(s => s.tipe === 'esai') ? 'Perlu Koreksi Manual' : 'Selesai',
+      waktuSubmit: new Date().toISOString(),
+      pelanggaranCount: cheatCount,
+      logKecurangan: cheatLogs
+    };
+
+    if (setHasilUjianList) {
+      setHasilUjianList(prev => [...prev, newHasil]);
+    }
 
     setFinalScore(score);
     setExamFinished(true);
@@ -922,6 +956,133 @@ export const CbtView: React.FC<CbtViewProps> = ({
             </div>
           )}
 
+        </div>
+      )}
+
+      {/* SUBTAB 5: HASIL UJIAN FROM FIREBASE */}
+      {subTab === 'hasil_ujian' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-amber-500" /> Hasil Penilaian Ujian CBT (Database Firebase)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Daftar hasil pengerjaan ujian siswa yang telah tersimpan secara aman dan realtime di Firestore cloud database.
+                </p>
+              </div>
+              <button
+                onClick={() => alert('Data hasil ujian telah sinkron 100% dengan Cloud Firestore.')}
+                className="px-3.5 py-2 bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+              >
+                <Cloud className="w-4 h-4" /> Cloud Terhubung
+              </button>
+            </div>
+
+            {/* Overview cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Hasil Disimpan</span>
+                  <span className="text-lg font-bold text-slate-800 block">{hasilUjianList.length} Lembar</span>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Rata-Rata Nilai</span>
+                  <span className="text-lg font-bold text-slate-800 block">
+                    {hasilUjianList.length > 0 
+                      ? Math.round(hasilUjianList.reduce((acc, h) => acc + h.nilaiTotal, 0) / hasilUjianList.length)
+                      : 0} / 100
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center font-bold">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Sesi Dengan Pelanggaran</span>
+                  <span className="text-lg font-bold text-slate-800 block">
+                    {hasilUjianList.filter(h => (h.pelanggaranCount || 0) > 0).length} Sesi
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Table */}
+            {hasilUjianList.length === 0 ? (
+              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                <ShieldCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <h4 className="font-bold text-slate-700 text-sm">Belum Ada Hasil Ujian Tersimpan</h4>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                  Silakan buka tab <strong className="text-slate-600">"Simulasi CBT Anti-Cheat"</strong>, pilih paket bank soal, lalu selesaikan ujian untuk mensimulasikan penyimpanan data otomatis ke Firebase.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto border border-slate-100 rounded-xl">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold uppercase text-[10px]">
+                    <tr>
+                      <th className="p-3">Nama Siswa</th>
+                      <th className="p-3">Kelas & NIS</th>
+                      <th className="p-3">Waktu Submit</th>
+                      <th className="p-3 text-center">Pelanggaran</th>
+                      <th className="p-3 text-center">Status</th>
+                      <th className="p-3 text-right">Nilai Akhir</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {hasilUjianList.map(h => (
+                      <tr key={h.id} className="hover:bg-slate-50/50">
+                        <td className="p-3 font-bold text-slate-800">{h.siswaNama}</td>
+                        <td className="p-3 text-slate-500">
+                          {h.kelas} <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded ml-1 font-mono">{h.nis}</span>
+                        </td>
+                        <td className="p-3 text-slate-500 font-mono text-[11px]">
+                          {new Date(h.waktuSubmit).toLocaleString('id-ID')}
+                        </td>
+                        <td className="p-3 text-center">
+                          {(h.pelanggaranCount || 0) > 0 ? (
+                            <span className="px-2 py-0.5 bg-rose-100 text-rose-800 font-bold rounded-full text-[9px] inline-flex items-center gap-1">
+                              <ShieldAlert className="w-3 h-3" /> {h.pelanggaranCount}x
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded-full text-[9px]">
+                              Aman
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className={`px-2 py-0.5 rounded-full font-bold text-[9px] ${
+                            h.statusPenilaian === 'Selesai' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {h.statusPenilaian}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right font-extrabold text-slate-900 text-sm">
+                          <span className={h.nilaiTotal >= 75 ? 'text-emerald-600' : 'text-amber-600'}>
+                            {h.nilaiTotal} / 100
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

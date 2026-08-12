@@ -16,7 +16,7 @@ export interface RombelKelas {
 export type Role = 'admin' | 'guru' | 'siswa' | 'staf';
 export type SubTab = 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel';
 export type AbsensiSubTab = 'scan_barcode' | 'harian_siswa' | 'kelas_mapel' | 'absensi_guru';
-export type CbtSubTab = 'bank_soal' | 'jadwal_kartu' | 'ai_generator' | 'simulasi_ujian';
+export type CbtSubTab = 'bank_soal' | 'jadwal_kartu' | 'ai_generator' | 'simulasi_ujian' | 'hasil_ujian';
 export type KeuanganSubTab = 'pembayaran' | 'pengaturan_biaya' | 'rekap';
 export type PengaturanSubTab = 'identitas' | 'logo' | 'google_drive' | 'fonnte' | 'jadwal';
 

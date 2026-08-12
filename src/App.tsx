@@ -28,6 +28,7 @@ import {
   AbsensiGuru, 
   BankSoal, 
   UjianCBT, 
+  HasilUjian,
   AdministrasiGuru, 
   TagihanKeuangan, 
   TransaksiKeuangan,
@@ -54,6 +55,12 @@ import {
 
 import { initAuth, googleSignOut } from './lib/firebase';
 import { exportAllToGoogleSheets } from './lib/googleDriveSync';
+import { 
+  validateFirestoreConnection, 
+  dbSaveItem, 
+  dbFetchCollection, 
+  dbSaveCollection 
+} from './lib/firebaseSync';
 
 function getSavedData<T>(key: string, initial: T): T {
   try {
@@ -90,6 +97,8 @@ export default function App() {
   // Google OAuth Auth State
   const [userGoogleToken, setUserGoogleToken] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
+  const [isDbLoaded, setIsDbLoaded] = useState<boolean>(false);
+  const [firebaseSyncStatus, setFirebaseSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   // Main School Master Data
   const [rombelList, setRombelList] = useState<RombelKelas[]>(() => getSavedData('edu_rombelList', INITIAL_ROMBEL));
@@ -106,6 +115,7 @@ export default function App() {
   // CBT State
   const [bankSoalList, setBankSoalList] = useState<BankSoal[]>(() => getSavedData('edu_bankSoalList', INITIAL_BANK_SOAL));
   const [ujianList, setUjianList] = useState<UjianCBT[]>(() => getSavedData('edu_ujianList', INITIAL_UJIAN));
+  const [hasilUjianList, setHasilUjianList] = useState<HasilUjian[]>(() => getSavedData('edu_hasilUjianList', []));
 
   // Curriculum & Administration State
   const [administrasiList, setAdministrasiList] = useState<AdministrasiGuru[]>(() => getSavedData('edu_administrasiList', INITIAL_ADMINISTRASI));
@@ -132,69 +142,238 @@ export default function App() {
   });
   const [theme, setTheme] = useState<'dark' | 'light'>(() => getSavedData('edu_theme', 'dark'));
 
-  // Sync state to localStorage on changes
+  // Load database from Firestore upon user login
+  useEffect(() => {
+    if (isLoggedIn) {
+      const loadAllFromFirestore = async () => {
+        try {
+          await validateFirestoreConnection();
+
+          // Fetch all collections
+          const rombelData = await dbFetchCollection<RombelKelas>('edu_rombelList');
+          const siswaData = await dbFetchCollection<Siswa>('edu_siswaList');
+          const guruData = await dbFetchCollection<Guru>('edu_guruList');
+          const stafData = await dbFetchCollection<Staf>('edu_stafList');
+          const mapelData = await dbFetchCollection<MataPelajaranItem>('edu_mapelList');
+          const absensiData = await dbFetchCollection<AbsensiSiswaHarian>('edu_absensiHarian');
+          const absensiKelasData = await dbFetchCollection<AbsensiSiswaKelas>('edu_absensiKelasList');
+          const absensiGuruData = await dbFetchCollection<AbsensiGuru>('edu_absensiGuruList');
+          const bankSoalData = await dbFetchCollection<BankSoal>('edu_bankSoalList');
+          const ujianData = await dbFetchCollection<UjianCBT>('edu_ujianList');
+          const administrasiData = await dbFetchCollection<AdministrasiGuru>('edu_administrasiList');
+          const tagihanData = await dbFetchCollection<TagihanKeuangan>('edu_tagihanList');
+          const transaksiData = await dbFetchCollection<TransaksiKeuangan>('edu_transaksiList');
+          const tarifBiayaData = await dbFetchCollection<TarifBiaya>('edu_tarifBiayaList');
+          const hasilUjianData = await dbFetchCollection<HasilUjian>('edu_hasilUjianList');
+          const settingsData = await dbFetchCollection<SchoolSettings>('edu_schoolSettings');
+
+          // Sync data back to React state or seed empty Firestore
+          if (rombelData.length > 0) setRombelList(rombelData);
+          else await dbSaveCollection('edu_rombelList', rombelList);
+
+          if (siswaData.length > 0) setSiswaList(siswaData);
+          else await dbSaveCollection('edu_siswaList', siswaList);
+
+          if (guruData.length > 0) setGuruList(guruData);
+          else await dbSaveCollection('edu_guruList', guruList);
+
+          if (stafData.length > 0) setStafList(stafData);
+          else await dbSaveCollection('edu_stafList', stafList);
+
+          if (mapelData.length > 0) setMapelList(mapelData);
+          else await dbSaveCollection('edu_mapelList', mapelList);
+
+          if (absensiData.length > 0) setAbsensiHarian(absensiData);
+          else await dbSaveCollection('edu_absensiHarian', absensiHarian);
+
+          if (absensiKelasData.length > 0) setAbsensiKelasList(absensiKelasData);
+          else await dbSaveCollection('edu_absensiKelasList', absensiKelasList);
+
+          if (absensiGuruData.length > 0) setAbsensiGuruList(absensiGuruData);
+          else await dbSaveCollection('edu_absensiGuruList', absensiGuruList);
+
+          if (bankSoalData.length > 0) setBankSoalList(bankSoalData);
+          else await dbSaveCollection('edu_bankSoalList', bankSoalList);
+
+          if (ujianData.length > 0) setUjianList(ujianData);
+          else await dbSaveCollection('edu_ujianList', ujianList);
+
+          if (administrasiData.length > 0) setAdministrasiList(administrasiData);
+          else await dbSaveCollection('edu_administrasiList', administrasiList);
+
+          if (tagihanData.length > 0) setTagihanList(tagihanData);
+          else await dbSaveCollection('edu_tagihanList', tagihanList);
+
+          if (transaksiData.length > 0) setTransaksiList(transaksiData);
+          else await dbSaveCollection('edu_transaksiList', transaksiList);
+
+          if (tarifBiayaData.length > 0) setTarifBiayaList(tarifBiayaData);
+          else await dbSaveCollection('edu_tarifBiayaList', tarifBiayaList);
+
+          if (hasilUjianData.length > 0) setHasilUjianList(hasilUjianData);
+
+          if (settingsData.length > 0) {
+            const foundSetting = settingsData.find(s => s.namaSekolah);
+            if (foundSetting) setSchoolSettings(foundSetting);
+          } else {
+            await dbSaveItem('edu_schoolSettings', { id: 'current', ...schoolSettings });
+          }
+
+          setIsDbLoaded(true);
+        } catch (error) {
+          console.error('Error in initial load from Firestore:', error);
+          setIsDbLoaded(true); // fall back to local storage
+        }
+      };
+      loadAllFromFirestore();
+    } else {
+      setIsDbLoaded(false);
+    }
+  }, [isLoggedIn]);
+
+  // Status-reporting wrappers for Firebase saves
+  const saveCollectionWithStatus = async (collectionName: string, items: any[]) => {
+    setFirebaseSyncStatus('saving');
+    try {
+      await dbSaveCollection(collectionName, items);
+      setFirebaseSyncStatus('saved');
+      const timer = setTimeout(() => setFirebaseSyncStatus('idle'), 2000);
+      return () => clearTimeout(timer);
+    } catch (e) {
+      console.error(`Error syncing ${collectionName} to Firebase:`, e);
+      setFirebaseSyncStatus('error');
+    }
+  };
+
+  const saveItemWithStatus = async (collectionName: string, item: any) => {
+    setFirebaseSyncStatus('saving');
+    try {
+      await dbSaveItem(collectionName, item);
+      setFirebaseSyncStatus('saved');
+      const timer = setTimeout(() => setFirebaseSyncStatus('idle'), 2000);
+      return () => clearTimeout(timer);
+    } catch (e) {
+      console.error(`Error syncing item ${collectionName} to Firebase:`, e);
+      setFirebaseSyncStatus('error');
+    }
+  };
+
+  // Sync state to localStorage and Firestore on changes
   useEffect(() => {
     localStorage.setItem('edu_theme', theme);
   }, [theme]);
+
   useEffect(() => {
     localStorage.setItem('edu_rombelList', JSON.stringify(rombelList));
-  }, [rombelList]);
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_rombelList', rombelList);
+    }
+  }, [rombelList, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem('edu_siswaList', JSON.stringify(siswaList));
-  }, [siswaList]);
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_siswaList', siswaList);
+    }
+  }, [siswaList, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem('edu_guruList', JSON.stringify(guruList));
-  }, [guruList]);
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_guruList', guruList);
+    }
+  }, [guruList, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem('edu_stafList', JSON.stringify(stafList));
-  }, [stafList]);
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_stafList', stafList);
+    }
+  }, [stafList, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem('edu_mapelList', JSON.stringify(mapelList));
-  }, [mapelList]);
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_mapelList', mapelList);
+    }
+  }, [mapelList, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem('edu_absensiHarian', JSON.stringify(absensiHarian));
-  }, [absensiHarian]);
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_absensiHarian', absensiHarian);
+    }
+  }, [absensiHarian, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem('edu_absensiKelasList', JSON.stringify(absensiKelasList));
-  }, [absensiKelasList]);
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_absensiKelasList', absensiKelasList);
+    }
+  }, [absensiKelasList, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem('edu_absensiGuruList', JSON.stringify(absensiGuruList));
-  }, [absensiGuruList]);
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_absensiGuruList', absensiGuruList);
+    }
+  }, [absensiGuruList, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem('edu_bankSoalList', JSON.stringify(bankSoalList));
-  }, [bankSoalList]);
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_bankSoalList', bankSoalList);
+    }
+  }, [bankSoalList, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem('edu_ujianList', JSON.stringify(ujianList));
-  }, [ujianList]);
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_ujianList', ujianList);
+    }
+  }, [ujianList, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem('edu_administrasiList', JSON.stringify(administrasiList));
-  }, [administrasiList]);
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_administrasiList', administrasiList);
+    }
+  }, [administrasiList, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem('edu_tagihanList', JSON.stringify(tagihanList));
-  }, [tagihanList]);
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_tagihanList', tagihanList);
+    }
+  }, [tagihanList, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem('edu_transaksiList', JSON.stringify(transaksiList));
-  }, [transaksiList]);
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_transaksiList', transaksiList);
+    }
+  }, [transaksiList, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem('edu_tarifBiayaList', JSON.stringify(tarifBiayaList));
-  }, [tarifBiayaList]);
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_tarifBiayaList', tarifBiayaList);
+    }
+  }, [tarifBiayaList, isDbLoaded, isLoggedIn]);
+
+  useEffect(() => {
+    localStorage.setItem('edu_hasilUjianList', JSON.stringify(hasilUjianList));
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_hasilUjianList', hasilUjianList);
+    }
+  }, [hasilUjianList, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem('edu_schoolSettings', JSON.stringify(schoolSettings));
-  }, [schoolSettings]);
+    if (isDbLoaded && isLoggedIn) {
+      saveItemWithStatus('edu_schoolSettings', { id: 'current', ...schoolSettings });
+    }
+  }, [schoolSettings, isDbLoaded, isLoggedIn]);
 
   // Auto-sync effect to Google Drive when master data changes and auto-sync is enabled
   useEffect(() => {
@@ -340,6 +519,7 @@ export default function App() {
         onLogout={handleLogout}
         theme={theme}
         setTheme={setTheme}
+        firebaseSyncStatus={firebaseSyncStatus}
       />
 
       {/* Main App Layout */}
@@ -437,6 +617,8 @@ export default function App() {
               setBankSoalList={setBankSoalList}
               ujianList={ujianList}
               setUjianList={setUjianList}
+              hasilUjianList={hasilUjianList}
+              setHasilUjianList={setHasilUjianList}
               siswaList={siswaList}
               currentRole={currentRole}
               userEmail={userEmail}

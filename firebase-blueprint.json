@@ -1,0 +1,332 @@
+{
+  "entities": {
+    "Siswa": {
+      "title": "Siswa",
+      "description": "Student master data records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nisn": { "type": "string" },
+        "nis": { "type": "string" },
+        "nama": { "type": "string" },
+        "kelas": { "type": "string" },
+        "jenisKelamin": { "type": "string", "enum": ["L", "P"] },
+        "alamat": { "type": "string" },
+        "namaWali": { "type": "string" },
+        "teleponWali": { "type": "string" },
+        "status": { "type": "string", "enum": ["Aktif", "Alumni", "Pindah"] }
+      },
+      "required": ["id", "nisn", "nis", "nama", "kelas", "status"]
+    },
+    "Guru": {
+      "title": "Guru",
+      "description": "Teacher master data records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nip": { "type": "string" },
+        "nama": { "type": "string" },
+        "mataPelajaran": { "type": "string" },
+        "jabatan": { "type": "string" },
+        "email": { "type": "string" },
+        "telepon": { "type": "string" },
+        "status": { "type": "string", "enum": ["GTY", "GTT", "PNS"] }
+      },
+      "required": ["id", "nip", "nama", "email", "status"]
+    },
+    "Staf": {
+      "title": "Staf",
+      "description": "Staff master data records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nik": { "type": "string" },
+        "nama": { "type": "string" },
+        "bagian": { "type": "string" },
+        "email": { "type": "string" },
+        "telepon": { "type": "string" },
+        "status": { "type": "string", "enum": ["Tetap", "Kontrak"] }
+      },
+      "required": ["id", "nik", "nama", "email", "status"]
+    },
+    "RombelKelas": {
+      "title": "RombelKelas",
+      "description": "Classroom learning groups",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "namaRombel": { "type": "string" },
+        "tingkatKelas": { "type": "string" },
+        "waliKelasNama": { "type": "string" },
+        "ruangan": { "type": "string" },
+        "kurikulum": { "type": "string", "enum": ["Kurikulum Merdeka", "Kurikulum 2013", "KTSP"] },
+        "tahunAjaran": { "type": "string" },
+        "semester": { "type": "string", "enum": ["Ganjil", "Genap"] },
+        "kapasitas": { "type": "number" }
+      },
+      "required": ["id", "namaRombel", "tingkatKelas", "waliKelasNama", "ruangan", "kurikulum", "tahunAjaran", "semester", "kapasitas"]
+    },
+    "MataPelajaran": {
+      "title": "MataPelajaran",
+      "description": "Subject master data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "kodeMapel": { "type": "string" },
+        "namaMapel": { "type": "string" },
+        "kategori": { "type": "string" },
+        "tingkatKelas": { "type": "string" },
+        "guruPengampuNama": { "type": "string" },
+        "alokasiJamPerMinggu": { "type": "number" },
+        "kkm": { "type": "number" },
+        "kurikulum": { "type": "string" }
+      },
+      "required": ["id", "kodeMapel", "namaMapel", "tingkatKelas", "guruPengampuNama", "kkm"]
+    },
+    "AbsensiSiswaHarian": {
+      "title": "AbsensiSiswaHarian",
+      "description": "Daily student attendance records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "siswaId": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "status": { "type": "string", "enum": ["Hadir", "Sakit", "Izin", "Alpha"] },
+        "keterangan": { "type": "string" },
+        "jamScan": { "type": "string" },
+        "jamMasuk": { "type": "string" },
+        "jamPulang": { "type": "string" },
+        "tipeScan": { "type": "string", "enum": ["Masuk", "Pulang"] },
+        "metodeScan": { "type": "string", "enum": ["Manual", "Barcode / QR"] }
+      },
+      "required": ["id", "siswaId", "tanggal", "status"]
+    },
+    "AbsensiSiswaKelas": {
+      "title": "AbsensiSiswaKelas",
+      "description": "Class session attendance records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "kelas": { "type": "string" },
+        "mataPelajaran": { "type": "string" },
+        "guruNama": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "jamKe": { "type": "string" },
+        "materi": { "type": "string" }
+      },
+      "required": ["id", "kelas", "mataPelajaran", "guruNama", "tanggal", "jamKe", "materi"]
+    },
+    "AbsensiGuru": {
+      "title": "AbsensiGuru",
+      "description": "Teacher attendance records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "guruId": { "type": "string" },
+        "guruNama": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "status": { "type": "string", "enum": ["Hadir", "Izin", "Sakit", "Dinas Outer"] },
+        "statusIzin": { "type": "string", "enum": ["Disetujui", "Pending", "Ditolak"] }
+      },
+      "required": ["id", "guruId", "guruNama", "tanggal", "status", "statusIzin"]
+    },
+    "BankSoal": {
+      "title": "BankSoal",
+      "description": "CBT Exam Question Bank",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "judul": { "type": "string" },
+        "kode": { "type": "string" },
+        "mataPelajaran": { "type": "string" },
+        "kelas": { "type": "string" },
+        "durasiMenit": { "type": "number" },
+        "jumlahSoal": { "type": "number" },
+        "dibuatOleh": { "type": "string" },
+        "tanggalDibuat": { "type": "string" }
+      },
+      "required": ["id", "judul", "kode", "mataPelajaran", "kelas", "durasiMenit", "jumlahSoal"]
+    },
+    "UjianCBT": {
+      "title": "UjianCBT",
+      "description": "CBT exams schedule",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "bankSoalId": { "type": "string" },
+        "judulUjian": { "type": "string" },
+        "mataPelajaran": { "type": "string" },
+        "kelasTarget": { "type": "string" },
+        "waktuMulai": { "type": "string" },
+        "waktuSelesai": { "type": "string" },
+        "durasiMenit": { "type": "number" },
+        "acakSoal": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["Aktif", "Draft", "Selesai"] }
+      },
+      "required": ["id", "bankSoalId", "judulUjian", "mataPelajaran", "kelasTarget", "status"]
+    },
+    "AdministrasiGuru": {
+      "title": "AdministrasiGuru",
+      "description": "Teacher documentation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tipe": { "type": "string" },
+        "guruNama": { "type": "string" },
+        "mataPelajaran": { "type": "string" },
+        "kelas": { "type": "string" },
+        "tahunAjaran": { "type": "string" },
+        "semester": { "type": "string", "enum": ["Ganjil", "Genap"] },
+        "judul": { "type": "string" },
+        "deskripsi": { "type": "string" },
+        "tanggalInput": { "type": "string" },
+        "status": { "type": "string", "enum": ["Draft", "Final", "Disetujui Kepala Sekolah"] }
+      },
+      "required": ["id", "tipe", "guruNama", "mataPelajaran", "kelas", "judul", "status"]
+    },
+    "TagihanKeuangan": {
+      "title": "TagihanKeuangan",
+      "description": "Financial bills / tuition fees details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "siswaId": { "type": "string" },
+        "siswaNama": { "type": "string" },
+        "kelas": { "type": "string" },
+        "tipe": { "type": "string", "enum": ["spp", "ukt", "ekskul"] },
+        "namaTagihan": { "type": "string" },
+        "bulanTahun": { "type": "string" },
+        "nominal": { "type": "number" },
+        "terbayar": { "type": "number" },
+        "status": { "type": "string", "enum": ["Lunas", "Belum Lunas", "Dicicil"] },
+        "jatuhTempo": { "type": "string" }
+      },
+      "required": ["id", "siswaId", "siswaNama", "kelas", "tipe", "namaTagihan", "nominal", "terbayar", "status"]
+    },
+    "TransaksiKeuangan": {
+      "title": "TransaksiKeuangan",
+      "description": "Individual payment transactions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tagihanId": { "type": "string" },
+        "siswaNama": { "type": "string" },
+        "tipe": { "type": "string", "enum": ["spp", "ukt", "ekskul"] },
+        "nominal": { "type": "number" },
+        "tanggal": { "type": "string" },
+        "metodePembayaran": { "type": "string", "enum": ["Cash / Kasir", "Transfer Bank", "QRIS"] },
+        "penerima": { "type": "string" }
+      },
+      "required": ["id", "tagihanId", "siswaNama", "tipe", "nominal", "tanggal", "metodePembayaran", "penerima"]
+    },
+    "TarifBiaya": {
+      "title": "TarifBiaya",
+      "description": "Financial tuition rates configurations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "namaBiaya": { "type": "string" },
+        "tipe": { "type": "string", "enum": ["spp", "ukt", "ekskul"] },
+        "tingkatKelas": { "type": "string" },
+        "nominal": { "type": "number" },
+        "periode": { "type": "string", "enum": ["Bulanan", "Sekali Bayar (Uang Masuk / UKT)", "Per Semester"] },
+        "status": { "type": "string", "enum": ["Aktif", "Nonaktif"] }
+      },
+      "required": ["id", "namaBiaya", "tipe", "tingkatKelas", "nominal", "periode", "status"]
+    },
+    "SchoolSettings": {
+      "title": "SchoolSettings",
+      "description": "General settings and school profile metadata",
+      "type": "object",
+      "properties": {
+        "namaSekolah": { "type": "string" },
+        "npsn": { "type": "string" },
+        "kepalaSekolah": { "type": "string" },
+        "nipKepalaSekolah": { "type": "string" },
+        "tahunAjaran": { "type": "string" },
+        "semesterAktif": { "type": "string" }
+      },
+      "required": ["namaSekolah", "npsn", "kepalaSekolah"]
+    }
+  },
+  "firestore": {
+    "edu_rombelList": {
+      "schema": { "$ref": "#/entities/RombelKelas" },
+      "description": "List of rombel / class learning groups"
+    },
+    "edu_siswaList": {
+      "schema": { "$ref": "#/entities/Siswa" },
+      "description": "List of students"
+    },
+    "edu_guruList": {
+      "schema": { "$ref": "#/entities/Guru" },
+      "description": "List of teachers"
+    },
+    "edu_stafList": {
+      "schema": { "$ref": "#/entities/Staf" },
+      "description": "List of staff"
+    },
+    "edu_mapelList": {
+      "schema": { "$ref": "#/entities/MataPelajaran" },
+      "description": "List of school subject courses"
+    },
+    "edu_absensiHarian": {
+      "schema": { "$ref": "#/entities/AbsensiSiswaHarian" },
+      "description": "List of student daily attendances"
+    },
+    "edu_absensiKelasList": {
+      "schema": { "$ref": "#/entities/AbsensiSiswaKelas" },
+      "description": "List of student class session attendances"
+    },
+    "edu_absensiGuruList": {
+      "schema": { "$ref": "#/entities/AbsensiGuru" },
+      "description": "List of teacher attendances"
+    },
+    "edu_bankSoalList": {
+      "schema": { "$ref": "#/entities/BankSoal" },
+      "description": "List of CBT question banks"
+    },
+    "edu_ujianList": {
+      "schema": { "$ref": "#/entities/UjianCBT" },
+      "description": "List of CBT exams scheduled"
+    },
+    "edu_administrasiList": {
+      "schema": { "$ref": "#/entities/AdministrasiGuru" },
+      "description": "List of teacher administrations"
+    },
+    "edu_tagihanList": {
+      "schema": { "$ref": "#/entities/TagihanKeuangan" },
+      "description": "List of school financial tuition fee bills"
+    },
+    "edu_transaksiList": {
+      "schema": { "$ref": "#/entities/TransaksiKeuangan" },
+      "description": "List of individual payment transactions"
+    },
+    "edu_tarifBiayaList": {
+      "schema": { "$ref": "#/entities/TarifBiaya" },
+      "description": "List of standard tuition rates config"
+    },
+    "edu_hasilUjianList": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "ujianId": { "type": "string" },
+          "siswaId": { "type": "string" },
+          "siswaNama": { "type": "string" },
+          "nis": { "type": "string" },
+          "kelas": { "type": "string" },
+          "nilaiTotal": { "type": "number" },
+          "statusPenilaian": { "type": "string" },
+          "waktuSubmit": { "type": "string" }
+        },
+        "required": ["id", "ujianId", "siswaId", "siswaNama", "nilaiTotal", "statusPenilaian", "waktuSubmit"]
+      },
+      "description": "List of completed CBT student exam results"
+    },
+    "edu_schoolSettings": {
+      "schema": { "$ref": "#/entities/SchoolSettings" },
+      "description": "General school profile settings document"
+    }
+  }
+}
