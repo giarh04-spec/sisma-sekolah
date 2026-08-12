@@ -3063,14 +3063,25 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                     </div>
                     <div>
                       <label className="text-[11px] font-bold text-slate-400">Tingkat Kelas</label>
-                      <input 
-                        type="text" 
-                        required 
-                        placeholder="contoh: Kelas 10, Kelas 11 & 12"
+                      <select 
                         value={formMapel.tingkatKelas} 
                         onChange={e => setFormMapel({ ...formMapel, tingkatKelas: e.target.value })}
-                        className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
-                      />
+                        className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
+                      >
+                        <option value="Semua Tingkat">Semua Tingkat</option>
+                        <option value="Kelas 1">Kelas 1</option>
+                        <option value="Kelas 2">Kelas 2</option>
+                        <option value="Kelas 3">Kelas 3</option>
+                        <option value="Kelas 4">Kelas 4</option>
+                        <option value="Kelas 5">Kelas 5</option>
+                        <option value="Kelas 6">Kelas 6</option>
+                        <option value="Kelas 7">Kelas 7</option>
+                        <option value="Kelas 8">Kelas 8</option>
+                        <option value="Kelas 9">Kelas 9</option>
+                        <option value="Kelas 10">Kelas 10</option>
+                        <option value="Kelas 11">Kelas 11</option>
+                        <option value="Kelas 12">Kelas 12</option>
+                      </select>
                     </div>
                   </div>
 
