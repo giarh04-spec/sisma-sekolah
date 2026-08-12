@@ -53,7 +53,8 @@ import {
   INITIAL_TARIF_BIAYA
 } from './data/mockData';
 
-import { initAuth, googleSignOut } from './lib/firebase';
+import { initAuth, googleSignOut, db } from './lib/firebase';
+import { onSnapshot, collection, doc } from 'firebase/firestore';
 import { exportAllToGoogleSheets } from './lib/googleDriveSync';
 import { 
   validateFirestoreConnection, 
@@ -374,6 +375,77 @@ export default function App() {
       saveItemWithStatus('edu_schoolSettings', { id: 'current', ...schoolSettings });
     }
   }, [schoolSettings, isDbLoaded, isLoggedIn]);
+
+  // Realtime synchronization from Firestore (Admin <-> TU/Staf/Guru integration)
+  useEffect(() => {
+    if (!isLoggedIn || !isDbLoaded) return;
+
+    const unsubs: (() => void)[] = [];
+
+    const listenCollection = <T extends { id: string }>(colName: string, setter: React.Dispatch<React.SetStateAction<T[]>>) => {
+      try {
+        const unsub = onSnapshot(collection(db, colName), (snapshot) => {
+          if (snapshot.metadata.hasPendingWrites) return;
+          const items: T[] = [];
+          snapshot.forEach((doc) => {
+            items.push(doc.data() as T);
+          });
+          setter((prev) => {
+            // Sort to ensure stable comparison
+            const sortKey = (a: any, b: any) => (a.id || '').localeCompare(b.id || '');
+            const sortedPrev = [...prev].sort(sortKey);
+            const sortedItems = [...items].sort(sortKey);
+            if (JSON.stringify(sortedPrev) !== JSON.stringify(sortedItems)) {
+              return items;
+            }
+            return prev;
+          });
+        });
+        unsubs.push(unsub);
+      } catch (err) {
+        console.error(`Error subscribing to ${colName}:`, err);
+      }
+    };
+
+    listenCollection<RombelKelas>('edu_rombelList', setRombelList);
+    listenCollection<Siswa>('edu_siswaList', setSiswaList);
+    listenCollection<Guru>('edu_guruList', setGuruList);
+    listenCollection<Staf>('edu_stafList', setStafList);
+    listenCollection<MataPelajaranItem>('edu_mapelList', setMapelList);
+    listenCollection<AbsensiSiswaHarian>('edu_absensiHarian', setAbsensiHarian);
+    listenCollection<AbsensiSiswaKelas>('edu_absensiKelasList', setAbsensiKelasList);
+    listenCollection<AbsensiGuru>('edu_absensiGuruList', setAbsensiGuruList);
+    listenCollection<BankSoal>('edu_bankSoalList', setBankSoalList);
+    listenCollection<UjianCBT>('edu_ujianList', setUjianList);
+    listenCollection<AdministrasiGuru>('edu_administrasiList', setAdministrasiList);
+    listenCollection<TagihanKeuangan>('edu_tagihanList', setTagihanList);
+    listenCollection<TransaksiKeuangan>('edu_transaksiList', setTransaksiList);
+    listenCollection<TarifBiaya>('edu_tarifBiayaList', setTarifBiayaList);
+    listenCollection<HasilUjian>('edu_hasilUjianList', setHasilUjianList);
+
+    // Document listener for school settings
+    try {
+      const unsubSettings = onSnapshot(doc(db, 'edu_schoolSettings', 'current'), (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
+        if (snapshot.exists()) {
+          const data = snapshot.data() as SchoolSettings;
+          setSchoolSettings((prev) => {
+            if (JSON.stringify(prev) !== JSON.stringify(data)) {
+              return data;
+            }
+            return prev;
+          });
+        }
+      });
+      unsubs.push(unsubSettings);
+    } catch (err) {
+      console.error('Error subscribing to edu_schoolSettings:', err);
+    }
+
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+    };
+  }, [isLoggedIn, isDbLoaded]);
 
   // Auto-sync effect to Google Drive when master data changes and auto-sync is enabled
   useEffect(() => {

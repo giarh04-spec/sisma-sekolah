@@ -19,7 +19,7 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 interface CameraScannerProps {
   onScanSuccess: (code: string) => void;
-  scanTargetType: 'siswa' | 'guru';
+  scanTargetType: 'siswa' | 'guru' | 'staf';
   isAutoReset?: boolean;
 }
 
@@ -289,13 +289,21 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
           <div className={`p-2 rounded-xl border ${
             scanTargetType === 'siswa' 
               ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' 
-              : 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+              : scanTargetType === 'guru'
+              ? 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+              : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
           }`}>
             <ScanLine className="w-5 h-5 animate-pulse" />
           </div>
           <div>
             <h3 className="font-bold text-white text-sm flex items-center gap-2">
-              Camera Live Scanner ({scanTargetType === 'siswa' ? 'Siswa' : 'Guru'})
+              Camera Live Scanner ({
+                scanTargetType === 'siswa' 
+                  ? 'Siswa' 
+                  : scanTargetType === 'guru' 
+                  ? 'Guru' 
+                  : 'Staf / Tata Usaha'
+              })
             </h3>
             <p className="text-[11px] text-slate-400">
               Integrasi langsung kamera HP / Laptop untuk membaca ID Barcode & QR Code

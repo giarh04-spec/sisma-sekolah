@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { CameraScanner } from './CameraScanner';
 import { 
   CalendarCheck, 
@@ -23,7 +23,8 @@ import {
   LogIn,
   LogOut,
   Smartphone,
-  Share2
+  Share2,
+  Sparkles
 } from 'lucide-react';
 import { 
   Siswa, 
@@ -174,9 +175,18 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   const [fonnteStatusInfo, setFonnteStatusInfo] = useState<FonnteDeviceStatus | null>(null);
   const [isCheckingToken, setIsCheckingToken] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState('');
-  const [scanTargetType, setScanTargetType] = useState<'siswa' | 'guru'>('siswa');
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const [autoSimulate, setAutoSimulate] = useState<boolean>(false);
+  const [scanTargetType, setScanTargetType] = useState<'siswa' | 'guru' | 'staf'>('siswa');
   const [scanMode, setScanMode] = useState<'Masuk' | 'Pulang'>('Masuk');
   const [autoSendWA, setAutoSendWA] = useState<boolean>(true);
+
+  // Custom Toast State
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 5000);
+  };
 
   const [lastScannedResult, setLastScannedResult] = useState<{
     nama: string;
@@ -189,6 +199,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
     tipeAbsensi?: 'Masuk' | 'Pulang';
     siswaObj?: Siswa;
     waSentStatus?: string;
+    isUnknown?: boolean;
   } | null>(null);
 
   const [scanHistory, setScanHistory] = useState<Array<{
@@ -200,6 +211,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
     teleponWali?: string;
     namaWali?: string;
     siswaObj?: Siswa;
+    isUnknown?: boolean;
   }>>([]);
 
   // Helper to send WhatsApp Notification using Fonnte API Token
@@ -279,121 +291,269 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   };
 
   const handleExecuteScan = (codeToScan: string) => {
-    const code = codeToScan.trim();
+    let code = codeToScan.trim();
     if (!code) return;
+
+    // Detect prefix and automatically switch scanTargetType to ensure flawless mapping
+    let currentTargetType = scanTargetType;
+    if (code.toUpperCase().startsWith('SIS-')) {
+      currentTargetType = 'siswa';
+      setScanTargetType('siswa');
+    } else if (code.toUpperCase().startsWith('GUR-')) {
+      currentTargetType = 'guru';
+      setScanTargetType('guru');
+    } else if (code.toUpperCase().startsWith('STF-')) {
+      currentTargetType = 'staf';
+      setScanTargetType('staf');
+    }
 
     playBeepSound();
     const timeNow = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const today = new Date().toISOString().split('T')[0];
 
-    if (scanTargetType === 'siswa') {
-      // Find student by barcode or NISN or NIS
-      const foundSiswa = siswaList.find(s => 
-        (s.kodeBarcode && s.kodeBarcode.toLowerCase() === code.toLowerCase()) ||
-        s.nisn === code ||
-        s.nis === code ||
-        s.nama.toLowerCase().includes(code.toLowerCase())
-      );
+    // Cross-check: find in siswa, guru, or staf list to prevent tab mismatch issues
+    const foundSiswa = siswaList.find(s => 
+      (s.kodeBarcode && s.kodeBarcode.toLowerCase() === code.toLowerCase()) ||
+      s.nisn === code ||
+      s.nis === code ||
+      `SIS-${s.nisn}`.toLowerCase() === code.toLowerCase() ||
+      `SIS-${s.nis}`.toLowerCase() === code.toLowerCase() ||
+      s.nama.toLowerCase().includes(code.toLowerCase())
+    );
 
-      if (foundSiswa) {
-        const statusInfo = calculateAttendanceStatusLabel(timeNow, scanMode);
+    const foundGuru = guruList.find(g => 
+      (g.kodeBarcode && g.kodeBarcode.toLowerCase() === code.toLowerCase()) ||
+      g.nip === code ||
+      `GUR-${g.nip}`.toLowerCase() === code.toLowerCase() ||
+      g.nama.toLowerCase().includes(code.toLowerCase())
+    );
 
-        setAbsensiHarian(prev => {
-          const existing = prev.find(a => a.siswaId === foundSiswa.id && a.tanggal === today);
-          const filtered = prev.filter(a => !(a.siswaId === foundSiswa.id && a.tanggal === today));
-          return [
-            {
-              id: `abh-${foundSiswa.id}-${today}`,
-              siswaId: foundSiswa.id,
-              tanggal: today,
-              status: statusInfo.isLate ? 'Terlambat' : 'Hadir',
-              jamScan: timeNow,
-              jamMasuk: scanMode === 'Masuk' ? timeNow : (existing?.jamMasuk || timeNow),
-              jamPulang: scanMode === 'Pulang' ? timeNow : existing?.jamPulang,
-              tipeScan: scanMode,
-              metodeScan: 'Barcode / QR'
-            },
-            ...filtered
-          ];
-        });
+    const foundStaf = stafList.find(s => 
+      (s.kodeBarcode && s.kodeBarcode.toLowerCase() === code.toLowerCase()) ||
+      (s.nik && s.nik === code) ||
+      (s.nik && `STF-${s.nik}`.toLowerCase() === code.toLowerCase()) ||
+      s.id === code ||
+      `STF-${s.id}`.toLowerCase() === code.toLowerCase() ||
+      s.nama.toLowerCase().includes(code.toLowerCase())
+    );
 
-        const res = {
-          nama: foundSiswa.nama,
-          role: `Siswa Kelas ${foundSiswa.kelas}`,
-          kode: foundSiswa.kodeBarcode || `SIS-${foundSiswa.nisn}`,
-          waktu: timeNow,
-          detail: `NISN: ${foundSiswa.nisn} | Status: ${statusInfo.label} | Wali: ${foundSiswa.namaWali || '-'} (${foundSiswa.teleponWali || '-'})`,
-          teleponWali: foundSiswa.teleponWali,
-          namaWali: foundSiswa.namaWali,
-          tipeAbsensi: scanMode,
-          siswaObj: foundSiswa
-        };
-        setLastScannedResult(res);
-        setScanHistory(prev => [res, ...prev]);
+    // Process based on who was actually found (prioritizing the selected currentTargetType)
+    let processed = false;
 
-        if (autoSendWA && foundSiswa.teleponWali) {
-          sendWhatsAppNotif(foundSiswa, timeNow, scanMode);
-        }
-      } else {
-        alert(`Barcode / ID "${code}" tidak ditemukan pada Database Siswa!`);
-      }
+    if (currentTargetType === 'siswa' && foundSiswa) {
+      processSiswaScan(foundSiswa, timeNow, today);
+      processed = true;
+    } else if (currentTargetType === 'guru' && foundGuru) {
+      processGuruScan(foundGuru, timeNow, today);
+      processed = true;
+    } else if (currentTargetType === 'staf' && foundStaf) {
+      processStafScan(foundStaf, timeNow, today);
+      processed = true;
     } else {
-      // Find guru by barcode or NIP
-      const foundGuru = guruList.find(g => 
-        (g.kodeBarcode && g.kodeBarcode.toLowerCase() === code.toLowerCase()) ||
-        g.nip === code ||
-        g.nama.toLowerCase().includes(code.toLowerCase())
-      );
-
-      if (foundGuru) {
-        setAbsensiGuruList(prev => {
-          const existingIndex = prev.findIndex(g => g.guruId === foundGuru.id && g.tanggal === today);
-          if (existingIndex >= 0) {
-            const updated = [...prev];
-            if (scanMode === 'Pulang') {
-              updated[existingIndex].jamPulang = timeNow;
-              updated[existingIndex].metodeOut = 'Barcode / QR';
-            } else {
-              updated[existingIndex].jamMasuk = timeNow;
-              updated[existingIndex].status = 'Hadir';
-              updated[existingIndex].metodeIn = 'Barcode / QR';
-            }
-            return updated;
-          } else {
-            return [
-              {
-                id: `abg-${Date.now()}`,
-                guruId: foundGuru.id,
-                guruNama: foundGuru.nama,
-                tanggal: today,
-                jamMasuk: scanMode === 'Masuk' ? timeNow : undefined,
-                jamPulang: scanMode === 'Pulang' ? timeNow : undefined,
-                status: 'Hadir',
-                statusIzin: 'Disetujui',
-                lokasiIn: 'Mesin Scan Barcode Utama',
-                metodeIn: 'Barcode / QR'
-              },
-              ...prev
-            ];
-          }
-        });
-
-        const res = {
-          nama: foundGuru.nama,
-          role: `Guru ${foundGuru.mataPelajaran}`,
-          kode: foundGuru.kodeBarcode || `GUR-${foundGuru.nip}`,
-          waktu: timeNow,
-          detail: `NIP: ${foundGuru.nip} | Status: ${foundGuru.status}`
-        };
-        setLastScannedResult(res);
-        setScanHistory(prev => [res, ...prev]);
-      } else {
-        alert(`Barcode / NIP "${code}" tidak ditemukan pada Database Guru!`);
+      // If not found in selected type but found in another, process with correct type
+      if (foundSiswa) {
+        setScanTargetType('siswa');
+        processSiswaScan(foundSiswa, timeNow, today);
+        processed = true;
+        showToast(`Otomatis mendeteksi Siswa: ${foundSiswa.nama}`, 'success');
+      } else if (foundGuru) {
+        setScanTargetType('guru');
+        processGuruScan(foundGuru, timeNow, today);
+        processed = true;
+        showToast(`Otomatis mendeteksi Guru: ${foundGuru.nama}`, 'success');
+      } else if (foundStaf) {
+        setScanTargetType('staf');
+        processStafScan(foundStaf, timeNow, today);
+        processed = true;
+        showToast(`Otomatis mendeteksi Staf: ${foundStaf.nama}`, 'success');
       }
     }
 
+    // Fallback: If code is not found in any database list, STILL display it in "Hasil Scan Terakhir" as requested!
+    if (!processed) {
+      const fallbackResult = {
+        nama: `ID / Kartu: ${code}`,
+        role: `Tidak Terdaftar (${scanTargetType.toUpperCase()})`,
+        kode: code,
+        waktu: timeNow,
+        detail: `Pemindaian sukses, namun kode "${code}" belum terdaftar di Database ${scanTargetType.toUpperCase()}.`,
+        tipeAbsensi: scanMode,
+        isUnknown: true
+      };
+      setLastScannedResult(fallbackResult);
+      setScanHistory(prev => [fallbackResult, ...prev]);
+      showToast(`ID / Barcode "${code}" tidak dikenal di Database ${scanTargetType.toUpperCase()}!`, 'error');
+    }
+
     setBarcodeInput('');
+    setTimeout(() => {
+      barcodeInputRef.current?.focus();
+    }, 50);
   };
+
+  // Helper scan processors to keep code modular and readable
+  const processSiswaScan = (siswa: Siswa, timeNow: string, today: string) => {
+    const statusInfo = calculateAttendanceStatusLabel(timeNow, scanMode);
+
+    setAbsensiHarian(prev => {
+      const existing = prev.find(a => a.siswaId === siswa.id && a.tanggal === today);
+      const filtered = prev.filter(a => !(a.siswaId === siswa.id && a.tanggal === today));
+      return [
+        {
+          id: `abh-${siswa.id}-${today}`,
+          siswaId: siswa.id,
+          tanggal: today,
+          status: statusInfo.isLate ? 'Terlambat' : 'Hadir',
+          jamScan: timeNow,
+          jamMasuk: scanMode === 'Masuk' ? timeNow : (existing?.jamMasuk || timeNow),
+          jamPulang: scanMode === 'Pulang' ? timeNow : existing?.jamPulang,
+          tipeScan: scanMode,
+          metodeScan: 'Barcode / QR'
+        },
+        ...filtered
+      ];
+    });
+
+    const res = {
+      nama: siswa.nama,
+      role: `Siswa Kelas ${siswa.kelas}`,
+      kode: siswa.kodeBarcode || `SIS-${siswa.nisn}`,
+      waktu: timeNow,
+      detail: `NISN: ${siswa.nisn} | Status: ${statusInfo.label} | Wali: ${siswa.namaWali || '-'} (${siswa.teleponWali || '-'})`,
+      teleponWali: siswa.teleponWali,
+      namaWali: siswa.namaWali,
+      tipeAbsensi: scanMode,
+      siswaObj: siswa
+    };
+    setLastScannedResult(res);
+    setScanHistory(prev => [res, ...prev]);
+    showToast(`Presensi ${scanMode} Berhasil: ${siswa.nama} (${statusInfo.label})`, 'success');
+
+    if (autoSendWA && siswa.teleponWali) {
+      sendWhatsAppNotif(siswa, timeNow, scanMode);
+    }
+  };
+
+  const processGuruScan = (guru: Guru, timeNow: string, today: string) => {
+    setAbsensiGuruList(prev => {
+      const existingIndex = prev.findIndex(g => g.guruId === guru.id && g.tanggal === today);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        if (scanMode === 'Pulang') {
+          updated[existingIndex].jamPulang = timeNow;
+          updated[existingIndex].metodeOut = 'Barcode / QR';
+        } else {
+          updated[existingIndex].jamMasuk = timeNow;
+          updated[existingIndex].status = 'Hadir';
+          updated[existingIndex].metodeIn = 'Barcode / QR';
+        }
+        return updated;
+      } else {
+        const record: any = {
+          id: `abg-${Date.now()}`,
+          guruId: guru.id,
+          guruNama: guru.nama,
+          tanggal: today,
+          status: 'Hadir',
+          statusIzin: 'Disetujui',
+          lokasiIn: 'Mesin Scan Barcode Utama',
+          metodeIn: 'Barcode / QR'
+        };
+        if (scanMode === 'Masuk') {
+          record.jamMasuk = timeNow;
+        } else if (scanMode === 'Pulang') {
+          record.jamPulang = timeNow;
+        }
+        return [record, ...prev];
+      }
+    });
+
+    const res = {
+      nama: guru.nama,
+      role: `Guru ${guru.mataPelajaran}`,
+      kode: guru.kodeBarcode || `GUR-${guru.nip}`,
+      waktu: timeNow,
+      detail: `NIP: ${guru.nip} | Status: ${guru.status}`,
+      tipeAbsensi: scanMode
+    };
+    setLastScannedResult(res);
+    setScanHistory(prev => [res, ...prev]);
+    showToast(`Presensi ${scanMode} Guru Berhasil: ${guru.nama}`, 'success');
+  };
+
+  const processStafScan = (staf: Staf, timeNow: string, today: string) => {
+    setAbsensiGuruList(prev => {
+      const existingIndex = prev.findIndex(g => g.guruId === staf.id && g.tanggal === today);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        if (scanMode === 'Pulang') {
+          updated[existingIndex].jamPulang = timeNow;
+          updated[existingIndex].metodeOut = 'Barcode / QR';
+        } else {
+          updated[existingIndex].jamMasuk = timeNow;
+          updated[existingIndex].status = 'Hadir';
+          updated[existingIndex].metodeIn = 'Barcode / QR';
+        }
+        return updated;
+      } else {
+        const record: any = {
+          id: `abg-${Date.now()}`,
+          guruId: staf.id,
+          guruNama: staf.nama,
+          tanggal: today,
+          status: 'Hadir',
+          statusIzin: 'Disetujui',
+          lokasiIn: 'Mesin Scan Barcode Utama',
+          metodeIn: 'Barcode / QR'
+        };
+        if (scanMode === 'Masuk') {
+          record.jamMasuk = timeNow;
+        } else if (scanMode === 'Pulang') {
+          record.jamPulang = timeNow;
+        }
+        return [record, ...prev];
+      }
+    });
+
+    const res = {
+      nama: staf.nama,
+      role: `Staf / Tata Usaha (${staf.bagian})`,
+      kode: staf.nik || staf.id,
+      waktu: timeNow,
+      detail: `NIK: ${staf.nik} | Bagian: ${staf.bagian} | Status: ${staf.status}`,
+      tipeAbsensi: scanMode
+    };
+    setLastScannedResult(res);
+    setScanHistory(prev => [res, ...prev]);
+    showToast(`Presensi ${scanMode} Staf Berhasil: ${staf.nama}`, 'success');
+  };
+
+  // Automated Simulation Effect for Automatic Scanning
+  useEffect(() => {
+    if (!autoSimulate) return;
+
+    const interval = setInterval(() => {
+      const today = new Date().toISOString().split('T')[0];
+      if (scanTargetType === 'siswa') {
+        if (siswaList.length === 0) return;
+        const randomIdx = Math.floor(Math.random() * siswaList.length);
+        const randomSiswa = siswaList[randomIdx];
+        handleExecuteScan(randomSiswa.kodeBarcode || `SIS-${randomSiswa.nisn}`);
+      } else if (scanTargetType === 'guru') {
+        if (guruList.length === 0) return;
+        const randomIdx = Math.floor(Math.random() * guruList.length);
+        const randomGuru = guruList[randomIdx];
+        handleExecuteScan(randomGuru.kodeBarcode || `GUR-${randomGuru.nip}`);
+      } else {
+        if (stafList.length === 0) return;
+        const randomIdx = Math.floor(Math.random() * stafList.length);
+        const randomStaf = stafList[randomIdx];
+        handleExecuteScan(randomStaf.nik || randomStaf.id);
+      }
+    }, 5000); // scan automatically every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [autoSimulate, scanTargetType, siswaList, guruList, stafList, scanMode]);
 
   // Dynamic list of available classes from rombelList and siswaList
   const availableKelasOptions = useMemo(() => {
@@ -670,7 +830,21 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      
+      {/* Floating Toast Notification */}
+      {toast && (
+        <div className="fixed top-6 right-6 z-50 animate-fade-in-down max-w-sm">
+          <div className={`px-4 py-3 rounded-xl shadow-2xl border text-xs font-bold flex items-center gap-2.5 text-white ${
+            toast.type === 'success' ? 'bg-emerald-600 border-emerald-500 shadow-emerald-950/50' :
+            toast.type === 'error' ? 'bg-red-600 border-red-500 shadow-red-950/50' :
+            'bg-blue-600 border-blue-500 shadow-blue-950/50'
+          }`}>
+            <span className="w-2 h-2 rounded-full bg-white animate-ping shrink-0" />
+            <span>{toast.message}</span>
+          </div>
+        </div>
+      )}
       
       {/* Top Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#121212] p-5 rounded-xl border border-slate-800 shadow-sm">
@@ -762,6 +936,15 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                     >
                       Guru
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setScanTargetType('staf')}
+                      className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
+                        scanTargetType === 'staf' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Staf
+                    </button>
                   </div>
                 ) : (
                   <span className="px-2.5 py-1 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-lg text-xs font-bold">
@@ -794,6 +977,23 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                   </button>
                 </div>
               )}
+
+              {/* Simulation Mode Toggle Button */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAutoSimulate(prev => !prev)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border shadow-sm ${
+                    autoSimulate
+                      ? 'bg-amber-600 border-amber-500/50 text-white shadow-md shadow-amber-600/30'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                  title="Simulasikan pemindaian kartu secara otomatis setiap 5 detik"
+                >
+                  <Sparkles className={`w-3.5 h-3.5 ${autoSimulate ? 'animate-spin text-amber-300' : 'text-amber-500'}`} />
+                  <span>{autoSimulate ? 'Simulasi Auto Scan Aktif (5s)' : 'Simulasi Auto Scan'}</span>
+                </button>
+              </div>
             </div>
 
             {/* Active Presensi Schedule Info Banner */}
@@ -843,8 +1043,15 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                 className="flex gap-2"
               >
                 <input
+                  ref={barcodeInputRef}
                   type="text"
-                  placeholder={scanTargetType === 'siswa' ? 'Contoh: SIS-0081234561 atau NISN' : 'Contoh: GUR-198501152010011002 atau NIP'}
+                  placeholder={
+                    scanTargetType === 'siswa'
+                      ? 'Contoh: SIS-0081234561 atau NISN'
+                      : scanTargetType === 'guru'
+                      ? 'Contoh: GUR-198501152010011002 atau NIP'
+                      : 'Contoh: NIK Staf (320xxxxxxxxxxxxx) atau Nama'
+                  }
                   value={barcodeInput}
                   onChange={e => setBarcodeInput(e.target.value)}
                   autoFocus
@@ -874,8 +1081,8 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                       <div className="text-[9px] font-mono text-slate-500">{s.kodeBarcode || `SIS-${s.nisn}`}</div>
                     </button>
                   ))
-                ) : (
-                  guruList.map(g => (
+                ) : scanTargetType === 'guru' ? (
+                  guruList.slice(0, 4).map(g => (
                     <button
                       key={g.id}
                       onClick={() => handleExecuteScan(g.kodeBarcode || `GUR-${g.nip}`)}
@@ -883,6 +1090,17 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                     >
                       <div className="text-[11px] font-bold text-white group-hover:text-purple-400">{g.nama}</div>
                       <div className="text-[9px] font-mono text-slate-500">{g.kodeBarcode || `GUR-${g.nip}`}</div>
+                    </button>
+                  ))
+                ) : (
+                  stafList.slice(0, 4).map(s => (
+                    <button
+                      key={s.id}
+                      onClick={() => handleExecuteScan(s.nik || s.id)}
+                      className="px-3 py-1.5 bg-[#181818] hover:bg-slate-800 border border-slate-800 hover:border-amber-500/40 rounded-lg text-left transition-all group"
+                    >
+                      <div className="text-[11px] font-bold text-white group-hover:text-amber-400">{s.nama}</div>
+                      <div className="text-[9px] font-mono text-slate-500">{s.nik || s.id}</div>
                     </button>
                   ))
                 )}
@@ -902,28 +1120,42 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                 </span>
                 {lastScannedResult?.tipeAbsensi && (
                   <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
-                    lastScannedResult.tipeAbsensi === 'Masuk' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    lastScannedResult.isUnknown
+                      ? 'bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse'
+                      : lastScannedResult.tipeAbsensi === 'Masuk'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                   }`}>
-                    {lastScannedResult.tipeAbsensi.toUpperCase()}
+                    {lastScannedResult.isUnknown ? 'UNREGISTERED' : lastScannedResult.tipeAbsensi.toUpperCase()}
                   </span>
                 )}
               </h4>
 
               {lastScannedResult ? (
-                <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-xl space-y-3">
+                <div className={`p-4 rounded-xl space-y-3 border ${
+                  lastScannedResult.isUnknown
+                    ? 'bg-red-950/25 border-red-900/40'
+                    : 'bg-slate-900/90 border-slate-800'
+                }`}>
                   <div className="flex items-center justify-between">
                     <span className={`px-2 py-0.5 font-bold text-[10px] rounded border ${
-                      lastScannedResult.tipeAbsensi === 'Pulang'
+                      lastScannedResult.isUnknown
+                        ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                        : lastScannedResult.tipeAbsensi === 'Pulang'
                         ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
                         : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                     }`}>
-                      PRESENSI {lastScannedResult.tipeAbsensi ? lastScannedResult.tipeAbsensi.toUpperCase() : 'BERHASIL'}
+                      {lastScannedResult.isUnknown ? 'KARTU TIDAK DIKENAL' : `PRESENSI ${lastScannedResult.tipeAbsensi ? lastScannedResult.tipeAbsensi.toUpperCase() : 'BERHASIL'}`}
                     </span>
                     <span className="text-[10px] font-mono text-slate-400">{lastScannedResult.waktu}</span>
                   </div>
                   <div>
-                    <h3 className="text-base font-extrabold text-white">{lastScannedResult.nama}</h3>
-                    <p className="text-xs font-semibold text-blue-400">{lastScannedResult.role}</p>
+                    <h3 className={`text-base font-extrabold ${lastScannedResult.isUnknown ? 'text-red-400' : 'text-white'}`}>
+                      {lastScannedResult.nama}
+                    </h3>
+                    <p className={`text-xs font-semibold ${lastScannedResult.isUnknown ? 'text-slate-400' : 'text-blue-400'}`}>
+                      {lastScannedResult.role}
+                    </p>
                     <p className="text-[10px] font-mono text-slate-400 mt-1">{lastScannedResult.detail}</p>
                   </div>
 
@@ -944,6 +1176,14 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                       </button>
                     </div>
                   )}
+
+                  {lastScannedResult.isUnknown && (
+                    <div className="pt-2 border-t border-red-900/30 text-center">
+                      <span className="text-[9px] text-red-400 font-semibold italic">
+                        *Daftarkan kode barcode ini di menu Database Sekolah agar terbaca otomatis.
+                      </span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="p-6 bg-[#181818] rounded-xl text-center text-slate-500 text-xs border border-slate-800">
@@ -960,15 +1200,23 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                   <p className="text-xs text-slate-500 text-center py-4">Belum ada riwayat scan.</p>
                 ) : (
                   scanHistory.map((item, idx) => (
-                    <div key={idx} className="p-2.5 bg-[#181818] rounded-lg border border-slate-800/80 flex items-center justify-between text-xs gap-2">
+                    <div key={idx} className={`p-2.5 rounded-lg border flex items-center justify-between text-xs gap-2 ${
+                      item.isUnknown 
+                        ? 'bg-red-950/10 border-red-900/20' 
+                        : 'bg-[#181818] border-slate-800/80'
+                    }`}>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-white truncate">{item.nama}</span>
+                          <span className={`font-bold truncate ${item.isUnknown ? 'text-red-400' : 'text-white'}`}>{item.nama}</span>
                           {item.tipeAbsensi && (
                             <span className={`px-1.5 py-0.2 text-[9px] font-extrabold rounded ${
-                              item.tipeAbsensi === 'Pulang' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              item.isUnknown
+                                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                : item.tipeAbsensi === 'Pulang'
+                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                             }`}>
-                              {item.tipeAbsensi}
+                              {item.isUnknown ? 'UNKNOWN' : item.tipeAbsensi}
                             </span>
                           )}
                         </div>
@@ -976,11 +1224,11 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <div className="text-right">
-                          <div className="font-mono text-emerald-400 font-bold text-[11px]">{item.waktu}</div>
+                          <div className={`font-mono font-bold text-[11px] ${item.isUnknown ? 'text-red-400' : 'text-emerald-400'}`}>{item.waktu}</div>
                           <div className="text-[9px] text-slate-500 font-mono">{item.kode}</div>
                         </div>
 
-                        {item.siswaObj && item.teleponWali && (
+                        {item.siswaObj && item.teleponWali && !item.isUnknown && (
                           <button
                             type="button"
                             onClick={() => sendWhatsAppNotif(item.siswaObj!, item.waktu, item.tipeAbsensi || 'Masuk')}

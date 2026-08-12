@@ -57,22 +57,66 @@ export const KartuDigitalModal: React.FC<KartuDigitalModalProps> = ({ type, data
 
   // Simple SVG Barcode Generator based on string hash
   const renderBarcodeSVG = (code: string) => {
+    // Generate a beautiful, high-fidelity pseudo Code-128 barcode look
     const bars = [];
-    let x = 10;
-    for (let i = 0; i < code.length; i++) {
-      const charCode = code.charCodeAt(i);
-      const width1 = (charCode % 3) + 2;
-      const width2 = ((charCode * 2) % 3) + 1;
-      bars.push(<rect key={`b1-${i}`} x={x} y="5" width={width1} height="40" fill="#0f172a" />);
-      x += width1 + 2;
-      bars.push(<rect key={`b2-${i}`} x={x} y="5" width={width2} height="40" fill="#0f172a" />);
-      x += width2 + 2;
+    const padding = 16;
+    const height = 54; // Tall, clear lines for easy scanning
+    
+    // We want the barcode to take up a clean wider width
+    const totalWidth = 300;
+    const availableWidth = totalWidth - (padding * 2);
+    
+    // Create a deterministic sequence of bars based on the barcode string
+    const codeToSeed = code + "EDUSMART";
+    const numBars = Math.min(36, codeToSeed.length * 3);
+    const barWidth = availableWidth / numBars;
+    
+    let currentX = padding;
+    for (let i = 0; i < numBars; i++) {
+      // Deterministic bar width & presence based on char codes
+      const charIdx = i % codeToSeed.length;
+      const charCode = codeToSeed.charCodeAt(charIdx);
+      const isBar = (charCode + i) % 2 === 0;
+      
+      // Variable thickness for authentic barcode look
+      const thickness = ((charCode + i * 3) % 3) + 1.8; // Thicker lines (1.8 to 3.8)
+      const nextX = currentX + thickness;
+      
+      if (isBar && nextX < (totalWidth - padding)) {
+        bars.push(
+          <rect
+            key={`bar-${i}`}
+            x={currentX}
+            y="6"
+            width={thickness}
+            height={height - 4}
+            fill="#090d16"
+          />
+        );
+      }
+      currentX += thickness + 1.5; // spacing
     }
+
     return (
-      <svg viewBox={`0 0 ${x + 10} 60`} className="w-full h-12 bg-white rounded p-1 border border-slate-300">
-        <rect width="100%" height="100%" fill="white" />
+      <svg 
+        viewBox={`0 0 ${totalWidth} 72`} 
+        className="w-full h-16 bg-white rounded-lg p-1 border border-slate-300 shadow-sm transition-all"
+        preserveAspectRatio="xMidYMid meet"
+      >
+        <rect width="100%" height="100%" fill="white" rx="6" />
+        {/* Render actual barcode lines */}
         {bars}
-        <text x="50%" y="55" textAnchor="middle" fontSize="10" fontFamily="monospace" fontWeight="bold" fill="#0f172a">
+        {/* Correctly centered barcode label */}
+        <text 
+          x={totalWidth / 2} 
+          y="64" 
+          textAnchor="middle" 
+          fontSize="12" 
+          fontFamily="monospace" 
+          fontWeight="900" 
+          fill="#090d16"
+          letterSpacing="3"
+        >
           {code}
         </text>
       </svg>
@@ -179,22 +223,13 @@ export const KartuDigitalModal: React.FC<KartuDigitalModalProps> = ({ type, data
               </div>
             </div>
 
-            {/* Barcode & QR Code SVG Container */}
-            <div className="mt-auto pt-1 flex items-center gap-2 bg-slate-900/90 p-2 rounded-xl border border-slate-700/60">
-              <div className="flex-1">
-                {renderBarcodeSVG(barcodeCode)}
-              </div>
-              <div className="w-14 h-14 bg-white p-1 rounded border border-slate-300 shrink-0">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(barcodeCode)}`}
-                  alt="QR Presensi"
-                  className="w-full h-full object-contain"
-                />
-              </div>
+            {/* Barcode SVG Container - Enlarged Single Barcode */}
+            <div className="mt-auto pt-1 bg-slate-900/90 p-2.5 rounded-xl border border-slate-700/60 shadow-inner">
+              {renderBarcodeSVG(barcodeCode)}
             </div>
-            <div className="text-[8px] text-center text-slate-400 mt-1 flex items-center justify-center gap-1">
-              <ShieldCheck className="w-3 h-3 text-emerald-400" />
-              Scan Barcode atau QR Code pada kamera mesin absensi
+            <div className="text-[8.5px] text-center text-slate-400 mt-1 flex items-center justify-center gap-1 font-semibold">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              Scan Barcode pada kamera mesin absensi
             </div>
           </div>
 

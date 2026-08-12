@@ -26,13 +26,40 @@ export async function validateFirestoreConnection() {
 }
 
 /**
+ * Helper to recursively clean object properties, removing any 'undefined' fields
+ * before they are sent to Firestore (which would cause a write error).
+ */
+function cleanObject<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(cleanObject) as unknown as T;
+  }
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        const val = obj[key];
+        if (val !== undefined) {
+          cleaned[key] = cleanObject(val);
+        }
+      }
+    }
+    return cleaned as T;
+  }
+  return obj;
+}
+
+/**
  * Saves or updates a single document in a collection
  */
 export async function dbSaveItem<T extends { id: string }>(collectionName: string, item: T) {
   const path = `${collectionName}/${item.id}`;
   try {
     const docRef = doc(db, collectionName, item.id);
-    await setDoc(docRef, item);
+    const cleanedItem = cleanObject(item);
+    await setDoc(docRef, cleanedItem);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -76,7 +103,8 @@ export async function dbSaveCollection<T extends { id: string }>(collectionName:
     const batch = writeBatch(db);
     items.forEach((item) => {
       const docRef = doc(db, collectionName, item.id);
-      batch.set(docRef, item);
+      const cleanedItem = cleanObject(item);
+      batch.set(docRef, cleanedItem);
     });
     await batch.commit();
   } catch (error) {
