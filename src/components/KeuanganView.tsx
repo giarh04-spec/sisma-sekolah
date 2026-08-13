@@ -47,6 +47,7 @@ interface KeuanganViewProps {
   setTransaksiList: React.Dispatch<React.SetStateAction<TransaksiKeuangan[]>>;
   userGoogleToken: string;
   siswaList?: Siswa[];
+  setSiswaList?: React.Dispatch<React.SetStateAction<Siswa[]>>;
   subTab?: KeuanganSubTab;
   setSubTab?: (subTab: KeuanganSubTab) => void;
   tarifBiayaList?: TarifBiaya[];
@@ -63,6 +64,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   setTransaksiList,
   userGoogleToken,
   siswaList = [],
+  setSiswaList,
   subTab,
   setSubTab,
   tarifBiayaList: propTarifBiayaList,
@@ -1210,6 +1212,17 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   const [exportingSheets, setExportingSheets] = useState(false);
   const [exportResult, setExportResult] = useState<{ success: boolean; url?: string; message?: string } | null>(null);
 
+  const [showEditSiswaModal, setShowEditSiswaModal] = useState(false);
+  const [editingSiswaData, setEditingSiswaData] = useState<Partial<Siswa>>({});
+
+  const handleSaveSiswa = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSiswa || !setSiswaList) return;
+    setSiswaList(prev => prev.map(s => s.id === selectedSiswa.id ? { ...s, ...editingSiswaData } as Siswa : s));
+    setShowEditSiswaModal(false);
+    alert("Data siswa berhasil diperbarui!");
+  };
+
   const defaultReminderText = `Yth. Bapak/Ibu Wali dari *{NAMA_SISWA}* ({KELAS}),\n\nMenginformasikan tagihan :\n• *No. Invoice*: {NO_INVOICE}\n• *{TAGIHAN}* sebesar *Rp {NOMINAL}*\n• *Jatuh tempo pada* {JATUH_TEMPO}\n• *Status saat ini*: {STATUS}.\n\nMohon dapat melakukan pembayaran melalui Rekening Kasir Sekolah / QRIS / Transfer.\n\nTerima kasih atas perhatian Bapak/Ibu.\n• *Bendahara SMPI MODERN AL FAKHIR*`;
   
   const defaultReceiptText = `Yth. Bapak/Ibu Wali dari *{NAMA_SISWA}* ({KELAS}),\n\nTerima kasih, pembayaran *{NAMA_TAGIHAN}* sebesar *{NOMINAL_BAYAR}* telah *KAMI TERIMA* dengan baik pada *{TANGGAL_BAYAR}*.\n• *No. Invoice* : {NO_INVOICE}\n• *Metode*: {METODE_BAYAR}\n\n*Status Tagihan*: {STATUS}.\n• *Bendahara SMPI MODERN AL FAKHIR*`;
@@ -2199,52 +2212,64 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 Informasi Siswa
               </h3>
 
-              <button
-                type="button"
-                disabled={!selectedSiswa}
-                onClick={() => {
-                  if (!selectedSiswa) return;
-                  setPrintReceiptData({
-                    noNota: generateInvoiceNumber(),
-                    tahunAjaran,
-                    nis: selectedSiswa.nis,
-                    nama: selectedSiswa.nama,
-                    namaIbu: selectedSiswa.namaIbu || selectedSiswa.namaWali,
-                    kelas: selectedSiswa.kelas,
-                    pembayaranTitle: `Rekap Seluruh Tagihan T.A ${tahunAjaran}`,
-                    nominal: totalSisaBulanan + 650000,
-                    dibayar: totalSisaBulanan + 650000,
-                    kembalian: 0,
-                    tanggal: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }),
-                    penerima: 'Bendahara Sekolah'
-                  });
-                  setShowPrintModal(true);
-                }}
-                className={`px-4 py-1.5 font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md ${!selectedSiswa ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50' : 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20'}`}
-              >
-                <Printer className="w-3.5 h-3.5" />
-                Cetak Semua Tagihan
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!selectedSiswa}
+                  onClick={() => {
+                    if (!selectedSiswa) return;
+                    setEditingSiswaData({ ...selectedSiswa });
+                    setShowEditSiswaModal(true);
+                  }}
+                  className={`px-3 py-1.5 font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md ${!selectedSiswa ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50' : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/20'}`}
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Siswa
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!selectedSiswa}
+                  onClick={() => {
+                    if (!selectedSiswa) return;
+                    setPrintReceiptData({
+                      noNota: generateInvoiceNumber(),
+                      tahunAjaran,
+                      nis: selectedSiswa.nis,
+                      nama: selectedSiswa.nama,
+                      namaIbu: selectedSiswa.namaIbu || selectedSiswa.namaWali,
+                      kelas: selectedSiswa.kelas,
+                      pembayaranTitle: `Rekap Seluruh Tagihan T.A ${tahunAjaran}`,
+                      nominal: totalSisaBulanan + 650000,
+                      dibayar: totalSisaBulanan + 650000,
+                      kembalian: 0,
+                      tanggal: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }),
+                      penerima: 'Bendahara Sekolah'
+                    });
+                    setShowPrintModal(true);
+                  }}
+                  className={`px-4 py-1.5 font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md ${!selectedSiswa ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50' : 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20'}`}
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  Cetak Semua Tagihan
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
               {/* Left Student Attributes Table */}
               <div className="md:col-span-3 space-y-2.5 text-xs text-slate-300">
                 <div className="grid grid-cols-12 py-1 border-b border-slate-800/60">
-                  <span className="col-span-4 font-semibold text-slate-400">Tahun Ajaran</span>
-                  <span className="col-span-8 font-bold text-white">: {tahunAjaran}</span>
-                </div>
-                <div className="grid grid-cols-12 py-1 border-b border-slate-800/60">
-                  <span className="col-span-4 font-semibold text-slate-400">Semester</span>
-                  <span className="col-span-8 font-bold text-emerald-400">: {semester}</span>
-                </div>
-                <div className="grid grid-cols-12 py-1 border-b border-slate-800/60">
-                  <span className="col-span-4 font-semibold text-slate-400">NIS</span>
-                  <span className="col-span-8 font-mono font-bold text-emerald-400">: {selectedSiswa ? selectedSiswa.nis : '-'}</span>
+                  <span className="col-span-4 font-semibold text-slate-400">NISN</span>
+                  <span className="col-span-8 font-mono font-bold text-emerald-400">: {selectedSiswa ? (selectedSiswa.nisn || selectedSiswa.nis || '-') : '-'}</span>
                 </div>
                 <div className="grid grid-cols-12 py-1 border-b border-slate-800/60">
                   <span className="col-span-4 font-semibold text-slate-400">Nama Siswa</span>
                   <span className="col-span-8 font-bold text-white text-sm">: {selectedSiswa ? selectedSiswa.nama : '-'}</span>
+                </div>
+                <div className="grid grid-cols-12 py-1 border-b border-slate-800/60">
+                  <span className="col-span-4 font-semibold text-slate-400">No. WhatsApp</span>
+                  <span className="col-span-8 font-mono font-bold text-emerald-400">: {selectedSiswa ? (selectedSiswa.teleponWali || '-') : '-'}</span>
                 </div>
                 <div className="grid grid-cols-12 py-1 border-b border-slate-800/60">
                   <span className="col-span-4 font-semibold text-slate-400">Nama Ibu Kandung</span>
@@ -3198,6 +3223,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     <th className="px-4 py-3">Sisa</th>
                     <th className="px-4 py-3">Tgl Tagihan</th>
                     <th className="px-4 py-3">Tgl Bayar</th>
+                    <th className="px-4 py-3">Metode Pembayaran</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3 text-center">Aksi</th>
                     <th className="px-4 py-3 text-center">Kirim Notif WA</th>
@@ -3290,15 +3316,19 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             {isLunas || isDicicil ? (
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-xs font-mono font-bold text-emerald-400 flex items-center gap-1">
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  {latestTx ? latestTx.tanggal : (t.tanggalBayar || '-')}
-                                </span>
-                                <span className="text-[9px] bg-slate-800 text-slate-300 font-semibold px-1.5 py-0.5 rounded-md w-fit border border-slate-700/60 mt-0.5">
-                                  {latestTx?.metodePembayaran || t.metodePembayaran || 'Cash / Kasir'}
-                                </span>
-                              </div>
+                              <span className="text-xs font-mono font-bold text-emerald-400 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                {latestTx ? latestTx.tanggal : (t.tanggalBayar || '-')}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-500">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {isLunas || isDicicil ? (
+                              <span className="text-[10px] bg-slate-800 text-slate-300 font-semibold px-2 py-1 rounded-md inline-block border border-slate-700/60">
+                                {latestTx?.metodePembayaran || t.metodePembayaran || 'Cash / Kasir'}
+                              </span>
                             ) : (
                               <span className="text-xs text-slate-500">-</span>
                             )}
@@ -4417,6 +4447,104 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 Ya, Hapus
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDIT SISWA */}
+      {showEditSiswaModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#121212] border border-slate-800 text-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="font-extrabold text-sm flex items-center gap-2 text-blue-400">
+                <Edit3 className="w-4 h-4" />
+                Edit Data Siswa
+              </h3>
+              <button
+                onClick={() => setShowEditSiswaModal(false)}
+                className="text-slate-400 hover:text-white font-bold"
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleSaveSiswa} className="space-y-3 text-xs">
+              <div>
+                <label className="text-slate-400 font-bold block mb-1">Nama Siswa</label>
+                <input
+                  type="text"
+                  value={editingSiswaData.nama || ''}
+                  onChange={e => setEditingSiswaData(prev => ({ ...prev, nama: e.target.value }))}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 font-bold block mb-1">NISN</label>
+                  <input
+                    type="text"
+                    value={editingSiswaData.nisn || ''}
+                    onChange={e => setEditingSiswaData(prev => ({ ...prev, nisn: e.target.value }))}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 font-bold block mb-1">NIS</label>
+                  <input
+                    type="text"
+                    value={editingSiswaData.nis || ''}
+                    onChange={e => setEditingSiswaData(prev => ({ ...prev, nis: e.target.value }))}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-mono"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 font-bold block mb-1">Kelas</label>
+                  <input
+                    type="text"
+                    value={editingSiswaData.kelas || ''}
+                    onChange={e => setEditingSiswaData(prev => ({ ...prev, kelas: e.target.value }))}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 font-bold block mb-1">No. WhatsApp Wali</label>
+                  <input
+                    type="text"
+                    value={editingSiswaData.teleponWali || ''}
+                    onChange={e => setEditingSiswaData(prev => ({ ...prev, teleponWali: e.target.value }))}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-mono"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-slate-400 font-bold block mb-1">Nama Ibu Kandung</label>
+                <input
+                  type="text"
+                  value={editingSiswaData.namaIbu || ''}
+                  onChange={e => setEditingSiswaData(prev => ({ ...prev, namaIbu: e.target.value }))}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowEditSiswaModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-xl text-xs transition-all shadow-md shadow-blue-600/30 flex items-center gap-1.5"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Simpan Perubahan
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

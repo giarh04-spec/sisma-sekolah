@@ -711,6 +711,7 @@ export default function App() {
           
           {activeTab === 'keuangan' && (
             <KeuanganView
+              setSiswaList={setSiswaList}
               tagihanList={tagihanList}
               setTagihanList={setTagihanList}
               transaksiList={transaksiList}
