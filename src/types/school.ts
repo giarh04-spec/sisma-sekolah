@@ -15,9 +15,9 @@ export interface RombelKelas {
 
 export type Role = 'admin' | 'guru' | 'siswa' | 'staf';
 export type SubTab = 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel';
-export type AbsensiSubTab = 'scan_barcode' | 'harian_siswa' | 'kelas_mapel' | 'absensi_guru';
+export type AbsensiSubTab = 'scan_barcode' | 'harian_siswa' | 'kelas_mapel' | 'absensi_guru' | 'redaksi';
 export type CbtSubTab = 'bank_soal' | 'jadwal_kartu' | 'ai_generator' | 'simulasi_ujian' | 'hasil_ujian';
-export type KeuanganSubTab = 'pembayaran' | 'pengaturan_biaya' | 'rekap';
+export type KeuanganSubTab = 'pembayaran' | 'pengaturan_biaya' | 'rekap' | 'redaksi';
 export type PengaturanSubTab = 'identitas' | 'logo' | 'google_drive' | 'fonnte' | 'jadwal';
 
 export interface TarifBiaya {
@@ -313,6 +313,7 @@ export interface TagihanKeuangan {
   jatuhTempo: string;
   tanggalBayar?: string; // Tanggal pembayaran dilakukan (e.g. "2026-08-09" / "09/08/2026")
   waWaliSentAt?: string;
+  isDeleted?: boolean;
 }
 
 export interface TransaksiKeuangan {

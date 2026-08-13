@@ -981,6 +981,16 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   </p>
                 </div>
 
+                {/* Info Watermark Fonnte */}
+                <div className="p-3 bg-amber-950/30 border border-amber-500/30 rounded-xl space-y-1">
+                  <p className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                    💡 Info Watermark "Sent via fonnte.com"
+                  </p>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                    Teks <code className="text-amber-200 font-mono">"Sent via fonnte.com"</code> ditambahkan secara otomatis oleh server Fonnte untuk akun dengan paket <b>Free / Trial</b>. Untuk menyembunyikan atau menghilangkan watermark tersebut, silakan upgrade akun Fonnte Anda ke paket <b>Pro / Berlangganan</b> di website resmi Fonnte.
+                  </p>
+                </div>
+
                 {/* Auto Sending Toggles */}
                 <div className="pt-3 border-t border-slate-800 space-y-3">
                   <div className="flex items-center justify-between p-3 bg-[#121212] rounded-xl border border-slate-800">

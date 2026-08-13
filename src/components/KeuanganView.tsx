@@ -31,7 +31,10 @@ import {
   GraduationCap,
   Sparkles,
   Layers,
-  RefreshCw
+  RefreshCw,
+  MessageSquare,
+  Smartphone,
+  Bell
 } from 'lucide-react';
 import { TagihanKeuangan, TransaksiKeuangan, Siswa, KeuanganSubTab, TarifBiaya, TipeKeuangan, SchoolSettings } from '../types/school';
 import { sendFonnteMessage } from '../lib/fonnte';
@@ -49,6 +52,7 @@ interface KeuanganViewProps {
   tarifBiayaList?: TarifBiaya[];
   setTarifBiayaList?: React.Dispatch<React.SetStateAction<TarifBiaya[]>>;
   schoolSettings?: SchoolSettings;
+  setSchoolSettings?: React.Dispatch<React.SetStateAction<SchoolSettings>>;
   onRefresh?: () => void;
 }
 
@@ -64,6 +68,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   tarifBiayaList: propTarifBiayaList,
   setTarifBiayaList: propSetTarifBiayaList,
   schoolSettings,
+  setSchoolSettings,
   onRefresh
 }) => {
   console.log('KeuanganView rendered with tagihanList.length:', tagihanList.length);
@@ -183,19 +188,26 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   const [filterTipeTagihan, setFilterTipeTagihan] = useState<'all' | 'spp' | 'ukt' | 'ekskul'>('all');
   const [filterNamaTagihan, setFilterNamaTagihan] = useState<string>('all');
   const [searchTagihanQuery, setSearchTagihanQuery] = useState<string>('');
-  const [deletedTagihanIds, setDeletedTagihanIds] = useState<string[]>([]);
 
   // Synthesize complete list of tagihan covering SPP, UKT, and Ekskul for all students
   const allEffectiveTagihanList = useMemo(() => {
-    const combined: TagihanKeuangan[] = tagihanList.filter(t => !deletedTagihanIds.includes(t.id));
+    const combined: TagihanKeuangan[] = tagihanList.filter(t => !t.isDeleted);
 
     // Build map of existing tagihan by (siswaNama.toLowerCase() + '-' + tipe.toLowerCase())
     const existingKeySet = new Set<string>();
+    const deletedSynIds = new Set<string>();
+
     tagihanList.forEach(t => {
-      if (t && t.siswaNama && !deletedTagihanIds.includes(t.id)) {
-        const sName = (t.siswaNama || '').trim().toLowerCase();
-        const sTipe = (t.tipe || '').toLowerCase();
-        existingKeySet.add(`${sName}-${sTipe}`);
+      if (t) {
+        if (t.isDeleted) {
+          if (t.id.startsWith('syn-')) {
+            deletedSynIds.add(t.id);
+          }
+        } else if (t.siswaNama) {
+          const sName = (t.siswaNama || '').trim().toLowerCase();
+          const sTipe = (t.tipe || '').toLowerCase();
+          existingKeySet.add(`${sName}-${sTipe}`);
+        }
       }
     });
 
@@ -208,7 +220,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       tipesToEnsure.forEach(tipe => {
         const key = `${sNameNorm}-${tipe}`;
         const synId = `syn-${tipe}-${siswa.id}`;
-        if (!existingKeySet.has(key) && !deletedTagihanIds.includes(synId)) {
+        if (!existingKeySet.has(key) && !deletedSynIds.has(synId)) {
           // Find tariff if available (class-specific for SPP)
           const matchingTarif = tarifList.find(tr => {
             if (!tr || (tr.tipe || '').toLowerCase() !== tipe || tr.status !== 'Aktif') return false;
@@ -254,7 +266,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             siswaNama: siswa.nama,
             kelas: siswa.kelas || '',
             tipe: tipe,
-            namaTagihan: latestTx ? latestTx.pembayaran : defaultNama,
+            namaTagihan: (latestTx && latestTx.pembayaran) ? latestTx.pembayaran : defaultNama,
             bulanTahun: tahunAjaran,
             nominal: nominalFinal,
             terbayar: terbayarFromTx,
@@ -267,7 +279,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     });
 
     return combined;
-  }, [tagihanList, siswaList, tarifList, transaksiList, tahunAjaran, deletedTagihanIds]);
+  }, [tagihanList, siswaList, tarifList, transaksiList, tahunAjaran]);
 
   // Dynamically derive list of available bill names for the dropdown
   const availableNamaTagihanList = useMemo(() => {
@@ -341,6 +353,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   const [transactionDate, setTransactionDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
+  const [selectedMetodePembayaran, setSelectedMetodePembayaran] = useState<string>('Cash / Kasir');
 
   // Sync total when selected months or monthlyFee change
   React.useEffect(() => {
@@ -410,7 +423,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   // Student Specific Recent Transactions List with localStorage persistence
   const [deleteTargetTx, setDeleteTargetTx] = useState<{
     id: string;
-    pembayaran: string;
+    pembayaran?: string;
     tagihan: number;
     tanggal: string;
     itemId?: string;
@@ -419,7 +432,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
   const [studentTransactions, setStudentTransactions] = useState<Array<{
     id: string;
-    pembayaran: string;
+    pembayaran?: string;
     tagihan: number;
     tanggal: string;
     itemId?: string;
@@ -533,10 +546,37 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     } catch (e) {}
   }, [bebasTerbayarMap, studentKey]);
 
+  // Helper helper to format dates beautifully
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '-';
+    if (dateStr.includes('/') || dateStr.length > 10) return dateStr;
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      const months = [
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      ];
+      const mIdx = parseInt(month, 10) - 1;
+      if (mIdx >= 0 && mIdx < 12) {
+        return `${parseInt(day, 10)} ${months[mIdx]} ${year}`;
+      }
+    }
+    return dateStr;
+  };
+
+  const studentBills = useMemo(() => {
+    if (!selectedSiswa) return [];
+    const normName = selectedSiswa.nama.trim().toLowerCase();
+    return allEffectiveTagihanList.filter(t => 
+      t && (t.siswaId === selectedSiswa.id || (t.siswaNama && t.siswaNama.trim().toLowerCase() === normName))
+    );
+  }, [selectedSiswa, allEffectiveTagihanList]);
+
   // Helper Function: Perform Transaction Deletion & State Rollback
   const performDeleteTransaction = (targetTx: {
     id: string;
-    pembayaran: string;
+    pembayaran?: string;
     tagihan: number;
     tanggal: string;
     itemId?: string;
@@ -549,17 +589,22 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       localStorage.setItem(`edu_student_tx_${studentKey}`, JSON.stringify(updatedTransactions));
     } catch (e) {}
 
-    const isSpp = targetTx.type === 'spp' || targetTx.pembayaran.toLowerCase().startsWith('spp');
+    const originalTx = transaksiList.find(tx => tx && tx.id === targetTx.id);
+    const txTipe = originalTx ? originalTx.tipe : (targetTx.type === 'spp' ? 'spp' : 'ukt');
+
+    const pembayaranText = targetTx.pembayaran || (originalTx ? originalTx.pembayaran : '') || '';
+    const isSpp = txTipe === 'spp' || pembayaranText.toLowerCase().includes('spp');
 
     // 2. Restore SPP paid months if applicable
     let updatedPaid = { ...paidMonthsState };
     if (isSpp) {
-      const monthMatch = targetTx.pembayaran.match(/\(([^)]+)\)/);
-      if (monthMatch && monthMatch[1]) {
-        const monthNames = monthMatch[1].split(/[,&]/).map(m => m.trim());
+      const monthMatch = pembayaranText.match(/\(([^)]+)\)/) || pembayaranText.match(/(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)/i);
+      if (monthMatch) {
+        const monthNames = monthMatch[1] ? monthMatch[1].split(/[,&]/).map(m => m.trim()) : [monthMatch[0]];
         monthNames.forEach(m => {
-          if (allMonths.includes(m)) {
-            delete updatedPaid[m];
+          const foundMonth = allMonths.find(month => month.toLowerCase() === m.toLowerCase());
+          if (foundMonth) {
+            delete updatedPaid[foundMonth];
           }
         });
         setPaidMonthsState(updatedPaid);
@@ -571,11 +616,12 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
     // 3. Restore Bebas payment balance if applicable
     let updatedBebas = { ...bebasTerbayarMap };
-    if (targetTx.type === 'bebas' || targetTx.itemId || !isSpp) {
-      if (targetTx.itemId) {
-        updatedBebas[targetTx.itemId!] = Math.max(0, (updatedBebas[targetTx.itemId!] || 0) - targetTx.tagihan);
+    if (txTipe !== 'spp' || targetTx.itemId) {
+      const targetId = targetTx.itemId || (originalTx ? originalTx.tagihanId : undefined);
+      if (targetId) {
+        updatedBebas[targetId] = Math.max(0, (updatedBebas[targetId] || 0) - targetTx.tagihan);
       } else {
-        const matchedBebas = bebasItems.find(item => targetTx.pembayaran.toLowerCase().includes(item.nama.toLowerCase()));
+        const matchedBebas = bebasItems.find(item => pembayaranText.toLowerCase().includes(item.nama.toLowerCase()));
         if (matchedBebas) {
           updatedBebas[matchedBebas.id] = Math.max(0, (updatedBebas[matchedBebas.id] || 0) - targetTx.tagihan);
         }
@@ -595,10 +641,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     if (setTagihanList) {
       setTagihanList(prev => {
         return prev.map(t => {
-          const isMatch = t.id === targetTx.itemId || 
+          const isMatch = t.id === targetTx.itemId || (originalTx && t.id === originalTx.tagihanId) || 
             (t.siswaNama && selectedSiswa && 
              (t.siswaNama.toLowerCase() === selectedSiswa.nama.toLowerCase()) &&
-             (t.tipe === (targetTx.type === 'spp' || targetTx.pembayaran.toLowerCase().startsWith('spp') ? 'spp' : 'ukt')));
+             (t.tipe === txTipe));
           if (isMatch) {
             const remainingTerbayar = Math.max(0, (t.terbayar || 0) - targetTx.tagihan);
             const isLunas = remainingTerbayar >= t.nominal && t.nominal > 0;
@@ -620,7 +666,11 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   const handleDeleteSingleTransaction = (txId: string) => {
     const targetTx = studentTransactions.find(t => t.id === txId);
     if (!targetTx) return;
-    setDeleteTargetTx(targetTx);
+    const cleanTx = {
+      ...targetTx,
+      pembayaran: targetTx.pembayaran || (targetTx.type === 'spp' ? 'Pembayaran SPP' : 'Pembayaran Tagihan')
+    };
+    setDeleteTargetTx(cleanTx);
   };
 
   // Reset Semua Transaksi Dari Awal Handler
@@ -647,6 +697,64 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       } catch (e) {}
       alert('Semua riwayat transaksi berhasil di-reset dari awal.');
     }
+  };
+
+  // Helper to generate automatic invoice number in 0001/C-ALFAKHIR/VIII/2026 format
+  const generateInvoiceNumber = (): string => {
+    const romanMonths = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentRomanMonth = romanMonths[now.getMonth()];
+    
+    // Get counter from localStorage
+    const storageKey = `invoice_seq_${currentYear}_${currentRomanMonth}`;
+    let counter = Number(localStorage.getItem(storageKey) || "0");
+    counter += 1;
+    localStorage.setItem(storageKey, String(counter));
+    
+    const paddedSeq = String(counter).padStart(4, '0');
+    return `${paddedSeq}/C-ALFAKHIR/${currentRomanMonth}/${currentYear}`;
+  };
+
+  // Stable invoice number generator per tagihan object
+  const getStableInvoiceNumber = (t: any): string => {
+    let seed = 1;
+    if (t && t.id) {
+      if (typeof t.id === 'number') {
+        seed = t.id % 9000;
+      } else {
+        let hash = 0;
+        const strId = String(t.id);
+        for (let i = 0; i < strId.length; i++) {
+          hash = (hash << 5) - hash + strId.charCodeAt(i);
+          hash |= 0;
+        }
+        seed = Math.abs(hash) % 9000;
+      }
+    }
+    const finalSeq = String((seed % 8999) + 1).padStart(4, '0');
+    let romanMonth = "VIII";
+    let year = "2026";
+    if (t && t.tanggalTagihan) {
+      const dateParts = String(t.tanggalTagihan).split(/[-/]/);
+      if (dateParts.length >= 3) {
+        const possibleYear = dateParts.find(p => p.length === 4);
+        if (possibleYear) {
+          year = possibleYear;
+        }
+        let monthNum = 8;
+        if (dateParts[0].length === 4) {
+          monthNum = parseInt(dateParts[1], 10) || 8;
+        } else {
+          monthNum = parseInt(dateParts[1], 10) || 8;
+        }
+        const romanMonths = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+        if (monthNum >= 1 && monthNum <= 12) {
+          romanMonth = romanMonths[monthNum - 1];
+        }
+      }
+    }
+    return `${finalSeq}/C-ALFAKHIR/${romanMonth}/${year}`;
   };
 
   // Printable Receipt Modal State
@@ -1071,7 +1179,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   // Re-open receipt modal for any previous transaction
   const handleReprintTransaction = (tx: { id: string; pembayaran: string; tagihan: number; tanggal: string }) => {
     const receipt = {
-      noNota: `KW-${Math.floor(100000 + Math.random() * 900000)}`,
+      noNota: generateInvoiceNumber(),
       tahunAjaran,
       nis: selectedSiswa ? selectedSiswa.nis : '20261001',
       nama: selectedSiswa ? selectedSiswa.nama : 'Ahmad Rizky Pratama',
@@ -1102,11 +1210,83 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   const [exportingSheets, setExportingSheets] = useState(false);
   const [exportResult, setExportResult] = useState<{ success: boolean; url?: string; message?: string } | null>(null);
 
+  const defaultReminderText = `Yth. Bapak/Ibu Wali dari *{NAMA_SISWA}* ({KELAS}),\n\nMenginformasikan tagihan :\n• *No. Invoice*: {NO_INVOICE}\n• *{TAGIHAN}* sebesar *Rp {NOMINAL}*\n• *Jatuh tempo pada* {JATUH_TEMPO}\n• *Status saat ini*: {STATUS}.\n\nMohon dapat melakukan pembayaran melalui Rekening Kasir Sekolah / QRIS / Transfer.\n\nTerima kasih atas perhatian Bapak/Ibu.\n• *Bendahara SMPI MODERN AL FAKHIR*`;
+  
+  const defaultReceiptText = `Yth. Bapak/Ibu Wali dari *{NAMA_SISWA}* ({KELAS}),\n\nTerima kasih, pembayaran *{NAMA_TAGIHAN}* sebesar *{NOMINAL_BAYAR}* telah *KAMI TERIMA* dengan baik pada *{TANGGAL_BAYAR}*.\n• *No. Invoice* : {NO_INVOICE}\n• *Metode*: {METODE_BAYAR}\n\n*Status Tagihan*: {STATUS}.\n• *Bendahara SMPI MODERN AL FAKHIR*`;
+
+  const [localTemplateReminder, setLocalTemplateReminder] = useState(schoolSettings?.fonnteConfig?.templateReminder || defaultReminderText);
+  const [localTemplateReceipt, setLocalTemplateReceipt] = useState(schoolSettings?.fonnteConfig?.templateReceipt || defaultReceiptText);
+  const [activeRedaksiTab, setActiveRedaksiTab] = useState<'reminder' | 'receipt'>('reminder');
+
   React.useEffect(() => {
     if (schoolSettings?.fonnteToken) {
       setFonnteToken(schoolSettings.fonnteToken);
     }
+    if (schoolSettings?.fonnteConfig?.templateReminder) {
+      setLocalTemplateReminder(schoolSettings.fonnteConfig.templateReminder);
+    }
+    if (schoolSettings?.fonnteConfig?.templateReceipt) {
+      setLocalTemplateReceipt(schoolSettings.fonnteConfig.templateReceipt);
+    }
   }, [schoolSettings]);
+
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+
+  const handleSaveTemplates = () => {
+    if (!setSchoolSettings) {
+      alert("Fasilitas simpan pengaturan tidak tersedia!");
+      return;
+    }
+    setSchoolSettings(prev => ({
+      ...prev,
+      fonnteConfig: {
+        ...(prev.fonnteConfig || {
+          apiKey: prev.fonnteToken || '',
+          senderName: '',
+          enabled: true,
+          autoSendAbsensi: true,
+          autoSendKeuangan: true
+        }),
+        templateReminder: localTemplateReminder,
+        templateReceipt: localTemplateReceipt
+      }
+    }));
+    setSaveSuccessMsg("Redaksi notifikasi WhatsApp berhasil disimpan!");
+    setTimeout(() => setSaveSuccessMsg(null), 3000);
+  };
+
+  const handleResetTemplate = () => {
+    if (activeRedaksiTab === 'reminder') {
+      setLocalTemplateReminder(defaultReminderText);
+    } else {
+      setLocalTemplateReceipt(defaultReceiptText);
+    }
+  };
+
+  const insertPlaceholder = (placeholder: string) => {
+    const elId = activeRedaksiTab === 'reminder' ? 'template_reminder_input' : 'template_receipt_input';
+    const textarea = document.getElementById(elId) as HTMLTextAreaElement;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = activeRedaksiTab === 'reminder' ? localTemplateReminder : localTemplateReceipt;
+    const before = text.substring(0, start);
+    const after = text.substring(end, text.length);
+    const newText = before + placeholder + after;
+
+    if (activeRedaksiTab === 'reminder') {
+      setLocalTemplateReminder(newText);
+    } else {
+      setLocalTemplateReceipt(newText);
+    }
+
+    // Restore focus and cursor selection range
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + placeholder.length, start + placeholder.length);
+    }, 0);
+  };
 
   // Fee Rates Settings View States
   const [feeCategoryFilter, setFeeCategoryFilter] = useState<'semua' | 'spp' | 'ukt' | 'ekskul'>('semua');
@@ -1171,13 +1351,15 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     tanggalBayar: string;
     status: 'Lunas' | 'Belum Lunas' | 'Dicicil';
     terbayar?: number;
+    metodePembayaran?: string;
   }>({
     namaTagihan: '',
     nominal: 0,
     jatuhTempo: '',
     tanggalBayar: '',
     status: 'Belum Lunas',
-    terbayar: 0
+    terbayar: 0,
+    metodePembayaran: 'Cash / Kasir'
   });
 
   // Search Submit Handler
@@ -1343,17 +1525,18 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             id: txUniqueId,
             tagihanId: tagId,
             siswaNama: studentName,
+            pembayaran: itemTitle,
             tipe: 'spp',
             nominal: inputDibayar,
             tanggal: dateNumeric,
-            metodePembayaran: 'Cash / Kasir',
+            metodePembayaran: selectedMetodePembayaran,
             penerima: 'Kasir / Bendahara Sekolah'
           };
           setTransaksiList(prev => [globalTrx, ...prev]);
         }
 
         const receipt = {
-          noNota: `KW-${Math.floor(100000 + Math.random() * 900000)}`,
+          noNota: generateInvoiceNumber(),
           tahunAjaran,
           nis: selectedSiswa ? selectedSiswa.nis : '',
           nama: studentName,
@@ -1431,17 +1614,18 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             id: txUniqueId,
             tagihanId: tagId,
             siswaNama: studentName,
+            pembayaran: itemTitle,
             tipe: quickPayType,
             nominal: inputDibayar,
             tanggal: dateNumeric,
-            metodePembayaran: 'Cash / Kasir',
+            metodePembayaran: selectedMetodePembayaran,
             penerima: 'Kasir / Bendahara Sekolah'
           };
           setTransaksiList(prev => [globalTrx, ...prev]);
         }
 
         const receipt = {
-          noNota: `KW-${Math.floor(100000 + Math.random() * 900000)}`,
+          noNota: generateInvoiceNumber(),
           tahunAjaran,
           nis: selectedSiswa ? selectedSiswa.nis : '',
           nama: studentName,
@@ -1524,16 +1708,17 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         id: txUniqueId,
         tagihanId: tagId,
         siswaNama: studentName,
+        pembayaran: `${namaItem} (T.A ${tahunAjaran})`,
         tipe: 'ukt',
         nominal: payNominal,
         tanggal: dateNumeric,
-        metodePembayaran: 'Cash / Kasir',
+        metodePembayaran: selectedMetodePembayaran,
         penerima: 'Kasir / Bendahara Sekolah'
       };
       setTransaksiList(prev => [globalTrx, ...prev]);
     }
     const receipt = {
-      noNota: `KW-${Math.floor(100000 + Math.random() * 900000)}`,
+      noNota: generateInvoiceNumber(),
       tahunAjaran,
       nis: selectedSiswa ? selectedSiswa.nis : '',
       nama: studentName,
@@ -1674,11 +1859,79 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   };
 
   // WhatsApp Fonnte Notification Handlers
+  const formatWhatsAppMarkdown = (text: string) => {
+    let html = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    // Asterisks for bold: *text* -> <strong class="font-bold text-slate-900">text</strong>
+    html = html.replace(/\*([^*]+)\*/g, '<strong class="font-extrabold text-slate-900">$1</strong>');
+    
+    // Underscores for italics: _text_ -> <em class="italic text-slate-600">text</em>
+    html = html.replace(/_([^_]+)_/g, '<em class="italic text-slate-600">$1</em>');
+
+    return html;
+  };
+
+  const parseWaTemplate = (
+    template: string,
+    vars: {
+      NAMA_SISWA: string;
+      KELAS: string;
+      NAMA_TAGIHAN: string;
+      NOMINAL_TAGIHAN: string;
+      SISA_TAGIHAN: string;
+      NOMINAL_BAYAR: string;
+      TANGGAL_BAYAR: string;
+      NAMA_SEKOLAH: string;
+      TAGIHAN?: string;
+      NOMINAL?: string;
+      JATUH_TEMPO?: string;
+      STATUS?: string;
+      NO_INVOICE?: string;
+      METODE_BAYAR?: string;
+    }
+  ) => {
+    let result = template;
+    const fullVars = {
+      ...vars,
+      TAGIHAN: vars.TAGIHAN || vars.NAMA_TAGIHAN,
+      NOMINAL: vars.NOMINAL || vars.NOMINAL_TAGIHAN,
+      JATUH_TEMPO: vars.JATUH_TEMPO || "10 Agustus 2026",
+      STATUS: vars.STATUS || "BELUM LUNAS",
+      NO_INVOICE: vars.NO_INVOICE || "0001/C-ALFAKHIR/VIII/2026",
+      METODE_BAYAR: vars.METODE_BAYAR || "Cash / Kasir"
+    };
+    Object.entries(fullVars).forEach(([key, val]) => {
+      result = result.replace(new RegExp(`{${key}}`, 'gi'), val);
+    });
+    return result;
+  };
+
   const handleSendWaReminder = async (tagihan: TagihanKeuangan) => {
     const s = siswaList.find(item => item.id === tagihan.siswaId || item.nis === tagihan.siswaNama || item.nama === tagihan.siswaNama);
     const phone = s?.teleponWali || '081234567890';
     const sisa = tagihan.nominal - tagihan.terbayar;
-    const message = `Yth. Bapak/Ibu Wali dari *${tagihan.siswaNama}* (${tagihan.kelas}),\n\n📌 *PENGINGAT PEMBAYARAN SEKOLAH*\nTerdapat tagihan *${tagihan.namaTagihan}* sebesar *Rp ${tagihan.nominal.toLocaleString('id-ID')}* (Sisa belum dibayar: *Rp ${sisa.toLocaleString('id-ID')}*).\n\nMohon untuk segera melakukan pembayaran ke loket kasir sekolah atau transfer ke rekening resmi.\n\nTerima kasih.\n_Bendahara & Tata Usaha Sekolah_`;
+    
+    const defaultTemplate = `Yth. Bapak/Ibu Wali dari *{NAMA_SISWA}* ({KELAS}),\n\nMenginformasikan tagihan :\n• *No. Invoice*: {NO_INVOICE}\n• *{TAGIHAN}* sebesar *Rp {NOMINAL}*\n• *Jatuh tempo pada* {JATUH_TEMPO}\n• *Status saat ini*: {STATUS}.\n\nMohon dapat melakukan pembayaran melalui Rekening Kasir Sekolah / QRIS / Transfer.\n\nTerima kasih atas perhatian Bapak/Ibu.\n• *Bendahara SMPI MODERN AL FAKHIR*`;
+    const templateToUse = schoolSettings?.fonnteConfig?.templateReminder || defaultTemplate;
+
+    const message = parseWaTemplate(templateToUse, {
+      NAMA_SISWA: tagihan.siswaNama,
+      KELAS: tagihan.kelas || 'X',
+      NAMA_TAGIHAN: tagihan.namaTagihan,
+      NOMINAL_TAGIHAN: `Rp ${tagihan.nominal.toLocaleString('id-ID')}`,
+      SISA_TAGIHAN: `Rp ${sisa.toLocaleString('id-ID')}`,
+      NOMINAL_BAYAR: `Rp ${tagihan.terbayar.toLocaleString('id-ID')}`,
+      TANGGAL_BAYAR: tagihan.tanggalBayar || new Date().toLocaleDateString('id-ID'),
+      NAMA_SEKOLAH: schoolSettings?.namaSekolah || 'Sekolah Modern Al-Fakhir',
+      TAGIHAN: tagihan.namaTagihan,
+      NOMINAL: `${tagihan.nominal.toLocaleString('id-ID')}`,
+      JATUH_TEMPO: tagihan.jatuhTempo || new Date().toLocaleDateString('id-ID'),
+      STATUS: tagihan.status === 'Lunas' ? 'LUNAS' : tagihan.status === 'Dicicil' ? 'DICICIL' : 'BELUM LUNAS',
+      NO_INVOICE: getStableInvoiceNumber(tagihan)
+    });
     
     setWaSendingStatus(`Mengirim WA Tagihan ke ${tagihan.siswaNama} (${phone})...`);
     const res = await sendFonnteMessage(phone, message, fonnteToken);
@@ -1692,7 +1945,28 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     const txs = transaksiList.filter(tx => tx.tagihanId === tagihan.id);
     const latestTx = txs.length > 0 ? txs[txs.length - 1] : null;
     const tglBayar = tagihan.tanggalBayar || (latestTx ? latestTx.tanggal : new Date().toLocaleDateString('id-ID'));
-    const message = `Yth. Bapak/Ibu Wali dari *${tagihan.siswaNama}* (${tagihan.kelas}),\n\n✅ *KONFIRMASI PEMBAYARAN SEKOLAH*\nKami informasikan bahwa pembayaran untuk *${tagihan.namaTagihan}* sebesar *Rp ${tagihan.terbayar > 0 ? tagihan.terbayar.toLocaleString('id-ID') : tagihan.nominal.toLocaleString('id-ID')}* telah *LUNAS* pada tanggal *${tglBayar}* dan tercatat resmi di kasir sekolah.\n\nTerima kasih atas kedisiplinan pembayarannya.\n_Bendahara & Tata Usaha Sekolah_`;
+    const sisa = tagihan.nominal - tagihan.terbayar;
+    const bayarNominal = tagihan.terbayar > 0 ? tagihan.terbayar : tagihan.nominal;
+
+    const defaultTemplate = `Yth. Bapak/Ibu Wali dari *{NAMA_SISWA}* ({KELAS}),\n\nTerima kasih, pembayaran *{NAMA_TAGIHAN}* sebesar *{NOMINAL_BAYAR}* telah *KAMI TERIMA* dengan baik pada *{TANGGAL_BAYAR}*.\n• *No. Invoice* : {NO_INVOICE}\n• *Metode*: {METODE_BAYAR}\n\n*Status Tagihan*: {STATUS}.\n• *Bendahara SMPI MODERN AL FAKHIR*`;
+    const templateToUse = schoolSettings?.fonnteConfig?.templateReceipt || defaultTemplate;
+
+    const message = parseWaTemplate(templateToUse, {
+      NAMA_SISWA: tagihan.siswaNama,
+      KELAS: tagihan.kelas || 'X',
+      NAMA_TAGIHAN: tagihan.namaTagihan,
+      NOMINAL_TAGIHAN: `Rp ${tagihan.nominal.toLocaleString('id-ID')}`,
+      SISA_TAGIHAN: `Rp ${sisa.toLocaleString('id-ID')}`,
+      NOMINAL_BAYAR: `Rp ${bayarNominal.toLocaleString('id-ID')}`,
+      TANGGAL_BAYAR: tglBayar,
+      NAMA_SEKOLAH: schoolSettings?.namaSekolah || 'Sekolah Modern Al-Fakhir',
+      TAGIHAN: tagihan.namaTagihan,
+      NOMINAL: `${tagihan.nominal.toLocaleString('id-ID')}`,
+      JATUH_TEMPO: tagihan.jatuhTempo || new Date().toLocaleDateString('id-ID'),
+      STATUS: 'LUNAS',
+      NO_INVOICE: getStableInvoiceNumber(tagihan),
+      METODE_BAYAR: latestTx?.metodePembayaran || (tagihan as any).metodePembayaran || 'Cash / Kasir'
+    });
     
     setWaSendingStatus(`Mengirim WA Konfirmasi Lunas ke ${tagihan.siswaNama} (${phone})...`);
     const res = await sendFonnteMessage(phone, message, fonnteToken);
@@ -1931,7 +2205,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 onClick={() => {
                   if (!selectedSiswa) return;
                   setPrintReceiptData({
-                    noNota: `ALL-${Math.floor(100000 + Math.random() * 900000)}`,
+                    noNota: generateInvoiceNumber(),
                     tahunAjaran,
                     nis: selectedSiswa.nis,
                     nama: selectedSiswa.nama,
@@ -2146,6 +2420,23 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     </div>
                   </div>
 
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Metode Pembayaran</label>
+                    <select
+                      value={selectedMetodePembayaran}
+                      onChange={(e) => setSelectedMetodePembayaran(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 text-slate-300 font-bold rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    >
+                      <option value="Cash / Kasir">Cash / Kasir (Tunai)</option>
+                      <option value="Transfer Bank - BRI">Transfer Bank - BRI</option>
+                      <option value="Transfer Bank - BNI">Transfer Bank - BNI</option>
+                      <option value="Transfer Bank - Mandiri">Transfer Bank - Mandiri</option>
+                      <option value="Transfer Bank - BCA">Transfer Bank - BCA</option>
+                      <option value="QRIS / E-Wallet">QRIS / E-Wallet (OVO/Dana/Gopay)</option>
+                      <option value="Tabungan Siswa">Tabungan Siswa</option>
+                    </select>
+                  </div>
+
                   <div className="flex items-center justify-between bg-slate-900/50 p-2 rounded-xl border border-slate-800/50">
                     <div className="flex flex-col">
                       <span className="text-[10px] text-slate-500 font-bold uppercase">Kembalian</span>
@@ -2197,7 +2488,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                       // Slip Tagihan Logic
                       if (!selectedSiswa) return;
                       setPrintReceiptData({
-                        noNota: `SLIP-${Math.floor(100000 + Math.random() * 900000)}`,
+                        noNota: generateInvoiceNumber(),
                         tahunAjaran,
                         nis: selectedSiswa.nis,
                         nama: selectedSiswa.nama,
@@ -2225,7 +2516,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 <div className="border-b border-slate-800 pb-2 flex items-center justify-between">
                   <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                    Transaksi Terakhir
+                    Semua Transaksi & Riwayat Tagihan Siswa
                   </h4>
                 </div>
 
@@ -2233,53 +2524,205 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   <table className="w-full text-left text-[11px]">
                     <thead className="bg-[#181818] text-slate-400 font-bold border-b border-slate-800">
                       <tr>
-                        <th className="px-2 py-1.5">Pembayaran</th>
-                        <th className="px-2 py-1.5">Tagihan</th>
-                        <th className="px-2 py-1.5">Tanggal</th>
-                        <th className="px-1 py-1.5 text-center w-8">Aksi</th>
+                        <th className="px-2 py-2">Nama Tagihan / Pembayaran</th>
+                        <th className="px-2 py-2">Total Tagihan</th>
+                        <th className="px-2 py-2">Terbayar</th>
+                        <th className="px-2 py-2">Tanggal Tagihan</th>
+                        <th className="px-2 py-2">Tanggal Bayar / Realisasi</th>
+                        <th className="px-2 py-2">Status</th>
+                        <th className="px-1 py-2 text-center w-16">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                      {studentTransactions.map((tx, idx) => (
-                        <tr key={tx.id} className="hover:bg-slate-900/50">
-                          <td className="px-2 py-2 font-semibold text-slate-200">
-                            {tx.pembayaran}
-                            {idx === 0 && (
-                              <span className="ml-1.5 px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 text-[9px] rounded font-bold">
-                                Terbaru
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-2 py-2 font-mono font-bold text-emerald-400 whitespace-nowrap">
-                            Rp. {tx.tagihan.toLocaleString('id-ID')}
-                          </td>
-                          <td className="px-2 py-2 text-[10px] text-slate-400 whitespace-nowrap">{tx.tanggal}</td>
-                          <td className="px-1 py-2 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleReprintTransaction(tx)}
-                                className="p-1 hover:bg-slate-800 text-slate-400 hover:text-emerald-400 rounded transition-colors"
-                                title="Cetak ulang kwitansi"
-                              >
-                                <Printer className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteSingleTransaction(tx.id)}
-                                className="p-1 hover:bg-rose-950/80 text-slate-500 hover:text-rose-400 rounded transition-colors"
-                                title="Hapus transaksi"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {studentTransactions.length === 0 && (
+                      {studentBills.map((t, idx) => {
+                        const isLunas = t.status === 'Lunas';
+                        const isDicicil = t.status === 'Dicicil';
+                        const isBelumLunas = t.status === 'Belum Lunas';
+
+                        return (
+                          <tr key={t.id} className="hover:bg-slate-900/50">
+                            <td className="px-2 py-2.5 font-semibold text-slate-200">
+                              {t.namaTagihan}
+                              {idx === 0 && (
+                                <span className="ml-1.5 px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 text-[9px] rounded font-bold">
+                                  Terbaru
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-2 py-2.5 font-mono font-bold text-slate-300 whitespace-nowrap">
+                              Rp {t.nominal.toLocaleString('id-ID')}
+                            </td>
+                            <td className="px-2 py-2.5 font-mono font-bold text-emerald-400 whitespace-nowrap">
+                              Rp {(t.terbayar || 0).toLocaleString('id-ID')}
+                            </td>
+                            <td className="px-2 py-2.5 text-[10px] text-slate-400 whitespace-nowrap">
+                              {formatDate(t.jatuhTempo)}
+                            </td>
+                            <td className="px-2 py-2.5 text-[10px] text-slate-400 whitespace-nowrap">
+                              {t.tanggalBayar ? formatDate(t.tanggalBayar) : '-'}
+                            </td>
+                            <td className="px-2 py-2.5 whitespace-nowrap">
+                              {isLunas && (
+                                <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] rounded-full font-bold">
+                                  Lunas
+                                </span>
+                              )}
+                              {isDicicil && (
+                                <span className="px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] rounded-full font-bold">
+                                  Dicicil
+                                </span>
+                              )}
+                              {isBelumLunas && (
+                                <span className="px-2 py-0.5 bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[9px] rounded-full font-bold">
+                                  Belum Lunas
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-1 py-2.5 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={t.terbayar === 0 && !isLunas}
+                                  onClick={() => {
+                                    const matchingTx = studentTransactions.find(tx => 
+                                      (tx.itemId && tx.itemId === t.id) || 
+                                      (tx.pembayaran && t.namaTagihan && tx.pembayaran === t.namaTagihan)
+                                    );
+                                    if (matchingTx) {
+                                      handleReprintTransaction(matchingTx);
+                                    } else {
+                                      handleReprintTransaction({
+                                        id: t.id,
+                                        pembayaran: t.namaTagihan,
+                                        tagihan: t.terbayar || t.nominal,
+                                        tanggal: t.tanggalBayar || new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
+                                      });
+                                    }
+                                  }}
+                                  className="p-1 hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent text-slate-400 hover:text-emerald-400 rounded transition-colors"
+                                  title="Cetak ulang kwitansi"
+                                >
+                                  <Printer className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (t.status === 'Lunas' || t.status === 'Dicicil') {
+                                      // Search with multiple extremely robust fallbacks across global and local transactions
+                                      const sName = selectedSiswa ? selectedSiswa.nama.toLowerCase().trim() : '';
+                                      
+                                      // Strategy A: Find in global transactions first
+                                      const globalTx = transaksiList.find(tx => {
+                                        if (!tx || !tx.siswaNama) return false;
+                                        if (tx.siswaNama.toLowerCase().trim() !== sName) return false;
+                                        
+                                        // 1. Match by exact tagihanId / itemId
+                                        if (tx.tagihanId && tx.tagihanId === t.id) return true;
+                                        
+                                        // 2. Match by exact tipe matching
+                                        if ((tx.tipe || '').toLowerCase() === (t.tipe || '').toLowerCase()) {
+                                          // Match the month for SPP if available
+                                          if ((t.tipe || '').toLowerCase() === 'spp' && tx.pembayaran && t.namaTagihan) {
+                                            const txPay = tx.pembayaran.toLowerCase();
+                                            const tName = t.namaTagihan.toLowerCase();
+                                            return txPay.includes(tName) || tName.includes(txPay);
+                                          }
+                                          // Verify name similarity for other types
+                                          if (tx.pembayaran && t.namaTagihan) {
+                                            const txPay = tx.pembayaran.toLowerCase();
+                                            const tName = t.namaTagihan.toLowerCase();
+                                            if (txPay.includes(tName) || tName.includes(txPay)) return true;
+                                          }
+                                          return true;
+                                        }
+                                        return false;
+                                      });
+
+                                      // Map to clean format expected by confirmation modal
+                                      let cleanTxToModal: any = null;
+                                      if (globalTx) {
+                                        cleanTxToModal = {
+                                          id: globalTx.id,
+                                          pembayaran: globalTx.pembayaran || (globalTx.tipe === 'spp' ? 'Pembayaran SPP' : 'Pembayaran Tagihan'),
+                                          tagihan: globalTx.nominal,
+                                          tanggal: globalTx.tanggal,
+                                          itemId: globalTx.tagihanId,
+                                          type: globalTx.tipe === 'spp' ? ('spp' as const) : ('bebas' as const)
+                                        };
+                                      } else {
+                                        // Strategy B: Fallback to studentTransactions list
+                                        const matchingTx = studentTransactions.find(tx => {
+                                          if (!tx) return false;
+                                          if (tx.itemId && tx.itemId === t.id) return true;
+                                          if (tx.pembayaran && t.namaTagihan && tx.pembayaran.toLowerCase().trim() === t.namaTagihan.toLowerCase().trim()) return true;
+                                          
+                                          if (tx.pembayaran && t.namaTagihan) {
+                                            const txPay = tx.pembayaran.toLowerCase().trim();
+                                            const tName = t.namaTagihan.toLowerCase().trim();
+                                            const isSimilar = txPay.includes(tName) || tName.includes(txPay);
+                                            const isSameTipe = (t.tipe || '').toLowerCase() === 'spp' ? (tx.type === 'spp') : (tx.type === 'bebas');
+                                            if (isSimilar && isSameTipe) return true;
+                                          }
+                                          
+                                          if (t.id.startsWith('syn-')) {
+                                            const isSameTipe = (t.tipe || '').toLowerCase() === 'spp' ? (tx.type === 'spp') : (tx.type === 'bebas');
+                                            if (isSameTipe) return true;
+                                          }
+                                          return false;
+                                        });
+
+                                        if (matchingTx) {
+                                          cleanTxToModal = matchingTx;
+                                        }
+                                      }
+
+                                      if (cleanTxToModal) {
+                                        setDeleteTargetTx(cleanTxToModal);
+                                      } else {
+                                        // Strategy C: Direct manual reset fallback
+                                        if (confirm(`Apakah Anda yakin ingin menghapus pembayaran untuk ${t.namaTagihan || 'Tagihan Ini'}?`)) {
+                                          if (!t.id.startsWith('syn-')) {
+                                            setTagihanList(prev => prev.map(item => item.id === t.id ? { ...item, terbayar: 0, status: 'Belum Lunas', tanggalBayar: undefined } : item));
+                                          } else {
+                                            // synthesized
+                                            if (setTransaksiList) {
+                                              setTransaksiList(prev => prev.filter(tx => {
+                                                const isSameStudent = tx.siswaNama && selectedSiswa && (tx.siswaNama.toLowerCase().trim() === selectedSiswa.nama.toLowerCase().trim());
+                                                const isSameType = (tx.tipe || '').toLowerCase() === (t.tipe || '').toLowerCase();
+                                                return !(isSameStudent && isSameType);
+                                              }));
+                                            }
+                                          }
+                                        }
+                                      }
+                                    } else {
+                                      if (confirm(`Apakah Anda yakin ingin menghapus tagihan ${t.namaTagihan || 'Tagihan Ini'} ini secara permanen?`)) {
+                                        if (t.id.startsWith('syn-')) {
+                                          const tombstone: TagihanKeuangan = {
+                                            ...t,
+                                            isDeleted: true
+                                          };
+                                          setTagihanList(prev => [...prev, tombstone]);
+                                        } else {
+                                          setTagihanList(prev => prev.filter(item => item.id !== t.id));
+                                        }
+                                      }
+                                    }
+                                  }}
+                                  className="p-1 hover:bg-rose-950/80 text-slate-500 hover:text-rose-400 rounded transition-colors"
+                                  title={t.status === 'Lunas' || t.status === 'Dicicil' ? "Hapus pembayaran" : "Hapus tagihan"}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {studentBills.length === 0 && (
                         <tr>
-                          <td colSpan={4} className="text-center py-6 text-slate-500 text-[10px]">
-                            Belum ada riwayat transaksi.
+                          <td colSpan={7} className="text-center py-8 text-slate-500 text-[10px]">
+                            Belum ada riwayat tagihan atau transaksi untuk siswa ini.
                           </td>
                         </tr>
                       )}
@@ -2747,6 +3190,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 <thead className="bg-[#181818] border-b border-slate-800 text-slate-400 font-bold uppercase text-[11px]">
                   <tr>
                     <th className="px-4 py-3">Siswa & Kelas</th>
+                    <th className="px-4 py-3">No. Invoice</th>
                     <th className="px-4 py-3">Tipe</th>
                     <th className="px-4 py-3">Nama Tagihan</th>
                     <th className="px-4 py-3">Nominal Tagihan</th>
@@ -2786,6 +3230,11 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                             <div className="font-bold text-white">{t.siswaNama}</div>
                             <div className="text-[10px] text-slate-400">{t.kelas}</div>
                           </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="font-mono font-bold text-[10px] bg-slate-900/60 border border-slate-800 text-slate-300 px-2 py-1 rounded-md">
+                              {getStableInvoiceNumber(t)}
+                            </span>
+                          </td>
                           <td className="px-4 py-3 font-semibold uppercase text-slate-400">{t.tipe}</td>
                           <td className="px-4 py-3">{t.namaTagihan}</td>
                           <td className="px-4 py-3 font-mono font-bold text-white">Rp {t.nominal.toLocaleString('id-ID')}</td>
@@ -2803,7 +3252,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                                     terbayar: totalTerbayar,
                                     jatuhTempo: t.jatuhTempo || '',
                                     tanggalBayar: effectiveTanggalBayar,
-                                    status: isLunas ? 'Lunas' : (isDicicil ? 'Dicicil' : 'Belum Lunas')
+                                    status: isLunas ? 'Lunas' : (isDicicil ? 'Dicicil' : 'Belum Lunas'),
+                                    metodePembayaran: latestTx?.metodePembayaran || 'Cash / Kasir'
                                   });
                                   setShowEditTagihanModal(true);
                                 }}
@@ -2825,7 +3275,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                                     terbayar: totalTerbayar,
                                     jatuhTempo: t.jatuhTempo || '',
                                     tanggalBayar: new Date().toISOString().slice(0, 10),
-                                    status: isLunas ? 'Lunas' : (isDicicil ? 'Dicicil' : 'Belum Lunas')
+                                    status: isLunas ? 'Lunas' : (isDicicil ? 'Dicicil' : 'Belum Lunas'),
+                                    metodePembayaran: latestTx?.metodePembayaran || 'Cash / Kasir'
                                   });
                                   setShowEditTagihanModal(true);
                                 }}
@@ -2839,10 +3290,15 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             {isLunas || isDicicil ? (
-                              <span className="text-xs font-mono font-bold text-emerald-400 flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" />
-                                {latestTx ? latestTx.tanggal : (t.tanggalBayar || '-')}
-                              </span>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-xs font-mono font-bold text-emerald-400 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  {latestTx ? latestTx.tanggal : (t.tanggalBayar || '-')}
+                                </span>
+                                <span className="text-[9px] bg-slate-800 text-slate-300 font-semibold px-1.5 py-0.5 rounded-md w-fit border border-slate-700/60 mt-0.5">
+                                  {latestTx?.metodePembayaran || t.metodePembayaran || 'Cash / Kasir'}
+                                </span>
+                              </div>
                             ) : (
                               <span className="text-xs text-slate-500">-</span>
                             )}
@@ -2868,7 +3324,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                                    terbayar: totalTerbayar,
                                    jatuhTempo: t.jatuhTempo || '',
                                    tanggalBayar: effectiveTanggalBayar,
-                                   status: isLunas ? 'Lunas' : (isDicicil ? 'Dicicil' : 'Belum Lunas')
+                                   status: isLunas ? 'Lunas' : (isDicicil ? 'Dicicil' : 'Belum Lunas'),
+                                   metodePembayaran: latestTx?.metodePembayaran || 'Cash / Kasir'
                                  });
                                  setShowEditTagihanModal(true);
                                }}
@@ -2882,20 +3339,25 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                               onClick={() => {
                                 try {
                                   console.log('Delete button clicked for tagihan ID:', t.id, 'Siswa:', t.siswaNama);
-                                  // 1. Remove the billing item
-                                  setDeletedTagihanIds(prev => [...prev, t.id]);
-                                  setTagihanList(prev => {
-                                    const updated = prev.filter(item => item.id !== t.id);
-                                    console.log('Updated tagihanList length:', updated.length);
-                                    return updated;
-                                  });
-                                  
-                                  // 2. Remove associated payment/transaction records
-                                  setTransaksiList(prev => {
-                                    const updated = prev.filter(tx => tx.tagihanId !== t.id);
-                                    console.log('Updated transaksiList length:', updated.length);
-                                    return updated;
-                                  });
+                                  if (confirm(`Apakah Anda yakin ingin menghapus tagihan ${t.namaTagihan || 'Tagihan Ini'} ini secara permanen?`)) {
+                                    // 1. Remove the billing item
+                                    if (t.id.startsWith('syn-')) {
+                                      const tombstone: TagihanKeuangan = {
+                                        ...t,
+                                        isDeleted: true
+                                      };
+                                      setTagihanList(prev => [...prev, tombstone]);
+                                    } else {
+                                      setTagihanList(prev => prev.filter(item => item.id !== t.id));
+                                    }
+                                    
+                                    // 2. Remove associated payment/transaction records
+                                    setTransaksiList(prev => {
+                                      const updated = prev.filter(tx => tx.tagihanId !== t.id);
+                                      console.log('Updated transaksiList length:', updated.length);
+                                      return updated;
+                                    });
+                                  }
                                 } catch (error) {
                                   console.error('Error deleting tagihan:', error);
                                 }
@@ -2958,6 +3420,249 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             </div>
           </div>
 
+        </div>
+      )}
+
+      {/* SUBTAB 4: EDIT REDAKSI TEMPLATE NOTIFIKASI WA */}
+      {activeTab === 'redaksi' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-indigo-900/20 via-indigo-950/10 to-transparent border border-indigo-500/20 p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+            <div className="space-y-1 text-left">
+              <h2 className="text-lg font-black text-white flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-indigo-400" />
+                Edit Redaksi Notifikasi WA
+              </h2>
+              <p className="text-xs text-slate-400">
+                Kustomisasi susunan kalimat pengingat tagihan dan konfirmasi pelunasan pembayaran yang dikirim ke wali murid.
+              </p>
+            </div>
+            
+            {saveSuccessMsg && (
+              <div className="px-4 py-2 bg-emerald-950/80 border border-emerald-500/30 rounded-xl text-emerald-300 text-xs font-bold shrink-0 shadow-lg border-l-4 border-l-emerald-400">
+                ✓ {saveSuccessMsg}
+              </div>
+            )}
+          </div>
+
+          {/* Subtab Toggle Buttons */}
+          <div className="flex border-b border-slate-800 pb-px gap-2">
+            <button
+              onClick={() => setActiveRedaksiTab('reminder')}
+              className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 ${
+                activeRedaksiTab === 'reminder'
+                  ? 'border-indigo-500 text-indigo-400 font-extrabold'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <Bell className="w-4 h-4" />
+              Notifikasi Tagihan (Pengingat)
+            </button>
+            <button
+              onClick={() => setActiveRedaksiTab('receipt')}
+              className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 ${
+                activeRedaksiTab === 'receipt'
+                  ? 'border-emerald-500 text-emerald-400 font-extrabold'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Konfirmasi Pelunasan Pembayaran
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Editor Column */}
+            <div className="lg:col-span-7 space-y-4">
+              <div className="bg-[#121212]/90 border border-slate-800 p-5 rounded-2xl space-y-4 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-300">
+                    {activeRedaksiTab === 'reminder' ? 'Template Teks Tagihan' : 'Template Teks Pelunasan'}
+                  </span>
+                  <button
+                    onClick={handleResetTemplate}
+                    className="text-[10px] text-slate-400 hover:text-rose-400 font-bold flex items-center gap-1 transition-all cursor-pointer"
+                    title="Kembalikan susunan kata ke setelan default"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Reset ke Default
+                  </button>
+                </div>
+
+                {/* Variable Pills Scrollbox */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-slate-400 font-bold block">
+                    Klik variabel di bawah untuk menyisipkan ke kursor:
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-[#181818] rounded-xl border border-slate-800">
+                    {Object.keys({
+                      NAMA_SISWA: "Muhammad Rafli",
+                      KELAS: "VIII-B",
+                      NAMA_TAGIHAN: "SPP Juli 2026",
+                      NOMINAL_TAGIHAN: "Rp 350.000",
+                      SISA_TAGIHAN: "Rp 350.000",
+                      NOMINAL_BAYAR: "Rp 350.000",
+                      TANGGAL_BAYAR: "13 Agustus 2026",
+                      TAGIHAN: "SPP Juli 2026",
+                      NOMINAL: "350.000",
+                      JATUH_TEMPO: "13 Agustus 2026",
+                      STATUS: "BELUM LUNAS",
+                      NO_INVOICE: "0001/C-ALFAKHIR/VIII/2026",
+                      NAMA_SEKOLAH: schoolSettings?.namaSekolah || "SMP Islam Modern Al-Fakhir"
+                    }).map(vKey => {
+                      if (activeRedaksiTab === 'reminder' && vKey === 'NOMINAL_BAYAR') return null;
+                      if (activeRedaksiTab === 'receipt' && vKey === 'SISA_TAGIHAN') return null;
+                      if (activeRedaksiTab === 'receipt' && vKey === 'JATUH_TEMPO') return null;
+
+                      return (
+                        <button
+                          key={vKey}
+                          onClick={() => insertPlaceholder(`{${vKey}}`)}
+                          className="px-2 py-1 bg-indigo-950/50 hover:bg-indigo-900 border border-indigo-500/20 rounded-lg text-[9px] font-mono font-extrabold text-indigo-300 transition-all cursor-pointer"
+                        >
+                          {`{${vKey}}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Editor Textarea */}
+                <div>
+                  <textarea
+                    id={activeRedaksiTab === 'reminder' ? 'template_reminder_input' : 'template_receipt_input'}
+                    value={activeRedaksiTab === 'reminder' ? localTemplateReminder : localTemplateReceipt}
+                    onChange={e => {
+                      if (activeRedaksiTab === 'reminder') {
+                        setLocalTemplateReminder(e.target.value);
+                      } else {
+                        setLocalTemplateReceipt(e.target.value);
+                      }
+                    }}
+                    rows={12}
+                    className="w-full bg-[#181818] border border-slate-800 text-slate-200 font-mono text-xs leading-relaxed p-4 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none"
+                    placeholder="Masukkan redaksi notifikasi di sini..."
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2.5 pt-2">
+                  <button
+                    onClick={handleSaveTemplates}
+                    className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-lg cursor-pointer ${
+                      activeRedaksiTab === 'reminder'
+                        ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'
+                        : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
+                    }`}
+                  >
+                    <CheckCheck className="w-4 h-4" />
+                    Simpan Perubahan Redaksi
+                  </button>
+                </div>
+              </div>
+
+              {/* Informative Tips Footer */}
+              <div className="p-4 bg-slate-900/30 border border-slate-800/60 rounded-xl text-[11px] text-slate-400 space-y-1.5 text-left">
+                <span className="font-extrabold text-slate-200 block">💡 Tips Format WhatsApp:</span>
+                <ul className="list-disc pl-4 space-y-1">
+                  <li>Gunakan tanda bintang untuk menebalkan teks, contoh: <code className="text-slate-300 font-mono">*Teks Tebal*</code></li>
+                  <li>Gunakan garis bawah untuk memiringkan teks, contoh: <code className="text-slate-300 font-mono">_Teks Miring_</code></li>
+                  <li>Pastikan Anda tidak mengubah ejaan variabel di dalam kurung kurawal agar sistem dapat menggantinya dengan informasi riil siswa secara otomatis.</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Smartphone Mockup Column */}
+            <div className="lg:col-span-5 flex flex-col items-center">
+              <span className="text-xs font-bold text-slate-400 mb-3 block self-start">
+                📱 Live Preview Tampilan Orang Tua / Wali:
+              </span>
+
+              {/* Phone Container */}
+              <div className="w-full max-w-[340px] bg-[#111] rounded-[36px] p-3 border-[6px] border-slate-800 shadow-2xl relative overflow-hidden aspect-[9/18]">
+                {/* Phone Notch */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-4 bg-slate-800 rounded-b-xl z-20"></div>
+
+                {/* WhatsApp Screen */}
+                <div className="w-full h-full bg-[#efeae2] rounded-[26px] flex flex-col relative overflow-hidden">
+                  {/* WhatsApp Status Bar Header */}
+                  <div className="bg-[#075e54] text-white pt-5 pb-2.5 px-4 flex items-center gap-3 shadow-md">
+                    <div className="w-8 h-8 rounded-full bg-slate-200/20 border border-white/10 flex items-center justify-center font-black text-xs text-white">
+                      🏫
+                    </div>
+                    <div className="flex-1 text-left">
+                      <h4 className="font-bold text-[12px] leading-tight text-white">
+                        {schoolSettings?.namaSekolah || 'Keuangan Sekolah'}
+                      </h4>
+                      <span className="text-[9px] text-emerald-300 font-semibold block leading-none">Online</span>
+                    </div>
+                    <div className="flex items-center gap-2.5 opacity-80">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                    </div>
+                  </div>
+
+                  {/* Message Thread Body */}
+                  <div className="flex-1 p-3 overflow-y-auto flex flex-col justify-end space-y-3">
+                    {/* Timestamp */}
+                    <div className="self-center bg-[#d6ebf1] text-sky-950 font-bold text-[9px] px-2 py-0.5 rounded-md shadow-sm">
+                      HARI INI
+                    </div>
+
+                    {/* Chat Bubble */}
+                    <div className="max-w-[88%] bg-[#e2f7cb] text-slate-800 rounded-lg p-2.5 shadow-md relative border border-emerald-200/30 self-start ml-2 rounded-tl-none text-left">
+                      {/* Triangle tail mockup */}
+                      <div className="absolute -left-1.5 top-0 w-0 h-0 border-t-[8px] border-t-[#e2f7cb] border-l-[8px] border-l-transparent"></div>
+                      
+                      {/* Formatted Text Content */}
+                      <div 
+                        className="text-[11px] leading-relaxed whitespace-pre-wrap break-words text-slate-800"
+                        dangerouslySetInnerHTML={{ 
+                          __html: formatWhatsAppMarkdown(
+                            parseWaTemplate(
+                              activeRedaksiTab === 'reminder' ? localTemplateReminder : localTemplateReceipt,
+                              {
+                                NAMA_SISWA: "Muhammad Rafli",
+                                KELAS: "VIII-B",
+                                NAMA_TAGIHAN: "SPP Juli 2026",
+                                NOMINAL_TAGIHAN: "Rp 350.000",
+                                SISA_TAGIHAN: "Rp 350.000",
+                                NOMINAL_BAYAR: "Rp 350.000",
+                                TANGGAL_BAYAR: "13 Agustus 2026",
+                                NAMA_SEKOLAH: schoolSettings?.namaSekolah || "SMP Islam Modern Al-Fakhir",
+                                TAGIHAN: "SPP Juli 2026",
+                                NOMINAL: "350.000",
+                                JATUH_TEMPO: "13 Agustus 2026",
+                                STATUS: "BELUM LUNAS",
+                                NO_INVOICE: "0001/C-ALFAKHIR/VIII/2026",
+                                METODE_BAYAR: "Cash / Kasir"
+                              }
+                            )
+                          ) 
+                        }}
+                      />
+
+                      {/* Bubble Info Footer */}
+                      <div className="flex items-center justify-end gap-1 mt-1 text-[8px] text-slate-500 font-semibold select-none">
+                        <span>10:30</span>
+                        <CheckCheck className="w-3 h-3 text-sky-500" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Input Mockup Footer */}
+                  <div className="p-2.5 bg-slate-100 flex items-center gap-2 border-t border-slate-200">
+                    <div className="flex-1 bg-white rounded-full px-3 py-1.5 text-[10px] text-slate-400 text-left border border-slate-200/80">
+                      Ketik pesan...
+                    </div>
+                    <div className="w-7 h-7 bg-[#075e54] rounded-full flex items-center justify-center shrink-0">
+                      <Send className="w-3.5 h-3.5 text-white ml-0.5" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -3224,6 +3929,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         </div>
       )}
 
+
+
       {/* MODAL TAMBAH / EDIT TARIF BIAYA */}
       {showTarifModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -3449,6 +4156,22 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   Tanggal tagihan resmi yang tercatat di kasir / sistem.
                 </span>
               </div>
+              <div>
+                <label className="text-slate-300 font-bold block mb-1">Metode Pembayaran</label>
+                <select
+                  value={editTagihanForm.metodePembayaran}
+                  onChange={e => setEditTagihanForm({ ...editTagihanForm, metodePembayaran: e.target.value })}
+                  className="w-full bg-[#181818] border border-slate-700/80 text-white font-bold rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                >
+                  <option value="Cash / Kasir">Cash / Kasir (Tunai)</option>
+                  <option value="Transfer Bank - BRI">Transfer Bank - BRI</option>
+                  <option value="Transfer Bank - BNI">Transfer Bank - BNI</option>
+                  <option value="Transfer Bank - Mandiri">Transfer Bank - Mandiri</option>
+                  <option value="Transfer Bank - BCA">Transfer Bank - BCA</option>
+                  <option value="QRIS / E-Wallet">QRIS / E-Wallet (OVO/Dana/Gopay)</option>
+                  <option value="Tabungan Siswa">Tabungan Siswa</option>
+                </select>
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
               <button
@@ -3536,7 +4259,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                             tipe: editingTagihan.tipe || 'spp',
                             nominal: updatedTerbayar,
                             tanggal: finalTanggalBayar || new Date().toLocaleDateString('id-ID'),
-                            metodePembayaran: 'Cash / Kasir',
+                            metodePembayaran: editTagihanForm.metodePembayaran || 'Cash / Kasir',
                             penerima: 'Kasir / Bendahara Sekolah'
                           };
                           return [newTx, ...baseTx];

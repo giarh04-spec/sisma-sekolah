@@ -400,6 +400,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           </div>
                         </button>
                       )}
+
+                      {/* 5. Redaksi Notifikasi WA */}
+                      {currentRole !== 'guru' && (
+                        <button
+                          onClick={() => {
+                            setActiveTab('absensi');
+                            if (setAbsensiSubTab) setAbsensiSubTab('redaksi');
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
+                            absensiSubTab === 'redaksi'
+                              ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-sm'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
+                            <span>Redaksi Notifikasi WA</span>
+                          </div>
+                          <span className="text-[9px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-1 py-0.5 rounded font-bold">
+                            Baru
+                          </span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -631,6 +654,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <FileSpreadsheet className="w-3.5 h-3.5 text-blue-400" />
                           <span>Rekap & Fonnte WA</span>
                         </div>
+                      </button>
+
+                      {/* 4. Redaksi Notifikasi WA */}
+                      <button
+                        onClick={() => {
+                          setActiveTab('keuangan');
+                          if (setKeuanganSubTab) setKeuanganSubTab('redaksi');
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
+                          keuanganSubTab === 'redaksi'
+                            ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-sm'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Redaksi Notifikasi WA</span>
+                        </div>
+                        <span className="text-[9px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-1 py-0.5 rounded font-bold">
+                          Baru
+                        </span>
                       </button>
                     </div>
                   )}

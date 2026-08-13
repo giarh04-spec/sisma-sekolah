@@ -24,7 +24,10 @@ import {
   LogOut,
   Smartphone,
   Share2,
-  Sparkles
+  Sparkles,
+  Bell,
+  Sliders,
+  RefreshCw
 } from 'lucide-react';
 import { 
   Siswa, 
@@ -63,7 +66,7 @@ interface AbsensiViewProps {
   setSchoolSettings?: React.Dispatch<React.SetStateAction<SchoolSettings>>;
 }
 
-type SubTabAbsensi = 'scan_barcode' | 'harian_siswa' | 'kelas_mapel' | 'absensi_guru';
+type SubTabAbsensi = 'scan_barcode' | 'harian_siswa' | 'kelas_mapel' | 'absensi_guru' | 'redaksi';
 
 export const AbsensiView: React.FC<AbsensiViewProps> = ({
   siswaList,
@@ -213,6 +216,116 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
     siswaObj?: Siswa;
     isUnknown?: boolean;
   }>>([]);
+
+  // --- Attendance WA Template Redaksi States & Helpers ---
+  const defaultAbsensiMasukText = `*PRESENSI SEKOLAH - NOTIFIKASI MASUK*\n\nYth. Bapak/Ibu Wali dari *{NAMA_SISWA}* (*Kelas {KELAS}*),\n\nKami menginformasikan bahwa siswa/i atas nama *{NAMA_SISWA}* telah *HADIR & MELAKUKAN PRESENSI MASUK* di sekolah pada:\n🗓 Tanggal: *{TANGGAL}*\n⏰ Jam Scan: *{JAM_SCAN} WIB*\n📍 Status: *{STATUS_KEHADIRAN}*\n\nTerima kasih atas perhatian dan kerja sama Bapak/Ibu Wali Murid.\n\n_{NAMA_SEKOLAH}_`;
+
+  const defaultAbsensiPulangText = `*PRESENSI SEKOLAH - NOTIFIKASI PULANG*\n\nYth. Bapak/Ibu Wali dari *{NAMA_SISWA}* (*Kelas {KELAS}*),\n\nKami menginformasikan bahwa siswa/i atas nama *{NAMA_SISWA}* telah *SELESAI KBM & PRESENSI PULANG* dari sekolah pada:\n🗓 Tanggal: *{TANGGAL}*\n⏰ Jam Scan: *{JAM_SCAN} WIB*\n📍 Status: *{STATUS_KEHADIRAN}*\n\nTerima kasih dan selamat beristirahat.\n\n_{NAMA_SEKOLAH}_`;
+
+  const [localTemplateAbsensiMasuk, setLocalTemplateAbsensiMasuk] = useState(schoolSettings?.fonnteConfig?.templateAbsensiMasuk || defaultAbsensiMasukText);
+  const [localTemplateAbsensiPulang, setLocalTemplateAbsensiPulang] = useState(schoolSettings?.fonnteConfig?.templateAbsensiPulang || defaultAbsensiPulangText);
+  const [activeRedaksiTab, setActiveRedaksiTab] = useState<'masuk' | 'pulang'>('masuk');
+  const [redaksiSaveSuccessMsg, setRedaksiSaveSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (schoolSettings?.fonnteConfig?.templateAbsensiMasuk) {
+      setLocalTemplateAbsensiMasuk(schoolSettings.fonnteConfig.templateAbsensiMasuk);
+    }
+    if (schoolSettings?.fonnteConfig?.templateAbsensiPulang) {
+      setLocalTemplateAbsensiPulang(schoolSettings.fonnteConfig.templateAbsensiPulang);
+    }
+  }, [schoolSettings]);
+
+  const formatWhatsAppMarkdown = (text: string) => {
+    let html = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    // Asterisks for bold: *text* -> <strong class="font-extrabold text-slate-900">text</strong>
+    html = html.replace(/\*([^*]+)\*/g, '<strong class="font-extrabold text-slate-900">$1</strong>');
+    
+    // Underscores for italics: _text_ -> <em class="italic text-slate-600">text</em>
+    html = html.replace(/_([^_]+)_/g, '<em class="italic text-slate-600">$1</em>');
+
+    return html;
+  };
+
+  const parseWaTemplateAbsensi = (
+    template: string,
+    vars: {
+      NAMA_SISWA: string;
+      KELAS: string;
+      TANGGAL: string;
+      JAM_SCAN: string;
+      STATUS_KEHADIRAN: string;
+      NAMA_SEKOLAH: string;
+    }
+  ) => {
+    let result = template;
+    Object.entries(vars).forEach(([key, val]) => {
+      result = result.replace(new RegExp(`{${key}}`, 'gi'), val);
+    });
+    return result;
+  };
+
+  const handleSaveTemplates = () => {
+    if (!setSchoolSettings) {
+      alert("Fasilitas simpan pengaturan tidak tersedia!");
+      return;
+    }
+    setSchoolSettings(prev => ({
+      ...prev,
+      fonnteConfig: {
+        ...(prev.fonnteConfig || {
+          apiKey: prev.fonnteToken || '',
+          senderName: '',
+          enabled: true,
+          autoSendAbsensi: true,
+          autoSendKeuangan: true,
+          templateReminder: '',
+          templateReceipt: ''
+        }),
+        templateAbsensiMasuk: localTemplateAbsensiMasuk,
+        templateAbsensiPulang: localTemplateAbsensiPulang
+      }
+    }));
+    setRedaksiSaveSuccessMsg("Redaksi notifikasi WhatsApp Presensi berhasil disimpan!");
+    setTimeout(() => setRedaksiSaveSuccessMsg(null), 3000);
+  };
+
+  const handleResetTemplate = () => {
+    if (activeRedaksiTab === 'masuk') {
+      setLocalTemplateAbsensiMasuk(defaultAbsensiMasukText);
+    } else {
+      setLocalTemplateAbsensiPulang(defaultAbsensiPulangText);
+    }
+  };
+
+  const insertPlaceholder = (placeholder: string) => {
+    const elId = activeRedaksiTab === 'masuk' ? 'template_masuk_input' : 'template_pulang_input';
+    const textarea = document.getElementById(elId) as HTMLTextAreaElement;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = activeRedaksiTab === 'masuk' ? localTemplateAbsensiMasuk : localTemplateAbsensiPulang;
+    const before = text.substring(0, start);
+    const after = text.substring(end, text.length);
+    const newText = before + placeholder + after;
+
+    if (activeRedaksiTab === 'masuk') {
+      setLocalTemplateAbsensiMasuk(newText);
+    } else {
+      setLocalTemplateAbsensiPulang(newText);
+    }
+
+    // Restore focus and cursor selection range
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + placeholder.length, start + placeholder.length);
+    }, 0);
+  };
 
   // Helper to send WhatsApp Notification using Fonnte API Token
   const sendWhatsAppNotif = async (siswa: Siswa, waktu: string, tipe: 'Masuk' | 'Pulang') => {
@@ -865,6 +978,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
             {subTab === 'harian_siswa' && <><CalendarCheck className="w-3.5 h-3.5" /> Absensi Harian Siswa</>}
             {subTab === 'kelas_mapel' && <><BookOpen className="w-3.5 h-3.5" /> Absensi Kelas Per Mapel</>}
             {subTab === 'absensi_guru' && <><UserCheck className="w-3.5 h-3.5" /> Presensi Guru</>}
+            {subTab === 'redaksi' && <><MessageSquare className="w-3.5 h-3.5" /> Redaksi Notifikasi WA</>}
           </span>
         </div>
       </div>
@@ -1691,6 +1805,217 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
             </div>
           </div>
 
+        </div>
+      )}
+
+      {/* SUBTAB 4: EDIT REDAKSI TEMPLATE NOTIFIKASI WA PRESENSI */}
+      {subTab === 'redaksi' && (
+        <div className="space-y-6 animate-fade-in text-left">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-indigo-900/20 via-indigo-950/10 to-transparent border border-indigo-500/20 p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+            <div className="space-y-1">
+              <h2 className="text-lg font-black text-white flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-indigo-400" />
+                Edit Redaksi Notifikasi WA Presensi
+              </h2>
+              <p className="text-xs text-slate-400">
+                Kustomisasi template kalimat notifikasi kehadiran masuk dan pulang siswa yang dikirimkan otomatis ke WhatsApp Wali Murid.
+              </p>
+            </div>
+            
+            {redaksiSaveSuccessMsg && (
+              <div className="px-4 py-2 bg-emerald-950/80 border border-emerald-500/30 rounded-xl text-emerald-300 text-xs font-bold shrink-0 shadow-lg border-l-4 border-l-emerald-400">
+                ✓ {redaksiSaveSuccessMsg}
+              </div>
+            )}
+          </div>
+
+          {/* Subtab Toggle Buttons */}
+          <div className="flex border-b border-slate-800 pb-px gap-2">
+            <button
+              onClick={() => setActiveRedaksiTab('masuk')}
+              className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
+                activeRedaksiTab === 'masuk'
+                  ? 'border-indigo-500 text-indigo-400 font-extrabold'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <LogIn className="w-4 h-4 text-emerald-400" />
+              Notifikasi Presensi Masuk
+            </button>
+            <button
+              onClick={() => setActiveRedaksiTab('pulang')}
+              className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
+                activeRedaksiTab === 'pulang'
+                  ? 'border-blue-500 text-blue-400 font-extrabold'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <LogOut className="w-4 h-4 text-blue-400" />
+              Notifikasi Presensi Pulang
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Editor Column */}
+            <div className="lg:col-span-7 space-y-4">
+              <div className="bg-[#121212]/90 border border-slate-800 p-5 rounded-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-300">
+                    {activeRedaksiTab === 'masuk' ? 'Template Teks Presensi Masuk' : 'Template Teks Presensi Pulang'}
+                  </span>
+                  <button
+                    onClick={handleResetTemplate}
+                    className="text-[10px] text-slate-400 hover:text-rose-400 font-bold flex items-center gap-1 transition-all cursor-pointer"
+                    title="Kembalikan susunan kata ke setelan default"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Reset ke Default
+                  </button>
+                </div>
+
+                {/* Variable Pills Scrollbox */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-slate-400 font-bold block">
+                    Klik variabel di bawah untuk menyisipkan ke kursor:
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-[#181818] rounded-xl border border-slate-800">
+                    {Object.keys({
+                      NAMA_SISWA: "Ahmad Rizky",
+                      KELAS: "VII-B",
+                      TANGGAL: "Kamis, 13 Agustus 2026",
+                      JAM_SCAN: "07:12",
+                      STATUS_KEHADIRAN: activeRedaksiTab === 'masuk' ? "Hadir Tepat Waktu" : "Sudah Pulang",
+                      NAMA_SEKOLAH: schoolSettings?.namaSekolah || "SMP Modern Al Fakhir"
+                    }).map(vKey => (
+                      <button
+                        key={vKey}
+                        onClick={() => insertPlaceholder(`{${vKey}}`)}
+                        className="px-2 py-1 bg-indigo-950/50 hover:bg-indigo-900 border border-indigo-500/20 rounded-lg text-[9px] font-mono font-extrabold text-indigo-300 transition-all cursor-pointer"
+                      >
+                        {`{${vKey}}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Editor Textarea */}
+                <div>
+                  <textarea
+                    id={activeRedaksiTab === 'masuk' ? 'template_masuk_input' : 'template_pulang_input'}
+                    value={activeRedaksiTab === 'masuk' ? localTemplateAbsensiMasuk : localTemplateAbsensiPulang}
+                    onChange={e => {
+                      if (activeRedaksiTab === 'masuk') {
+                        setLocalTemplateAbsensiMasuk(e.target.value);
+                      } else {
+                        setLocalTemplateAbsensiPulang(e.target.value);
+                      }
+                    }}
+                    rows={12}
+                    className="w-full bg-[#181818] border border-slate-800 text-slate-200 font-mono text-xs leading-relaxed p-4 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none"
+                    placeholder="Masukkan redaksi notifikasi di sini..."
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2.5 pt-2">
+                  <button
+                    onClick={handleSaveTemplates}
+                    className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-lg cursor-pointer ${
+                      activeRedaksiTab === 'masuk'
+                        ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'
+                        : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/20'
+                    }`}
+                  >
+                    <CheckCheck className="w-4 h-4" />
+                    Simpan Perubahan Redaksi
+                  </button>
+                </div>
+              </div>
+
+              {/* Informative Tips Footer */}
+              <div className="p-4 bg-slate-900/30 border border-slate-800/60 rounded-xl text-[11px] text-slate-400 space-y-1.5">
+                <span className="font-extrabold text-slate-200 block">💡 Tips Format WhatsApp:</span>
+                <ul className="list-disc pl-4 space-y-1">
+                  <li>Gunakan tanda bintang untuk menebalkan teks, contoh: <code className="text-slate-300 font-mono">*Teks Tebal*</code></li>
+                  <li>Gunakan garis bawah untuk memiringkan teks, contoh: <code className="text-slate-300 font-mono">_Teks Miring_</code></li>
+                  <li>Pastikan Anda tidak mengubah ejaan variabel di dalam kurung kurawal agar sistem dapat menggantinya dengan informasi riil siswa secara otomatis.</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Smartphone Mockup Column */}
+            <div className="lg:col-span-5 flex justify-center">
+               <div className="w-full max-w-[320px] bg-[#0b141a] rounded-[36px] p-3 border-4 border-slate-800 shadow-2xl relative overflow-hidden aspect-[9/18]">
+                 {/* Phone Notch/Speaker */}
+                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-4 bg-slate-800 rounded-b-xl z-20 flex items-center justify-center">
+                   <div className="w-8 h-1.5 bg-slate-900 rounded-full" />
+                 </div>
+ 
+                 {/* Status Bar */}
+                 <div className="flex items-center justify-between text-[10px] text-slate-400 px-4 pt-1.5 pb-2 border-b border-emerald-900/10 z-10 bg-[#075e54]">
+                   <span className="font-semibold text-white">07:12</span>
+                   <div className="flex items-center gap-1.5 text-white">
+                     <span className="text-[8px]">📶</span>
+                     <span className="text-[8px]">🔋 85%</span>
+                   </div>
+                 </div>
+ 
+                 {/* WA Chat Room Header */}
+                 <div className="bg-[#075e54] text-white p-3 flex items-center gap-2 border-b border-[#128c7e]/10">
+                   <div className="w-7 h-7 rounded-full bg-emerald-700/80 border border-emerald-400/25 flex items-center justify-center font-bold text-xs text-white uppercase shadow-sm">
+                     {schoolSettings?.namaSekolah ? schoolSettings.namaSekolah[0] : 'S'}
+                   </div>
+                   <div>
+                     <h5 className="text-[10px] font-extrabold leading-none truncate w-[160px] text-left">
+                       {schoolSettings?.namaSekolah || "SMP Modern Al Fakhir"}
+                     </h5>
+                     <span className="text-[7px] text-emerald-300 block text-left mt-0.5">Online • WhatsApp Gateway</span>
+                   </div>
+                 </div>
+ 
+                 {/* WA Chat Body with Bubble */}
+                 <div className="p-3 space-y-3 bg-[#0b141a] h-[360px] overflow-y-auto flex flex-col justify-end text-left select-none relative">
+                   {/* Background Wallpaper Pattern (Subtle grid simulated) */}
+                   <div className="absolute inset-0 bg-[#0b141a] opacity-35 pointer-events-none" />
+ 
+                   {/* System Date Badge */}
+                   <div className="mx-auto px-2 py-0.5 bg-[#121b22] text-slate-400 text-[8px] rounded-lg shadow border border-slate-800/50 text-center font-bold tracking-wide z-10">
+                     HARI INI
+                   </div>
+ 
+                   {/* Message Bubble Container */}
+                   <div className="bg-[#005c4b] border border-emerald-800/20 text-slate-100 p-3 rounded-2xl rounded-tr-none text-[11px] leading-relaxed shadow-md max-w-[88%] self-end relative z-10 border-l-4 border-l-emerald-500">
+                     <div 
+                       className="whitespace-pre-wrap select-text selection:bg-emerald-600 font-sans"
+                       dangerouslySetInnerHTML={{
+                         __html: formatWhatsAppMarkdown(
+                           parseWaTemplateAbsensi(
+                             activeRedaksiTab === 'masuk' ? localTemplateAbsensiMasuk : localTemplateAbsensiPulang,
+                             {
+                               NAMA_SISWA: "Ahmad Rizky",
+                               KELAS: "VII-B",
+                               TANGGAL: "Kamis, 13 Agustus 2026",
+                               JAM_SCAN: "07:12",
+                               STATUS_KEHADIRAN: activeRedaksiTab === 'masuk' ? "Hadir Tepat Waktu" : "Sudah Pulang",
+                               NAMA_SEKOLAH: schoolSettings?.namaSekolah || "SMP Modern Al Fakhir"
+                             }
+                           )
+                         )
+                       }}
+                     />
+                     {/* Timestamp & Sent Checks */}
+                     <div className="flex items-center justify-end gap-1 text-[7px] text-emerald-300 mt-1.5 font-semibold">
+                       <span>07:12</span>
+                       <span className="text-sky-300">✓✓</span>
+                     </div>
+                   </div>
+                 </div>
+ 
+                 {/* Phone Bottom Pill */}
+                 <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-slate-800 rounded-full z-20" />
+               </div>
+             </div>
+          </div>
         </div>
       )}
 
