@@ -35,10 +35,17 @@ import {
   Check,
   Clock,
   BookCheck,
-  Home
+  Home,
+  Trophy,
+  Activity,
+  ShieldAlert,
+  DollarSign,
+  CheckSquare,
+  Square,
+  AlertCircle
 } from 'lucide-react';
-import { Siswa, Guru, Staf, RombelKelas, MataPelajaranItem, ScheduleSlot, SubTab } from '../types/school';
-import { INITIAL_ROMBEL, INITIAL_MAPEL } from '../data/mockData';
+import { Siswa, Guru, Staf, RombelKelas, MataPelajaranItem, ScheduleSlot, SubTab, EkstrakurikulerItem } from '../types/school';
+import { INITIAL_ROMBEL, INITIAL_MAPEL, INITIAL_EKSKUL } from '../data/mockData';
 import { KartuDigitalModal } from './KartuDigitalModal';
 import { exportAllToGoogleSheets } from '../lib/googleDriveSync';
 
@@ -53,6 +60,8 @@ interface DatabaseViewProps {
   setStafList: React.Dispatch<React.SetStateAction<Staf[]>>;
   mapelList?: MataPelajaranItem[];
   setMapelList?: React.Dispatch<React.SetStateAction<MataPelajaranItem[]>>;
+  ekskulList?: EkstrakurikulerItem[];
+  setEkskulList?: React.Dispatch<React.SetStateAction<EkstrakurikulerItem[]>>;
   subTab?: SubTab;
   setSubTab?: (subTab: SubTab) => void;
   userGoogleToken?: string;
@@ -73,6 +82,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   setStafList,
   mapelList: propsMapelList,
   setMapelList: setPropsMapelList,
+  ekskulList: propsEkskulList,
+  setEkskulList: setPropsEkskulList,
   subTab: propsSubTab,
   setSubTab: propsSetSubTab,
   userGoogleToken = 'demo_workspace_token_active',
@@ -107,6 +118,17 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       setPropsMapelList(action);
     } else {
       setLocalMapelList(action);
+    }
+  };
+
+  // Fallback state for Ekstrakurikuler if props not provided
+  const [localEkskulList, setLocalEkskulList] = useState<EkstrakurikulerItem[]>(INITIAL_EKSKUL);
+  const activeEkskulList = propsEkskulList || localEkskulList;
+  const setActiveEkskulList = (action: React.SetStateAction<EkstrakurikulerItem[]>) => {
+    if (setPropsEkskulList) {
+      setPropsEkskulList(action);
+    } else {
+      setLocalEkskulList(action);
     }
   };
 
@@ -205,8 +227,38 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<{
     id: string;
     nama: string;
-    targetType: 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel';
+    targetType: 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel' | 'ekskul';
   } | null>(null);
+
+  // Ekskul specific state & filters
+  const [filterKategoriEkskul, setFilterKategoriEkskul] = useState<string>('Semua');
+  const [filterHariEkskul, setFilterHariEkskul] = useState<string>('Semua');
+  const [filterStatusEkskul, setFilterStatusEkskul] = useState<string>('Semua');
+
+  // Active Ekskul for Member Enrollment Modal
+  const [activeEkskulMembersModal, setActiveEkskulMembersModal] = useState<EkstrakurikulerItem | null>(null);
+  const [ekskulMemberSearch, setEkskulMemberSearch] = useState<string>('');
+  const [ekskulMemberKelasFilter, setEkskulMemberKelasFilter] = useState<string>('Semua');
+
+  // Form State for Ekstrakurikuler
+  const [formEkskul, setFormEkskul] = useState<Omit<EkstrakurikulerItem, 'id'>>({
+    kodeEkskul: 'EKS-01',
+    namaEkskul: '',
+    kategori: 'Olahraga',
+    pembinaNama: guruList[0]?.nama || 'Drs. H. Bambang Sutrisno',
+    nipPembina: guruList[0]?.nip || '197103251998021001',
+    kontakPembina: guruList[0]?.telepon || '081234567801',
+    hariLatihan: 'Jumat',
+    jamMulai: '15:00',
+    jamSelesai: '17:00',
+    tempat: 'Lapangan Utama Sekolah',
+    tingkatTarget: 'Semua Tingkat',
+    kuotaMaksimal: 30,
+    anggotaSiswaIds: [],
+    status: 'Aktif',
+    biayaIuran: 0,
+    deskripsi: ''
+  });
 
   // Digital ID Card Modal State
   const [cardModalData, setCardModalData] = useState<{
@@ -567,6 +619,57 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     return matchSearch && matchKategori && matchHari;
   });
 
+  const filteredEkskul = activeEkskulList.filter(e => {
+    const matchSearch = e.namaEkskul.toLowerCase().includes(search.toLowerCase()) ||
+                        e.kodeEkskul.toLowerCase().includes(search.toLowerCase()) ||
+                        e.pembinaNama.toLowerCase().includes(search.toLowerCase()) ||
+                        e.tempat.toLowerCase().includes(search.toLowerCase());
+    const matchKategori = filterKategoriEkskul === 'Semua' || e.kategori === filterKategoriEkskul;
+    const matchHari = filterHariEkskul === 'Semua' || e.hariLatihan === filterHariEkskul;
+    const matchStatus = filterStatusEkskul === 'Semua' || e.status === filterStatusEkskul;
+    return matchSearch && matchKategori && matchHari && matchStatus;
+  });
+
+  const handleExportEkskulCsv = () => {
+    let csv = 'Kode Ekskul,Nama Ekstrakurikuler,Kategori,Pembina,NIP Pembina,Kontak,Hari Latihan,Jam Latihan,Tempat,Tingkat Target,Kuota,Jumlah Anggota,Biaya Iuran (Rp),Status,Deskripsi,Daftar Nama Siswa Anggota\n';
+    activeEkskulList.forEach(e => {
+      const studentNames = e.anggotaSiswaIds
+        .map(sid => siswaList.find(s => s.id === sid)?.nama || sid)
+        .join('; ');
+      csv += `"${e.kodeEkskul}","${e.namaEkskul}","${e.kategori}","${e.pembinaNama}","${e.nipPembina || '-'}","${e.kontakPembina || '-'}","${e.hariLatihan}","${e.jamMulai} - ${e.jamSelesai}","${e.tempat}","${e.tingkatTarget}","${e.kuotaMaksimal}","${e.anggotaSiswaIds.length}","${e.biayaIuran}","${e.status}","${(e.deskripsi || '').replace(/"/g, '""')}","${studentNames}"\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Database_Kelas_Ekstrakurikuler_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const toggleStudentInEkskul = (ekskulId: string, siswaId: string) => {
+    setActiveEkskulList(prev => prev.map(e => {
+      if (e.id === ekskulId) {
+        const exists = e.anggotaSiswaIds.includes(siswaId);
+        const updated = exists 
+          ? e.anggotaSiswaIds.filter(id => id !== siswaId)
+          : [...e.anggotaSiswaIds, siswaId];
+        return { ...e, anggotaSiswaIds: updated };
+      }
+      return e;
+    }));
+    if (activeEkskulMembersModal && activeEkskulMembersModal.id === ekskulId) {
+      setActiveEkskulMembersModal(prev => {
+        if (!prev) return null;
+        const exists = prev.anggotaSiswaIds.includes(siswaId);
+        const updated = exists 
+          ? prev.anggotaSiswaIds.filter(id => id !== siswaId)
+          : [...prev.anggotaSiswaIds, siswaId];
+        return { ...prev, anggotaSiswaIds: updated };
+      });
+    }
+  };
+
   const handleExportMapelCsv = () => {
     let csv = 'Kode Mapel,Nama Mata Pelajaran,Kategori,Tingkat Kelas,Guru Pengampu,NIP,Alokasi JP/Minggu,KKM,Kurikulum,Jadwal & Jam Mengajar\n';
     activeMapelList.forEach(m => {
@@ -586,12 +689,15 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     setModalMode('add');
     setEditingId(null);
     if (subTab === 'siswa') {
+      const defaultRombel = activeRombelList[0];
       setFormSiswa({
         nisn: '',
         nis: '',
         nik: '',
         nama: '',
-        kelas: activeRombelList[0]?.namaRombel || 'X-IPA-1',
+        kelas: defaultRombel?.namaRombel || 'X-IPA-1',
+        tingkatKelas: defaultRombel?.tingkatKelas || 'Kelas 7',
+        rombel: defaultRombel?.namaRombel || '',
         jenisKelamin: 'L',
         tempatLahir: 'Jakarta',
         tanggalLahir: '2008-01-01',
@@ -695,6 +801,27 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           { id: `js-${Date.now()}`, hari: 'Senin', jamMulai: '07:30', jamSelesai: '09:00', kelasTarget: 'X-IPA-1', ruangan: 'Ruang R.101 (Gedung A)' }
         ]
       });
+    } else if (subTab === 'ekskul') {
+      const defaultGuru = guruList[0];
+      const newNum = String(activeEkskulList.length + 1).padStart(2, '0');
+      setFormEkskul({
+        kodeEkskul: `EKS-0${newNum}`,
+        namaEkskul: '',
+        kategori: 'Olahraga',
+        pembinaNama: defaultGuru?.nama || 'Drs. H. Bambang Sutrisno',
+        nipPembina: defaultGuru?.nip || '197103251998021001',
+        kontakPembina: defaultGuru?.telepon || '081234567801',
+        hariLatihan: 'Jumat',
+        jamMulai: '15:00',
+        jamSelesai: '17:00',
+        tempat: 'Lapangan Utama / Aula',
+        tingkatTarget: 'Semua Tingkat',
+        kuotaMaksimal: 30,
+        anggotaSiswaIds: [],
+        status: 'Aktif',
+        biayaIuran: 0,
+        deskripsi: ''
+      });
     }
     setIsModalOpen(true);
   };
@@ -755,13 +882,20 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       } else if (editingId) {
         setActiveMapelList(prev => prev.map(m => m.id === editingId ? { ...formMapel, id: editingId } : m));
       }
+    } else if (subTab === 'ekskul') {
+      if (modalMode === 'add') {
+        const newEkskul: EkstrakurikulerItem = { ...formEkskul, id: `eks-${Date.now()}` };
+        setActiveEkskulList(prev => [newEkskul, ...prev]);
+      } else if (editingId) {
+        setActiveEkskulList(prev => prev.map(e => e.id === editingId ? { ...formEkskul, id: editingId } : e));
+      }
     }
     setIsModalOpen(false);
   };
 
   // Delete Handlers
-  const handleDelete = (id: string, name?: string, type?: 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel') => {
-    const currentType = type || (subTab as 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel');
+  const handleDelete = (id: string, name?: string, type?: 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel' | 'ekskul') => {
+    const currentType = type || (subTab as 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel' | 'ekskul');
     let itemName = name || '';
 
     if (!itemName) {
@@ -770,6 +904,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       else if (currentType === 'staf') itemName = stafList.find(st => st.id === id)?.nama || 'Staf';
       else if (currentType === 'rombel') itemName = activeRombelList.find(r => r.id === id)?.namaRombel || 'Rombel';
       else if (currentType === 'mapel') itemName = activeMapelList.find(m => m.id === id)?.namaMapel || 'Mata Pelajaran';
+      else if (currentType === 'ekskul') itemName = activeEkskulList.find(e => e.id === id)?.namaEkskul || 'Kelas Ekstrakurikuler';
     }
 
     setDeleteConfirmItem({ id, nama: itemName, targetType: currentType });
@@ -798,6 +933,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       }
     } else if (targetType === 'mapel') {
       setActiveMapelList(prev => prev.filter(m => m.id !== id));
+    } else if (targetType === 'ekskul') {
+      setActiveEkskulList(prev => prev.filter(e => e.id !== id));
     }
 
     setDeleteConfirmItem(null);
@@ -837,10 +974,21 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   <BookOpen className="w-3.5 h-3.5 text-amber-400" /> Mata Pelajaran ({activeMapelList.length})
                 </>
               )}
+              {subTab === 'ekskul' && (
+                <>
+                  <Trophy className="w-3.5 h-3.5 text-emerald-400" /> Kelas Ekstrakurikuler ({activeEkskulList.length})
+                </>
+              )}
             </span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Manajemen data master Siswa, Guru, dan Staf Kependidikan
+            {subTab === 'ekskul' 
+              ? 'Manajemen program, pembina, jadwal latihan, kuota, dan keanggotaan ekstrakurikuler'
+              : subTab === 'mapel'
+              ? 'Manajemen kurikulum, mata pelajaran, alokasi jam, dan jadwal mengajar guru'
+              : subTab === 'rombel'
+              ? 'Manajemen rombongan belajar, wali kelas, ruangan, dan pembagian siswa per kelas'
+              : 'Manajemen data master Siswa, Guru, dan Staf Kependidikan'}
           </p>
         </div>
 
@@ -898,6 +1046,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   ? "Cari Rombel, Wali Kelas, Ruangan..." 
                   : subTab === 'mapel'
                   ? "Cari nama mapel, kode, atau guru pengampu..."
+                  : subTab === 'ekskul'
+                  ? "Cari ekskul, pembina, hari, atau tempat latihan..."
                   : "Cari nama, NUPTK/NISN/NIK, atau mata pelajaran..."
               }
               value={search}
@@ -990,6 +1140,53 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
               </select>
             </div>
           )}
+
+          {/* Kategori, Hari, & Status Filter for Ekskul */}
+          {subTab === 'ekskul' && (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <Filter className="w-4 h-4 text-slate-500" />
+                <select
+                  value={filterKategoriEkskul}
+                  onChange={e => setFilterKategoriEkskul(e.target.value)}
+                  className="bg-[#181818] border border-slate-800 text-slate-200 rounded-lg px-3 py-2 text-xs font-medium focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                >
+                  <option value="Semua">Semua Kategori</option>
+                  <option value="Olahraga">Olahraga</option>
+                  <option value="Seni & Budaya">Seni & Budaya</option>
+                  <option value="Keagamaan">Keagamaan</option>
+                  <option value="Sains & Teknologi">Sains & Teknologi</option>
+                  <option value="Kepanduan & Bela Negara">Kepanduan & Bela Negara</option>
+                  <option value="Bahasa & Komunikasi">Bahasa & Komunikasi</option>
+                </select>
+              </div>
+
+              <select
+                value={filterHariEkskul}
+                onChange={e => setFilterHariEkskul(e.target.value)}
+                className="bg-[#181818] border border-slate-800 text-slate-200 rounded-lg px-3 py-2 text-xs font-medium focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+              >
+                <option value="Semua">Semua Hari Latihan</option>
+                <option value="Senin">Senin</option>
+                <option value="Selasa">Selasa</option>
+                <option value="Rabu">Rabu</option>
+                <option value="Kamis">Kamis</option>
+                <option value="Jumat">Jumat</option>
+                <option value="Sabtu">Sabtu</option>
+                <option value="Minggu">Minggu</option>
+              </select>
+
+              <select
+                value={filterStatusEkskul}
+                onChange={e => setFilterStatusEkskul(e.target.value)}
+                className="bg-[#181818] border border-slate-800 text-slate-200 rounded-lg px-3 py-2 text-xs font-medium focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+              >
+                <option value="Semua">Semua Status</option>
+                <option value="Aktif">Aktif</option>
+                <option value="Nonaktif">Nonaktif</option>
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Template & Add Controls */}
@@ -1005,7 +1202,17 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
               </button>
             )}
 
-            {subTab !== 'rombel' && subTab !== 'mapel' && (
+            {subTab === 'ekskul' && (
+              <button
+                onClick={handleExportEkskulCsv}
+                className="px-3 py-2 bg-[#181818] hover:bg-slate-800 text-emerald-300 border border-emerald-500/30 font-bold rounded-lg text-xs transition-all flex items-center gap-1.5 shadow-sm"
+                title="Ekspor Database Ekstrakurikuler ke CSV"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-400" /> Ekspor Ekskul CSV
+              </button>
+            )}
+
+            {subTab !== 'rombel' && subTab !== 'mapel' && subTab !== 'ekskul' && (
               <>
                 <button
                   onClick={() => handleDownloadTemplate(subTab as 'siswa' | 'guru' | 'staf')}
@@ -1039,11 +1246,13 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   ? 'bg-indigo-600 hover:bg-indigo-500 text-white ring-1 ring-indigo-400/50' 
                   : subTab === 'mapel'
                   ? 'bg-amber-600 hover:bg-amber-500 text-white ring-1 ring-amber-400/50'
+                  : subTab === 'ekskul'
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-1 ring-emerald-400/50'
                   : 'bg-blue-600 hover:bg-blue-500 text-white'
               }`}
             >
               <Plus className="w-4 h-4" />
-              Tambah {subTab === 'siswa' ? 'Siswa' : subTab === 'guru' ? 'Guru' : subTab === 'staf' ? 'Staf' : subTab === 'mapel' ? 'Mata Pelajaran' : 'Rombel'} Baru
+              Tambah {subTab === 'siswa' ? 'Siswa' : subTab === 'guru' ? 'Guru' : subTab === 'staf' ? 'Staf' : subTab === 'mapel' ? 'Mata Pelajaran' : subTab === 'ekskul' ? 'Ekskul' : 'Rombel'} Baru
             </button>
           </div>
         )}
@@ -1218,6 +1427,75 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
               </p>
               <p className="text-[10px] text-slate-400 mt-1">
                 TU, Keuangan, Perpustakaan, IT
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {subTab === 'ekskul' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-[#121212] p-4 rounded-xl border border-slate-800 flex items-center gap-3 shadow-md hover:border-emerald-500/30 transition-all">
+            <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20 shadow-inner">
+              <Trophy className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Ekstrakurikuler</p>
+              <p className="text-xl font-black text-white mt-0.5">
+                {activeEkskulList.length} <span className="text-[10px] font-normal text-slate-400">Klub</span>
+              </p>
+              <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-400">
+                <span className="text-emerald-400 font-bold">
+                  {activeEkskulList.filter(e => e.status === 'Aktif').length}
+                </span>
+                <span>Aktif</span>
+                <span className="text-slate-600">•</span>
+                <span className="text-slate-400">{activeEkskulList.filter(e => e.status === 'Nonaktif').length} Nonaktif</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[#121212] p-4 rounded-xl border border-slate-800 flex items-center gap-3 shadow-md hover:border-blue-500/30 transition-all">
+            <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl border border-blue-500/20 shadow-inner">
+              <Users className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Siswa Terdaftar</p>
+              <p className="text-xl font-black text-white mt-0.5">
+                {activeEkskulList.reduce((acc, curr) => acc + (curr.anggotaSiswaIds ? curr.anggotaSiswaIds.length : 0), 0)} <span className="text-[10px] font-normal text-slate-400">Pendaftaran</span>
+              </p>
+              <p className="text-[10px] text-blue-300 mt-1 truncate">
+                Partisipasi minat & bakat siswa
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-[#121212] p-4 rounded-xl border border-slate-800 flex items-center gap-3 shadow-md hover:border-amber-500/30 transition-all">
+            <div className="p-3 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20 shadow-inner">
+              <Award className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kategori Bidang</p>
+              <p className="text-xl font-black text-white mt-0.5">
+                {new Set(activeEkskulList.map(e => e.kategori)).size} <span className="text-[10px] font-normal text-slate-400">Bidang</span>
+              </p>
+              <p className="text-[10px] text-amber-300 mt-1 truncate">
+                Olahraga, Seni, Sains, Kepanduan
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-[#121212] p-4 rounded-xl border border-slate-800 flex items-center gap-3 shadow-md hover:border-purple-500/30 transition-all">
+            <div className="p-3 bg-purple-500/10 text-purple-400 rounded-xl border border-purple-500/20 shadow-inner">
+              <UserCheck className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Guru Pembina</p>
+              <p className="text-xl font-black text-white mt-0.5">
+                {new Set(activeEkskulList.map(e => e.pembinaNama)).size} <span className="text-[10px] font-normal text-slate-400">Pembina</span>
+              </p>
+              <p className="text-[10px] text-purple-300 mt-1 truncate">
+                Pendampingan intensif & prestasi
               </p>
             </div>
           </div>
@@ -2025,6 +2303,217 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           </div>
         )}
 
+        {subTab === 'ekskul' && (
+          <div className="p-4 sm:p-5">
+            {filteredEkskul.length === 0 ? (
+              <div className="text-center py-12 text-slate-500">
+                <Trophy className="w-12 h-12 mx-auto text-slate-700 mb-3" />
+                <p className="font-semibold text-sm text-slate-400">Tidak ada data kelas ekstrakurikuler yang cocok.</p>
+                <p className="text-xs text-slate-500 mt-1">Coba ubah kata kunci pencarian atau filter kategori/hari.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredEkskul.map(ekskul => {
+                  const memberCount = ekskul.anggotaSiswaIds ? ekskul.anggotaSiswaIds.length : 0;
+                  const kuotaPercent = Math.min(100, Math.round((memberCount / (ekskul.kuotaMaksimal || 1)) * 100));
+                  
+                  const categoryBadgeColor = 
+                    ekskul.kategori === 'Olahraga' 
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      : ekskul.kategori === 'Seni & Budaya'
+                      ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                      : ekskul.kategori === 'Keagamaan'
+                      ? 'bg-teal-500/10 text-teal-400 border-teal-500/20'
+                      : ekskul.kategori === 'Sains & Teknologi'
+                      ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+                      : ekskul.kategori === 'Kepanduan & Bela Negara'
+                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                      : 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+
+                  return (
+                    <div 
+                      key={ekskul.id} 
+                      className="bg-[#181818] rounded-xl border border-slate-800 p-4.5 flex flex-col justify-between space-y-4 hover:border-emerald-500/40 transition-all shadow-md group"
+                    >
+                      {/* Top Header Card */}
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="font-mono text-[11px] font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                                {ekskul.kodeEkskul}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${categoryBadgeColor}`}>
+                                {ekskul.kategori}
+                              </span>
+                            </div>
+                            <h3 className="font-black text-white text-base group-hover:text-emerald-400 transition-colors flex items-center gap-1.5">
+                              <Trophy className="w-4 h-4 text-emerald-400 shrink-0" />
+                              {ekskul.namaEkskul}
+                            </h3>
+                          </div>
+                          
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border uppercase tracking-wider shrink-0 ${
+                            ekskul.status === 'Aktif' 
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                              : 'bg-slate-800 text-slate-400 border-slate-700'
+                          }`}>
+                            {ekskul.status}
+                          </span>
+                        </div>
+
+                        {ekskul.deskripsi && (
+                          <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                            {ekskul.deskripsi}
+                          </p>
+                        )}
+
+                        {/* Coach & Schedule info */}
+                        <div className="space-y-2 pt-2 border-t border-slate-800/80 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500 font-semibold flex items-center gap-1.5">
+                              <UserCheck className="w-3.5 h-3.5 text-blue-400" /> Pembina:
+                            </span>
+                            <span className="font-bold text-slate-200 text-right truncate max-w-[160px]" title={ekskul.pembinaNama}>
+                              {ekskul.pembinaNama}
+                            </span>
+                          </div>
+
+                          {ekskul.kontakPembina && (
+                            <div className="flex items-center justify-between text-[11px] text-slate-400 pl-5">
+                              <span className="flex items-center gap-1">
+                                <Phone className="w-3 h-3 text-slate-500" /> Kontak:
+                              </span>
+                              <span className="font-mono text-slate-300">{ekskul.kontakPembina}</span>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-800/50">
+                            <span className="text-slate-500 font-semibold flex items-center gap-1.5">
+                              <Calendar className="w-3.5 h-3.5 text-emerald-400" /> Hari & Jam:
+                            </span>
+                            <span className="font-bold text-emerald-300">
+                              {ekskul.hariLatihan}, {ekskul.jamMulai} - {ekskul.jamSelesai}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500 font-semibold flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-rose-400" /> Tempat:
+                            </span>
+                            <span className="font-medium text-slate-300 text-right truncate max-w-[160px]" title={ekskul.tempat}>
+                              {ekskul.tempat}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500 font-semibold flex items-center gap-1.5">
+                              <Layers className="w-3.5 h-3.5 text-indigo-400" /> Target Kelas:
+                            </span>
+                            <span className="font-medium text-slate-300">
+                              {ekskul.tingkatTarget}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500 font-semibold flex items-center gap-1.5">
+                              <DollarSign className="w-3.5 h-3.5 text-amber-400" /> Biaya Iuran:
+                            </span>
+                            <span className="font-bold text-amber-300">
+                              {ekskul.biayaIuran > 0 ? `Rp ${ekskul.biayaIuran.toLocaleString('id-ID')} / bln` : 'Gratis (Sekolah)'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Quota & Enrollment progress */}
+                        <div className="bg-[#121212] p-3 rounded-lg border border-slate-800 space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-400 font-bold flex items-center gap-1.5">
+                              <Users className="w-3.5 h-3.5 text-blue-400" /> Anggota Terdaftar
+                            </span>
+                            <span className="font-bold text-slate-200">
+                              <span className="text-emerald-400">{memberCount}</span> / {ekskul.kuotaMaksimal} Siswa
+                            </span>
+                          </div>
+                          
+                          <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+                            <div 
+                              className={`h-full transition-all duration-300 ${
+                                kuotaPercent >= 100 
+                                  ? 'bg-rose-500' 
+                                  : kuotaPercent >= 80 
+                                  ? 'bg-amber-500' 
+                                  : 'bg-emerald-500'
+                              }`}
+                              style={{ width: `${kuotaPercent}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-slate-500 text-right">
+                            Keterisian Kuota: {kuotaPercent}% {kuotaPercent >= 100 ? '(Penuh)' : ''}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="pt-2 border-t border-slate-800 space-y-2">
+                        <button
+                          onClick={() => {
+                            setActiveEkskulMembersModal(ekskul);
+                            setEkskulMemberSearch('');
+                            setEkskulMemberKelasFilter('Semua');
+                          }}
+                          className="w-full py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                        >
+                          <Users className="w-3.5 h-3.5" /> Kelola Anggota Siswa ({memberCount})
+                        </button>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingId(ekskul.id);
+                              setFormEkskul({
+                                kodeEkskul: ekskul.kodeEkskul,
+                                namaEkskul: ekskul.namaEkskul,
+                                kategori: ekskul.kategori,
+                                pembinaNama: ekskul.pembinaNama,
+                                nipPembina: ekskul.nipPembina || '',
+                                kontakPembina: ekskul.kontakPembina || '',
+                                hariLatihan: ekskul.hariLatihan,
+                                jamMulai: ekskul.jamMulai,
+                                jamSelesai: ekskul.jamSelesai,
+                                tempat: ekskul.tempat,
+                                tingkatTarget: ekskul.tingkatTarget,
+                                kuotaMaksimal: ekskul.kuotaMaksimal,
+                                anggotaSiswaIds: ekskul.anggotaSiswaIds || [],
+                                status: ekskul.status,
+                                biayaIuran: ekskul.biayaIuran || 0,
+                                deskripsi: ekskul.deskripsi || ''
+                              });
+                              setModalMode('edit');
+                              setIsModalOpen(true);
+                            }}
+                            className="px-3 py-1.5 bg-[#121212] hover:bg-slate-800 text-slate-300 border border-slate-700 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 flex-1 justify-center"
+                          >
+                            <Edit className="w-3.5 h-3.5 text-blue-400" /> Edit Ekskul
+                          </button>
+
+                          <button
+                            onClick={() => handleDelete(ekskul.id, ekskul.namaEkskul, 'ekskul')}
+                            title="Hapus Ekstrakurikuler"
+                            className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors border border-slate-800"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
 
       {/* MODAL ADD / EDIT */}
@@ -2206,27 +2695,46 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[11px] font-bold text-slate-400">Kelas</label>
+                        <label className="text-[11px] font-bold text-slate-400">Tingkat Kelas</label>
+                        <select 
+                          value={formSiswa.tingkatKelas || 'Kelas 7'} 
+                          onChange={e => {
+                            const newTingkat = e.target.value;
+                            const matchingRombel = activeRombelList.find(r => r.tingkatKelas === newTingkat);
+                            setFormSiswa({ 
+                              ...formSiswa, 
+                              tingkatKelas: newTingkat,
+                              kelas: matchingRombel ? matchingRombel.namaRombel : formSiswa.kelas
+                            });
+                          }}
+                          className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
+                        >
+                          <option value="Kelas 7">Kelas 7</option>
+                          <option value="Kelas 8">Kelas 8</option>
+                          <option value="Kelas 9">Kelas 9</option>
+                          <option value="Kelas 10">Kelas 10</option>
+                          <option value="Kelas 11">Kelas 11</option>
+                          <option value="Kelas 12">Kelas 12</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-400">Rombel / Sub-Kelas</label>
                         <select 
                           value={formSiswa.kelas} 
                           onChange={e => setFormSiswa({ ...formSiswa, kelas: e.target.value })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
                         >
-                          {activeRombelList.map(r => (
-                            <option key={r.id} value={r.namaRombel}>{r.namaRombel}</option>
-                          ))}
+                          {activeRombelList
+                            .filter(r => !formSiswa.tingkatKelas || r.tingkatKelas === formSiswa.tingkatKelas)
+                            .map(r => (
+                              <option key={r.id} value={r.namaRombel}>{r.namaRombel} ({r.tingkatKelas})</option>
+                            ))}
+                          {activeRombelList.filter(r => !formSiswa.tingkatKelas || r.tingkatKelas === formSiswa.tingkatKelas).length === 0 && (
+                            activeRombelList.map(r => (
+                              <option key={r.id} value={r.namaRombel}>{r.namaRombel} ({r.tingkatKelas})</option>
+                            ))
+                          )}
                           <option value="Belum Ada Kelas">Belum Ada Kelas</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-400">Jenis Kelamin</label>
-                        <select 
-                          value={formSiswa.jenisKelamin} 
-                          onChange={e => setFormSiswa({ ...formSiswa, jenisKelamin: e.target.value as 'L' | 'P' })}
-                          className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
-                        >
-                          <option value="L">Laki-laki (L)</option>
-                          <option value="P">Perempuan (P)</option>
                         </select>
                       </div>
                     </div>
@@ -2256,14 +2764,15 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[11px] font-bold text-slate-400">Asal Sekolah</label>
-                        <input 
-                          type="text" 
-                          placeholder="contoh: SMP Negeri 1 Jakarta"
-                          value={formSiswa.asalSekolah || ''} 
-                          onChange={e => setFormSiswa({ ...formSiswa, asalSekolah: e.target.value })}
-                          className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
-                        />
+                        <label className="text-[11px] font-bold text-slate-400">Jenis Kelamin</label>
+                        <select 
+                          value={formSiswa.jenisKelamin} 
+                          onChange={e => setFormSiswa({ ...formSiswa, jenisKelamin: e.target.value as 'L' | 'P' })}
+                          className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
+                        >
+                          <option value="L">Laki-laki (L)</option>
+                          <option value="P">Perempuan (P)</option>
+                        </select>
                       </div>
                       <div>
                         <label className="text-[11px] font-bold text-slate-400">Agama</label>
@@ -2273,14 +2782,15 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
                         >
                           <option value="Islam">Islam</option>
-                          <option value="Kristen">Kristen Protestan</option>
+                          <option value="Kristen">Kristen</option>
                           <option value="Katolik">Katolik</option>
                           <option value="Hindu">Hindu</option>
                           <option value="Buddha">Buddha</option>
-                          <option value="Khonghucu">Khonghucu</option>
+                          <option value="Konghucu">Konghucu</option>
                         </select>
                       </div>
                     </div>
+
 
                     <div>
                       <label className="text-[11px] font-bold text-slate-400">Alamat Tempat Tinggal</label>
@@ -3314,6 +3824,230 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                 </>
               )}
 
+              {subTab === 'ekskul' && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400">Kode Ekskul *</label>
+                      <input 
+                        required 
+                        placeholder="Contoh: EKS-PMR"
+                        value={formEkskul.kodeEkskul} 
+                        onChange={e => setFormEkskul({ ...formEkskul, kodeEkskul: e.target.value })}
+                        className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white uppercase font-mono focus:outline-none focus:border-emerald-500" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400">Nama Ekstrakurikuler *</label>
+                      <input 
+                        required 
+                        placeholder="Contoh: Palang Merah Remaja"
+                        value={formEkskul.namaEkskul} 
+                        onChange={e => setFormEkskul({ ...formEkskul, namaEkskul: e.target.value })}
+                        className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400">Kategori Bidang *</label>
+                      <select 
+                        value={formEkskul.kategori} 
+                        onChange={e => setFormEkskul({ ...formEkskul, kategori: e.target.value })}
+                        className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="Olahraga">Olahraga</option>
+                        <option value="Seni & Budaya">Seni & Budaya</option>
+                        <option value="Keagamaan">Keagamaan</option>
+                        <option value="Sains & Teknologi">Sains & Teknologi</option>
+                        <option value="Kepanduan & Bela Negara">Kepanduan & Bela Negara</option>
+                        <option value="Bahasa & Komunikasi">Bahasa & Komunikasi</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400">Status Klub *</label>
+                      <select 
+                        value={formEkskul.status} 
+                        onChange={e => setFormEkskul({ ...formEkskul, status: e.target.value as 'Aktif' | 'Nonaktif' })}
+                        className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="Aktif">Aktif</option>
+                        <option value="Nonaktif">Nonaktif</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-[#181818] rounded-xl border border-slate-800 space-y-3">
+                    <label className="text-[11px] font-bold text-emerald-400 block uppercase tracking-wider">
+                      Informasi Pembina / Pelatih
+                    </label>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1">Pilih Guru Pembina atau Tulis Nama</label>
+                        <select
+                          value={formEkskul.pembinaNama}
+                          onChange={e => {
+                            const selectedGuru = guruList.find(g => g.nama === e.target.value);
+                            setFormEkskul({
+                              ...formEkskul,
+                              pembinaNama: e.target.value,
+                              nipPembina: selectedGuru ? selectedGuru.nuptk : formEkskul.nipPembina,
+                              kontakPembina: selectedGuru ? selectedGuru.telepon : formEkskul.kontakPembina
+                            });
+                          }}
+                          className="w-full p-2 bg-[#121212] border border-slate-700 text-white rounded-lg text-xs focus:outline-none focus:border-emerald-500"
+                        >
+                          <option value="">-- Pilih dari Daftar Guru --</option>
+                          {guruList.map(g => (
+                            <option key={g.id} value={g.nama}>{g.nama} ({g.mataPelajaran})</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1">Nama Pembina / Pelatih Luar *</label>
+                        <input
+                          required
+                          placeholder="Nama lengkap pembina"
+                          value={formEkskul.pembinaNama}
+                          onChange={e => setFormEkskul({ ...formEkskul, pembinaNama: e.target.value })}
+                          className="w-full p-2 bg-[#121212] border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1">NIP / NUPTK Pembina</label>
+                        <input
+                          placeholder="NIP jika guru tetap"
+                          value={formEkskul.nipPembina || ''}
+                          onChange={e => setFormEkskul({ ...formEkskul, nipPembina: e.target.value })}
+                          className="w-full p-2 bg-[#121212] border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1">Kontak Telepon / WA</label>
+                        <input
+                          placeholder="081234567890"
+                          value={formEkskul.kontakPembina || ''}
+                          onChange={e => setFormEkskul({ ...formEkskul, kontakPembina: e.target.value })}
+                          className="w-full p-2 bg-[#121212] border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400">Hari Latihan *</label>
+                      <select 
+                        value={formEkskul.hariLatihan} 
+                        onChange={e => setFormEkskul({ ...formEkskul, hariLatihan: e.target.value })}
+                        className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="Senin">Senin</option>
+                        <option value="Selasa">Selasa</option>
+                        <option value="Rabu">Rabu</option>
+                        <option value="Kamis">Kamis</option>
+                        <option value="Jumat">Jumat</option>
+                        <option value="Sabtu">Sabtu</option>
+                        <option value="Minggu">Minggu</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400">Jam Mulai *</label>
+                      <input 
+                        type="text"
+                        placeholder="15:30"
+                        value={formEkskul.jamMulai} 
+                        onChange={e => setFormEkskul({ ...formEkskul, jamMulai: e.target.value })}
+                        className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white font-mono text-center focus:outline-none focus:border-emerald-500" 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400">Jam Selesai *</label>
+                      <input 
+                        type="text"
+                        placeholder="17:00"
+                        value={formEkskul.jamSelesai} 
+                        onChange={e => setFormEkskul({ ...formEkskul, jamSelesai: e.target.value })}
+                        className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white font-mono text-center focus:outline-none focus:border-emerald-500" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400">Tempat / Lokasi Latihan *</label>
+                      <input 
+                        required 
+                        placeholder="Contoh: Lapangan Utama, Ruang Musik"
+                        value={formEkskul.tempat} 
+                        onChange={e => setFormEkskul({ ...formEkskul, tempat: e.target.value })}
+                        className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400">Tingkat Kelas Target</label>
+                      <select 
+                        value={formEkskul.tingkatTarget} 
+                        onChange={e => setFormEkskul({ ...formEkskul, tingkatTarget: e.target.value })}
+                        className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="Semua Tingkat (Kelas 7, 8, 9)">Semua Tingkat (Kelas 7, 8, 9)</option>
+                        <option value="Semua Tingkat (Kelas 10, 11, 12)">Semua Tingkat (Kelas 10, 11, 12)</option>
+                        <option value="Kelas 7 & 8">Kelas 7 & 8</option>
+                        <option value="Kelas 10 & 11">Kelas 10 & 11</option>
+                        <option value="Khusus Kelas 7">Khusus Kelas 7</option>
+                        <option value="Khusus Kelas 10">Khusus Kelas 10</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400">Kuota Maksimal Siswa</label>
+                      <input 
+                        type="number"
+                        min="1"
+                        max="200"
+                        value={formEkskul.kuotaMaksimal} 
+                        onChange={e => setFormEkskul({ ...formEkskul, kuotaMaksimal: Number(e.target.value) || 30 })}
+                        className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-emerald-500" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400">Iuran / Biaya (Rp per Bulan)</label>
+                      <input 
+                        type="number"
+                        min="0"
+                        step="5000"
+                        placeholder="0 jika gratis"
+                        value={formEkskul.biayaIuran} 
+                        onChange={e => setFormEkskul({ ...formEkskul, biayaIuran: Number(e.target.value) || 0 })}
+                        className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-emerald-500" 
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-400">Deskripsi & Program Kerja</label>
+                    <textarea 
+                      rows={2}
+                      placeholder="Uraian singkat program kegiatan, target lomba/prestasi..."
+                      value={formEkskul.deskripsi || ''} 
+                      onChange={e => setFormEkskul({ ...formEkskul, deskripsi: e.target.value })}
+                      className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white resize-none focus:outline-none focus:border-emerald-500" 
+                    />
+                  </div>
+                </>
+              )}
+
               </div>
 
               <div className="p-5 pt-3 flex justify-end gap-2 border-t border-slate-800 shrink-0">
@@ -3327,7 +4061,13 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                 <button
                   type="submit"
                   className={`px-4 py-2 rounded-lg text-xs font-bold text-white transition-colors ${
-                    subTab === 'rombel' ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-blue-600 hover:bg-blue-500'
+                    subTab === 'rombel' 
+                      ? 'bg-indigo-600 hover:bg-indigo-500' 
+                      : subTab === 'mapel'
+                      ? 'bg-amber-600 hover:bg-amber-500'
+                      : subTab === 'ekskul'
+                      ? 'bg-emerald-600 hover:bg-emerald-500'
+                      : 'bg-blue-600 hover:bg-blue-500'
                   }`}
                 >
                   Simpan Data
@@ -3465,6 +4205,282 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                 Selesai
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EKSKUL MEMBERSHIP MANAGEMENT MODAL */}
+      {activeEkskulMembersModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#121212] rounded-2xl max-w-4xl w-full p-6 border border-slate-800 shadow-2xl space-y-5 max-h-[90vh] flex flex-col">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
+                  <Trophy className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-black text-white text-lg">
+                      Keanggotaan: {activeEkskulMembersModal.namaEkskul}
+                    </h3>
+                    <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px] font-bold border border-slate-700">
+                      {activeEkskulMembersModal.kodeEkskul}
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
+                      {activeEkskulMembersModal.kategori}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
+                    <span>Pembina: <strong className="text-slate-200">{activeEkskulMembersModal.pembinaNama}</strong></span>
+                    <span>•</span>
+                    <span>Jadwal: <strong className="text-emerald-300">{activeEkskulMembersModal.hariLatihan} ({activeEkskulMembersModal.jamMulai} - {activeEkskulMembersModal.jamSelesai})</strong></span>
+                    <span>•</span>
+                    <span>Lokasi: <strong className="text-slate-200">{activeEkskulMembersModal.tempat}</strong></span>
+                  </p>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setActiveEkskulMembersModal(null)} 
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Quota & Capacity Info Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-[#181818] rounded-xl border border-slate-800 shrink-0 text-xs">
+              <div className="flex items-center justify-between p-2 rounded-lg bg-[#121212] border border-slate-800/80">
+                <span className="text-slate-400 font-medium">Terdaftar Saat Ini:</span>
+                <span className="font-black text-emerald-400 text-sm">
+                  {activeEkskulMembersModal.anggotaSiswaIds.length} Siswa
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between p-2 rounded-lg bg-[#121212] border border-slate-800/80">
+                <span className="text-slate-400 font-medium">Kapasitas Kuota:</span>
+                <span className="font-black text-white text-sm">
+                  {activeEkskulMembersModal.kuotaMaksimal} Siswa
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between p-2 rounded-lg bg-[#121212] border border-slate-800/80">
+                <span className="text-slate-400 font-medium">Sisa Slot Kursi:</span>
+                <span className={`font-black text-sm ${
+                  activeEkskulMembersModal.kuotaMaksimal - activeEkskulMembersModal.anggotaSiswaIds.length <= 0
+                    ? 'text-rose-400'
+                    : 'text-amber-400'
+                }`}>
+                  {Math.max(0, activeEkskulMembersModal.kuotaMaksimal - activeEkskulMembersModal.anggotaSiswaIds.length)} Slot
+                </span>
+              </div>
+            </div>
+
+            {/* Search and Filters for Member modal */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+              <div className="relative flex-1 w-full">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Cari nama siswa atau NISN..."
+                  value={ekskulMemberSearch}
+                  onChange={e => setEkskulMemberSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Filter className="w-4 h-4 text-slate-500" />
+                <select
+                  value={ekskulMemberKelasFilter}
+                  onChange={e => setEkskulMemberKelasFilter(e.target.value)}
+                  className="bg-[#181818] border border-slate-800 text-slate-200 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-emerald-500 w-full sm:w-auto"
+                >
+                  <option value="Semua">Semua Kelas Siswa</option>
+                  {Array.from(new Set(siswaList.map(s => s.kelas))).filter(Boolean).map(k => (
+                    <option key={k} value={k}>{k}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Main Member Lists Section */}
+            <div className="flex-1 overflow-y-auto space-y-6 min-h-0 pr-1">
+              
+              {/* SECTION 1: ANGGOTA TERDAFTAR */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <UserCheck className="w-4 h-4" /> Daftar Anggota Aktif ({activeEkskulMembersModal.anggotaSiswaIds.length})
+                  </h4>
+                  <span className="text-[11px] text-slate-400">
+                    Siswa resmi terdaftar dalam kegiatan
+                  </span>
+                </div>
+
+                {activeEkskulMembersModal.anggotaSiswaIds.length === 0 ? (
+                  <div className="p-6 bg-[#181818] border border-slate-800 rounded-xl text-center text-slate-500 text-xs">
+                    Belum ada siswa yang terdaftar di ekstrakurikuler ini. Silakan tambahkan dari daftar di bawah.
+                  </div>
+                ) : (
+                  <div className="bg-[#181818] rounded-xl border border-slate-800 overflow-hidden">
+                    <table className="w-full text-left text-xs text-slate-300">
+                      <thead className="bg-[#121212] border-b border-slate-800 text-slate-400 font-semibold uppercase text-[10px]">
+                        <tr>
+                          <th className="px-4 py-2.5">Nama Siswa</th>
+                          <th className="px-4 py-2.5">NISN / NIS</th>
+                          <th className="px-4 py-2.5">Kelas</th>
+                          <th className="px-4 py-2.5">L/P</th>
+                          <th className="px-4 py-2.5">No. Telepon Wali</th>
+                          <th className="px-4 py-2.5 text-right">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {siswaList
+                          .filter(s => activeEkskulMembersModal.anggotaSiswaIds.includes(s.id))
+                          .filter(s => {
+                            const matchSearch = s.nama.toLowerCase().includes(ekskulMemberSearch.toLowerCase()) ||
+                                                s.nisn.includes(ekskulMemberSearch) ||
+                                                s.nis.includes(ekskulMemberSearch);
+                            const matchKelas = ekskulMemberKelasFilter === 'Semua' || s.kelas === ekskulMemberKelasFilter;
+                            return matchSearch && matchKelas;
+                          })
+                          .map(s => (
+                            <tr key={s.id} className="hover:bg-slate-800/40 transition-colors">
+                              <td className="px-4 py-2.5 font-bold text-white flex items-center gap-2.5">
+                                <img
+                                  src={s.fotoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}
+                                  alt={s.nama}
+                                  className="w-7 h-7 rounded-full object-cover border border-slate-700"
+                                />
+                                {s.nama}
+                              </td>
+                              <td className="px-4 py-2.5 font-mono text-slate-400">{s.nisn} / {s.nis}</td>
+                              <td className="px-4 py-2.5 font-semibold text-slate-200">
+                                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px]">
+                                  {s.kelas}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 font-semibold text-slate-400">{s.jenisKelamin}</td>
+                              <td className="px-4 py-2.5 font-mono text-slate-400">{s.teleponWali || '-'}</td>
+                              <td className="px-4 py-2.5 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updatedIds = activeEkskulMembersModal.anggotaSiswaIds.filter(id => id !== s.id);
+                                    const updatedEkskul = { ...activeEkskulMembersModal, anggotaSiswaIds: updatedIds };
+                                    setActiveEkskulList(prev => prev.map(e => e.id === updatedEkskul.id ? updatedEkskul : e));
+                                    setActiveEkskulMembersModal(updatedEkskul);
+                                  }}
+                                  className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ml-auto"
+                                >
+                                  <X className="w-3 h-3" /> Keluarkan
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 2: TAMBAH / DAFTARKAN SISWA LAIN */}
+              <div className="space-y-3 pt-4 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Plus className="w-4 h-4" /> Daftarkan Siswa Baru ke Ekskul Ini
+                  </h4>
+                  <span className="text-[11px] text-slate-400">
+                    Pilih siswa untuk diikutsertakan
+                  </span>
+                </div>
+
+                {activeEkskulMembersModal.anggotaSiswaIds.length >= activeEkskulMembersModal.kuotaMaksimal ? (
+                  <div className="p-4 bg-rose-950/30 border border-rose-800/50 rounded-xl text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                    <span>Kuota siswa untuk ekstrakurikuler ini telah <strong>PENUH</strong> ({activeEkskulMembersModal.kuotaMaksimal} siswa). Anda dapat menambah batas kuota di menu Edit Ekskul.</span>
+                  </div>
+                ) : (
+                  <div className="bg-[#181818] rounded-xl border border-slate-800 overflow-hidden">
+                    <table className="w-full text-left text-xs text-slate-300">
+                      <thead className="bg-[#121212] border-b border-slate-800 text-slate-400 font-semibold uppercase text-[10px]">
+                        <tr>
+                          <th className="px-4 py-2.5">Nama Siswa</th>
+                          <th className="px-4 py-2.5">NISN / NIS</th>
+                          <th className="px-4 py-2.5">Kelas</th>
+                          <th className="px-4 py-2.5">L/P</th>
+                          <th className="px-4 py-2.5 text-right">Aksi Pendaftaran</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {siswaList
+                          .filter(s => !activeEkskulMembersModal.anggotaSiswaIds.includes(s.id))
+                          .filter(s => {
+                            const matchSearch = s.nama.toLowerCase().includes(ekskulMemberSearch.toLowerCase()) ||
+                                                s.nisn.includes(ekskulMemberSearch) ||
+                                                s.nis.includes(ekskulMemberSearch);
+                            const matchKelas = ekskulMemberKelasFilter === 'Semua' || s.kelas === ekskulMemberKelasFilter;
+                            return matchSearch && matchKelas;
+                          })
+                          .slice(0, 15) // Limit view to 15 for fast performance
+                          .map(s => (
+                            <tr key={s.id} className="hover:bg-slate-800/40 transition-colors">
+                              <td className="px-4 py-2.5 font-bold text-white flex items-center gap-2.5">
+                                <img
+                                  src={s.fotoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}
+                                  alt={s.nama}
+                                  className="w-7 h-7 rounded-full object-cover border border-slate-700"
+                                />
+                                {s.nama}
+                              </td>
+                              <td className="px-4 py-2.5 font-mono text-slate-400">{s.nisn} / {s.nis}</td>
+                              <td className="px-4 py-2.5 font-semibold text-slate-200">
+                                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px]">
+                                  {s.kelas}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 font-semibold text-slate-400">{s.jenisKelamin}</td>
+                              <td className="px-4 py-2.5 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (activeEkskulMembersModal.anggotaSiswaIds.length >= activeEkskulMembersModal.kuotaMaksimal) {
+                                      alert('Kuota ekstrakurikuler sudah penuh!');
+                                      return;
+                                    }
+                                    const updatedIds = [...activeEkskulMembersModal.anggotaSiswaIds, s.id];
+                                    const updatedEkskul = { ...activeEkskulMembersModal, anggotaSiswaIds: updatedIds };
+                                    setActiveEkskulList(prev => prev.map(e => e.id === updatedEkskul.id ? updatedEkskul : e));
+                                    setActiveEkskulMembersModal(updatedEkskul);
+                                  }}
+                                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ml-auto shadow-sm"
+                                >
+                                  <Plus className="w-3 h-3" /> Daftarkan
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="pt-3 border-t border-slate-800 flex justify-end shrink-0">
+              <button
+                onClick={() => setActiveEkskulMembersModal(null)}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-md"
+              >
+                Selesai & Tutup
+              </button>
+            </div>
+
           </div>
         </div>
       )}

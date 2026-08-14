@@ -32,13 +32,14 @@ import {
   Sparkles,
   Layers,
   RefreshCw,
+  RotateCcw,
   MessageSquare,
   Smartphone,
   Bell
 } from 'lucide-react';
-import { TagihanKeuangan, TransaksiKeuangan, Siswa, KeuanganSubTab, TarifBiaya, TipeKeuangan, SchoolSettings } from '../types/school';
+import { TagihanKeuangan, TransaksiKeuangan, Siswa, KeuanganSubTab, TarifBiaya, TipeKeuangan, SchoolSettings, RombelKelas } from '../types/school';
 import { sendFonnteMessage } from '../lib/fonnte';
-import { INITIAL_FONNTE_CONFIG, INITIAL_TARIF_BIAYA } from '../data/mockData';
+import { INITIAL_FONNTE_CONFIG, INITIAL_TARIF_BIAYA, INITIAL_ROMBEL } from '../data/mockData';
 
 interface KeuanganViewProps {
   tagihanList: TagihanKeuangan[];
@@ -48,6 +49,7 @@ interface KeuanganViewProps {
   userGoogleToken: string;
   siswaList?: Siswa[];
   setSiswaList?: React.Dispatch<React.SetStateAction<Siswa[]>>;
+  rombelList?: RombelKelas[];
   subTab?: KeuanganSubTab;
   setSubTab?: (subTab: KeuanganSubTab) => void;
   tarifBiayaList?: TarifBiaya[];
@@ -65,6 +67,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   userGoogleToken,
   siswaList = [],
   setSiswaList,
+  rombelList = INITIAL_ROMBEL,
   subTab,
   setSubTab,
   tarifBiayaList: propTarifBiayaList,
@@ -186,29 +189,42 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   const [quickPayType, setQuickPayType] = useState<'spp' | 'ukt' | 'ekskul'>('spp');
   const [quickPayItemId, setQuickPayItemId] = useState<string>('');
 
-  // Rekap / Daftar Tagihan Filter States (SPP, UKT, Ekskul, Nama Tagihan)
+  // Rekap / Daftar Tagihan Filter States (SPP, UKT, Ekskul, Kelas/Rombel)
   const [filterTipeTagihan, setFilterTipeTagihan] = useState<'all' | 'spp' | 'ukt' | 'ekskul'>('all');
-  const [filterNamaTagihan, setFilterNamaTagihan] = useState<string>('all');
+  const [filterKelas, setFilterKelas] = useState<string>('all');
   const [searchTagihanQuery, setSearchTagihanQuery] = useState<string>('');
 
   // Synthesize complete list of tagihan covering SPP, UKT, and Ekskul for all students
   const allEffectiveTagihanList = useMemo(() => {
     const combined: TagihanKeuangan[] = tagihanList.filter(t => !t.isDeleted);
 
-    // Build map of existing tagihan by (siswaNama.toLowerCase() + '-' + tipe.toLowerCase())
+    // Build map of existing tagihan and deleted markers
     const existingKeySet = new Set<string>();
     const deletedSynIds = new Set<string>();
+    const deletedKeys = new Set<string>();
 
     tagihanList.forEach(t => {
       if (t) {
         if (t.isDeleted) {
-          if (t.id.startsWith('syn-')) {
-            deletedSynIds.add(t.id);
+          deletedSynIds.add(t.id);
+          if (t.siswaId && t.tipe) {
+            deletedKeys.add(`${t.siswaId}-${t.tipe.toLowerCase()}`);
+          }
+          if (t.siswaNama && t.tipe) {
+            const sName = (t.siswaNama || '').trim().toLowerCase();
+            const sTipe = (t.tipe || '').toLowerCase();
+            deletedKeys.add(`${sName}-${sTipe}`);
+            if (t.namaTagihan) {
+              deletedKeys.add(`${sName}-${t.namaTagihan.toLowerCase()}`);
+            }
           }
         } else if (t.siswaNama) {
           const sName = (t.siswaNama || '').trim().toLowerCase();
           const sTipe = (t.tipe || '').toLowerCase();
           existingKeySet.add(`${sName}-${sTipe}`);
+          if (t.siswaId) {
+            existingKeySet.add(`${t.siswaId}-${sTipe}`);
+          }
         }
       }
     });
@@ -221,8 +237,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
       tipesToEnsure.forEach(tipe => {
         const key = `${sNameNorm}-${tipe}`;
+        const idKey = `${siswa.id}-${tipe}`;
         const synId = `syn-${tipe}-${siswa.id}`;
-        if (!existingKeySet.has(key) && !deletedSynIds.has(synId)) {
+
+        if (!existingKeySet.has(key) && !existingKeySet.has(idKey) && !deletedSynIds.has(synId) && !deletedKeys.has(key) && !deletedKeys.has(idKey)) {
           // Find tariff if available (class-specific for SPP)
           const matchingTarif = tarifList.find(tr => {
             if (!tr || (tr.tipe || '').toLowerCase() !== tipe || tr.status !== 'Aktif') return false;
@@ -251,6 +269,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
           } else if (tipe === 'spp') {
             defaultNominal = matchingTarif ? matchingTarif.nominal : 350000;
             defaultNama = matchingTarif ? `${matchingTarif.namaBiaya} (Agustus 2026)` : `SPP Bulanan Kelas 7 (Agustus 2026)`;
+          }
+
+          if (deletedKeys.has(`${sNameNorm}-${defaultNama.toLowerCase()}`)) {
+            return;
           }
 
           // Check if there's any transaction for this student and tipe in transaksiList
@@ -283,27 +305,14 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     return combined;
   }, [tagihanList, siswaList, tarifList, transaksiList, tahunAjaran]);
 
-  // Dynamically derive list of available bill names for the dropdown
-  const availableNamaTagihanList = useMemo(() => {
+  // Dynamically derive list of available classes for the dropdown
+  const availableKelasList = useMemo(() => {
     const list = new Set<string>();
-    allEffectiveTagihanList.forEach(t => {
-      if (t) {
-        const tTipe = (t.tipe || '').toLowerCase();
-        if (filterTipeTagihan === 'all' || tTipe === filterTipeTagihan.toLowerCase()) {
-          if (t.namaTagihan) list.add(t.namaTagihan);
-        }
-      }
+    siswaList.forEach(s => {
+      if (s.kelas) list.add(s.kelas);
     });
-    tarifList.forEach(tr => {
-      if (tr) {
-        const trTipe = (tr.tipe || '').toLowerCase();
-        if (filterTipeTagihan === 'all' || trTipe === filterTipeTagihan.toLowerCase()) {
-          if (tr.namaBiaya) list.add(`${tr.namaBiaya}`);
-        }
-      }
-    });
-    return Array.from(list);
-  }, [allEffectiveTagihanList, tarifList, filterTipeTagihan]);
+    return Array.from(list).sort();
+  }, [siswaList]);
 
   // Filtered tagihan list for the Rekap table
   const filteredGlobalTagihanList = useMemo(() => {
@@ -314,10 +323,9 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       if (filterTipeTagihan !== 'all') {
         if (tTipe !== filterTipeTagihan.toLowerCase()) return false;
       }
-      // 2. Nama Tagihan Filter
-      if (filterNamaTagihan !== 'all') {
-        const tNama = (t.namaTagihan || '').toLowerCase();
-        if (t.namaTagihan !== filterNamaTagihan && !tNama.includes(filterNamaTagihan.toLowerCase())) return false;
+      // 2. Kelas Filter
+      if (filterKelas !== 'all') {
+        if ((t.kelas || '') !== filterKelas) return false;
       }
 
       // Calculate status for filtering
@@ -347,7 +355,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       }
       return true;
     });
-  }, [allEffectiveTagihanList, filterTipeTagihan, filterNamaTagihan, searchTagihanQuery, transaksiList]);
+  }, [allEffectiveTagihanList, filterTipeTagihan, filterKelas, searchTagihanQuery, transaksiList]);
 
   // Payment Form Input States
   const [inputTotal, setInputTotal] = useState<number>(0);
@@ -357,14 +365,33 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   );
   const [selectedMetodePembayaran, setSelectedMetodePembayaran] = useState<string>('Cash / Kasir');
 
-  // Sync total when selected months or monthlyFee change
+  // Auto-select first item when type changes or tariffs update
+  React.useEffect(() => {
+    if (quickPayType === 'ukt' && uktTarifs.length > 0 && !uktTarifs.some(t => t.id === quickPayItemId)) {
+      setQuickPayItemId(uktTarifs[0].id);
+    } else if (quickPayType === 'ekskul' && ekskulTarifs.length > 0 && !ekskulTarifs.some(t => t.id === quickPayItemId)) {
+      setQuickPayItemId(ekskulTarifs[0].id);
+    }
+  }, [quickPayType, uktTarifs, ekskulTarifs]);
+
+  // Sync total when selected months, monthlyFee, or selected item change
   React.useEffect(() => {
     if (quickPayType === 'spp') {
       const tot = selectedMonths.length > 0 ? selectedMonths.length * monthlyFee : 0;
       setInputTotal(tot);
       setInputDibayar(tot);
+    } else {
+      const list = quickPayType === 'ukt' ? uktTarifs : ekskulTarifs;
+      const found = list.find(t => t.id === quickPayItemId) || list[0];
+      if (found) {
+        setInputTotal(found.nominal);
+        setInputDibayar(found.nominal);
+      } else {
+        setInputTotal(0);
+        setInputDibayar(0);
+      }
     }
-  }, [selectedMonths, monthlyFee, quickPayType]);
+  }, [selectedMonths, monthlyFee, quickPayType, quickPayItemId, uktTarifs, ekskulTarifs]);
 
   // Calculate Kembalian
   const kembalian = Math.max(0, inputDibayar - (selectedMonths.length > 0 ? calculatedTotal : inputTotal));
@@ -403,24 +430,42 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   }, [tarifList, bebasTerbayarMap, tahunAjaran, selectedSiswa]);
 
   const totalSppPaid = useMemo(() => {
+    if (!selectedSiswa) return 0;
     return allEffectiveTagihanList
-      .filter(t => t.tipe === 'spp')
+      .filter(t => {
+        if (!t) return false;
+        const matchStudent = t.siswaId === selectedSiswa.id || (t.siswaNama && selectedSiswa.nama && t.siswaNama.trim().toLowerCase() === selectedSiswa.nama.trim().toLowerCase());
+        return matchStudent && t.tipe === 'spp';
+      })
       .reduce((sum, t) => sum + (t.terbayar || 0), 0);
-  }, [allEffectiveTagihanList]);
+  }, [allEffectiveTagihanList, selectedSiswa]);
 
   const totalUktPaid = useMemo(() => {
+    if (!selectedSiswa) return 0;
     return allEffectiveTagihanList
-      .filter(t => t.tipe === 'ukt')
+      .filter(t => {
+        if (!t) return false;
+        const matchStudent = t.siswaId === selectedSiswa.id || (t.siswaNama && selectedSiswa.nama && t.siswaNama.trim().toLowerCase() === selectedSiswa.nama.trim().toLowerCase());
+        return matchStudent && t.tipe === 'ukt';
+      })
       .reduce((sum, t) => sum + (t.terbayar || 0), 0);
-  }, [allEffectiveTagihanList]);
+  }, [allEffectiveTagihanList, selectedSiswa]);
 
   const totalEkskulPaid = useMemo(() => {
+    if (!selectedSiswa) return 0;
     return allEffectiveTagihanList
-      .filter(t => t.tipe === 'ekskul')
+      .filter(t => {
+        if (!t) return false;
+        const matchStudent = t.siswaId === selectedSiswa.id || (t.siswaNama && selectedSiswa.nama && t.siswaNama.trim().toLowerCase() === selectedSiswa.nama.trim().toLowerCase());
+        return matchStudent && t.tipe === 'ekskul';
+      })
       .reduce((sum, t) => sum + (t.terbayar || 0), 0);
-  }, [allEffectiveTagihanList]);
+  }, [allEffectiveTagihanList, selectedSiswa]);
 
   const totalSemuaPembayaran = totalSppPaid + totalUktPaid + totalEkskulPaid;
+
+  // State for deletion modal
+  const [deleteTargetTagihan, setDeleteTargetTagihan] = useState<TagihanKeuangan | null>(null);
 
   // Student Specific Recent Transactions List with localStorage persistence
   const [deleteTargetTx, setDeleteTargetTx] = useState<{
@@ -447,7 +492,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     return [];
   });
 
-  // Sync state changes to localStorage on studentKey change or updates, merging with global transactions as the primary source of truth
+  // Sync state changes on studentKey change or updates, treating active transaksiList and tagihanList as primary truth
   React.useEffect(() => {
     if (!selectedSiswa) {
       setStudentTransactions([]);
@@ -474,16 +519,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         itemId: tx.tagihanId
       }));
 
-      const savedTxStr = localStorage.getItem(`edu_student_tx_${studentKey}`);
-      const savedTx = savedTxStr ? JSON.parse(savedTxStr) : [];
-      // Combine and unique by transaction ID
-      const txMap = new Map();
-      derivedTxs.forEach(t => txMap.set(t.id, t));
-      savedTx.forEach((t: any) => {
-        if (t && t.id) txMap.set(t.id, t);
-      });
-      const finalTxs = Array.from(txMap.values());
-      setStudentTransactions(finalTxs);
+      setStudentTransactions(derivedTxs);
+      try {
+        localStorage.setItem(`edu_student_tx_${studentKey}`, JSON.stringify(derivedTxs));
+      } catch (e) {}
 
       // 2. Paid Months State
       const derivedPaid: Record<string, string> = {};
@@ -498,7 +537,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       });
 
       tagihanList.forEach(t => {
-        if (t && t.siswaNama && (t.siswaNama || '').trim().toLowerCase() === normName && t.tipe === 'spp' && t.status === 'Lunas') {
+        if (t && !t.isDeleted && t.siswaNama && (t.siswaNama || '').trim().toLowerCase() === normName && t.tipe === 'spp' && t.status === 'Lunas') {
           allMonths.forEach(m => {
             if (t.namaTagihan && t.namaTagihan.toLowerCase().includes(m.toLowerCase())) {
               derivedPaid[m] = t.tanggalBayar || '09/08/2026';
@@ -507,10 +546,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         }
       });
 
-      const savedPaidStr = localStorage.getItem(`edu_student_paid_${studentKey}`);
-      const savedPaid = savedPaidStr ? JSON.parse(savedPaidStr) : {};
-      const finalPaid = { ...savedPaid, ...derivedPaid };
-      setPaidMonthsState(finalPaid);
+      setPaidMonthsState(derivedPaid);
+      try {
+        localStorage.setItem(`edu_student_paid_${studentKey}`, JSON.stringify(derivedPaid));
+      } catch (e) {}
 
       // 3. Bebas Terbayar Map
       const derivedBebas: Record<string, number> = {};
@@ -520,10 +559,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         }
       });
 
-      const savedBebasStr = localStorage.getItem(`edu_student_bebas_${studentKey}`);
-      const savedBebas = savedBebasStr ? JSON.parse(savedBebasStr) : {};
-      const finalBebas = { ...savedBebas, ...derivedBebas };
-      setBebasTerbayarMap(finalBebas);
+      setBebasTerbayarMap(derivedBebas);
+      try {
+        localStorage.setItem(`edu_student_bebas_${studentKey}`, JSON.stringify(derivedBebas));
+      } catch (e) {}
 
     } catch (e) {
       console.error('Error syncing student finance data:', e);
@@ -571,9 +610,190 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     if (!selectedSiswa) return [];
     const normName = selectedSiswa.nama.trim().toLowerCase();
     return allEffectiveTagihanList.filter(t => 
-      t && (t.siswaId === selectedSiswa.id || (t.siswaNama && t.siswaNama.trim().toLowerCase() === normName))
+      t && !t.isDeleted && (t.siswaId === selectedSiswa.id || (t.siswaNama && t.siswaNama.trim().toLowerCase() === normName))
     );
   }, [selectedSiswa, allEffectiveTagihanList]);
+
+  // Execute Permanent Bill Deletion (Deletes bill & removes all associated transaction records)
+  const handleExecuteDeleteTagihanPermanen = (t: TagihanKeuangan) => {
+    if (!t) return;
+    const sNameNorm = (t.siswaNama || (selectedSiswa ? selectedSiswa.nama : '') || '').trim().toLowerCase();
+    const tTipe = (t.tipe || '').toLowerCase();
+    const tName = (t.namaTagihan || '').toLowerCase();
+
+    // 1. Mark bill as tombstoned in tagihanList
+    const tombstone: TagihanKeuangan = {
+      ...t,
+      isDeleted: true
+    };
+    setTagihanList(prev => [
+      ...prev.filter(item => item.id !== t.id),
+      tombstone
+    ]);
+
+    // 2. Remove associated transactions from global transaksiList
+    if (setTransaksiList) {
+      setTransaksiList(prev => prev.filter(tx => {
+        if (!tx) return true;
+        if (tx.tagihanId && tx.tagihanId === t.id) return false;
+        const txStudent = (tx.siswaNama || '').trim().toLowerCase();
+        if (sNameNorm && txStudent === sNameNorm) {
+          const txTipe = (tx.tipe || '').toLowerCase();
+          const txPay = (tx.pembayaran || '').toLowerCase();
+          if (txTipe === tTipe && tName && (txPay.includes(tName) || tName.includes(txPay))) {
+            return false;
+          }
+          if (t.id.startsWith('syn-') && txTipe === tTipe) {
+            return false;
+          }
+        }
+        return true;
+      }));
+    }
+
+    // 3. Remove associated transactions from studentTransactions
+    const updatedStudentTx = studentTransactions.filter(tx => {
+      if (tx.itemId && tx.itemId === t.id) return false;
+      const txPay = (tx.pembayaran || '').toLowerCase();
+      if (tName && (txPay.includes(tName) || tName.includes(txPay))) return false;
+      if (t.id.startsWith('syn-') && ((tTipe === 'spp' && tx.type === 'spp') || (tTipe !== 'spp' && tx.type === 'bebas'))) {
+        return false;
+      }
+      return true;
+    });
+    setStudentTransactions(updatedStudentTx);
+    try {
+      localStorage.setItem(`edu_student_tx_${studentKey}`, JSON.stringify(updatedStudentTx));
+    } catch (e) {}
+
+    // 4. Clean up paid SPP months if applicable
+    if (tTipe === 'spp') {
+      const updatedPaid = { ...paidMonthsState };
+      allMonths.forEach(m => {
+        if (tName.includes(m.toLowerCase())) {
+          delete updatedPaid[m];
+        }
+      });
+      setPaidMonthsState(updatedPaid);
+      try {
+        localStorage.setItem(`edu_student_paid_${studentKey}`, JSON.stringify(updatedPaid));
+      } catch (e) {}
+    }
+
+    // 5. Clean up Bebas balances if applicable
+    if (tTipe !== 'spp') {
+      const updatedBebas = { ...bebasTerbayarMap };
+      if (t.id) delete updatedBebas[t.id];
+      bebasItems.forEach(b => {
+        if (b.id === t.id || tName.includes(b.nama.toLowerCase()) || b.nama.toLowerCase().includes(tName)) {
+          delete updatedBebas[b.id];
+        }
+      });
+      setBebasTerbayarMap(updatedBebas);
+      try {
+        localStorage.setItem(`edu_student_bebas_${studentKey}`, JSON.stringify(updatedBebas));
+      } catch (e) {}
+    }
+
+    setDeleteTargetTagihan(null);
+  };
+
+  // Execute Payment Cancellation Only (Resets bill to Belum Lunas)
+  const handleExecuteResetPaymentOnly = (t: TagihanKeuangan) => {
+    if (!t) return;
+    const sNameNorm = (t.siswaNama || (selectedSiswa ? selectedSiswa.nama : '') || '').trim().toLowerCase();
+    const tTipe = (t.tipe || '').toLowerCase();
+    const tName = (t.namaTagihan || '').toLowerCase();
+
+    // 1. Reset bill payment status in tagihanList
+    setTagihanList(prev => {
+      const exists = prev.some(item => item.id === t.id);
+      if (exists) {
+        return prev.map(item => item.id === t.id ? {
+          ...item,
+          terbayar: 0,
+          status: 'Belum Lunas',
+          tanggalBayar: ''
+        } : item);
+      } else {
+        const materializedId = t.id.startsWith('syn-') ? `tag-${Date.now()}` : t.id;
+        const unpaidBill: TagihanKeuangan = {
+          ...t,
+          id: materializedId,
+          terbayar: 0,
+          status: 'Belum Lunas',
+          tanggalBayar: ''
+        };
+        return [unpaidBill, ...prev.filter(item => item.id !== t.id)];
+      }
+    });
+
+    // 2. Remove associated transactions from global transaksiList
+    if (setTransaksiList) {
+      setTransaksiList(prev => prev.filter(tx => {
+        if (!tx) return true;
+        if (tx.tagihanId && tx.tagihanId === t.id) return false;
+        const txStudent = (tx.siswaNama || '').trim().toLowerCase();
+        if (sNameNorm && txStudent === sNameNorm) {
+          const txTipe = (tx.tipe || '').toLowerCase();
+          const txPay = (tx.pembayaran || '').toLowerCase();
+          if (txTipe === tTipe && tName && (txPay.includes(tName) || tName.includes(txPay))) {
+            return false;
+          }
+          if (t.id.startsWith('syn-') && txTipe === tTipe) {
+            return false;
+          }
+        }
+        return true;
+      }));
+    }
+
+    // 3. Remove associated transactions from studentTransactions
+    const updatedStudentTx = studentTransactions.filter(tx => {
+      if (tx.itemId && tx.itemId === t.id) return false;
+      const txPay = (tx.pembayaran || '').toLowerCase();
+      if (tName && (txPay.includes(tName) || tName.includes(txPay))) return false;
+      if (t.id.startsWith('syn-') && ((tTipe === 'spp' && tx.type === 'spp') || (tTipe !== 'spp' && tx.type === 'bebas'))) {
+        return false;
+      }
+      return true;
+    });
+    setStudentTransactions(updatedStudentTx);
+    try {
+      localStorage.setItem(`edu_student_tx_${studentKey}`, JSON.stringify(updatedStudentTx));
+    } catch (e) {}
+
+    // 4. Clean up paid SPP months if applicable
+    if (tTipe === 'spp') {
+      const updatedPaid = { ...paidMonthsState };
+      allMonths.forEach(m => {
+        if (tName.includes(m.toLowerCase())) {
+          delete updatedPaid[m];
+        }
+      });
+      setPaidMonthsState(updatedPaid);
+      try {
+        localStorage.setItem(`edu_student_paid_${studentKey}`, JSON.stringify(updatedPaid));
+      } catch (e) {}
+    }
+
+    // 5. Clean up Bebas balances if applicable
+    if (tTipe !== 'spp') {
+      const updatedBebas = { ...bebasTerbayarMap };
+      if (t.id) delete updatedBebas[t.id];
+      bebasItems.forEach(b => {
+        if (b.id === t.id || tName.includes(b.nama.toLowerCase()) || b.nama.toLowerCase().includes(tName)) {
+          delete updatedBebas[b.id];
+        }
+      });
+      setBebasTerbayarMap(updatedBebas);
+      try {
+        localStorage.setItem(`edu_student_bebas_${studentKey}`, JSON.stringify(updatedBebas));
+      } catch (e) {}
+    }
+
+    setDeleteTargetTagihan(null);
+  };
 
   // Helper Function: Perform Transaction Deletion & State Rollback
   const performDeleteTransaction = (targetTx: {
@@ -661,8 +881,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       });
     }
   };
-
-
 
   // Hapus Transaksi Spesifik Handler
   const handleDeleteSingleTransaction = (txId: string) => {
@@ -1212,15 +1430,59 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   const [exportingSheets, setExportingSheets] = useState(false);
   const [exportResult, setExportResult] = useState<{ success: boolean; url?: string; message?: string } | null>(null);
 
+  const getStudentTingkatDanRombel = (siswa: Siswa | null) => {
+    if (!siswa) return { tingkatKelas: '-', rombel: '-' };
+    
+    let tk = siswa.tingkatKelas;
+    let rb = siswa.rombel || siswa.kelas || '-';
+
+    if (!tk && rombelList && rombelList.length > 0) {
+      const matchRombel = rombelList.find(r => 
+        r.namaRombel.trim().toLowerCase() === (siswa.kelas || '').trim().toLowerCase() || 
+        r.namaRombel.trim().toLowerCase() === (siswa.rombel || '').trim().toLowerCase()
+      );
+      if (matchRombel) {
+        tk = matchRombel.tingkatKelas;
+      }
+    }
+
+    if (!tk && siswa.kelas) {
+      const k = siswa.kelas.toLowerCase();
+      if (k.includes('7') || k.includes('vii')) tk = 'Kelas 7';
+      else if (k.includes('8') || k.includes('viii')) tk = 'Kelas 8';
+      else if (k.includes('9') || k.includes('ix')) tk = 'Kelas 9';
+      else if (k.includes('10') || k.includes(' x') || k.startsWith('x-') || k.startsWith('x ')) tk = 'Kelas 10';
+      else if (k.includes('11') || k.includes('xi')) tk = 'Kelas 11';
+      else if (k.includes('12') || k.includes('xii')) tk = 'Kelas 12';
+    }
+
+    return {
+      tingkatKelas: tk || 'Kelas 7',
+      rombel: rb
+    };
+  };
+
   const [showEditSiswaModal, setShowEditSiswaModal] = useState(false);
   const [editingSiswaData, setEditingSiswaData] = useState<Partial<Siswa>>({});
 
   const handleSaveSiswa = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSiswa || !setSiswaList) return;
-    setSiswaList(prev => prev.map(s => s.id === selectedSiswa.id ? { ...s, ...editingSiswaData } as Siswa : s));
+    
+    const finalRombel = editingSiswaData.rombel || editingSiswaData.kelas || selectedSiswa.kelas;
+    const finalTingkat = editingSiswaData.tingkatKelas || selectedSiswa.tingkatKelas || 'Kelas 7';
+
+    const updatedSiswa: Siswa = {
+      ...selectedSiswa,
+      ...editingSiswaData,
+      tingkatKelas: finalTingkat,
+      rombel: finalRombel,
+      kelas: finalRombel
+    };
+
+    setSiswaList(prev => prev.map(s => s.id === selectedSiswa.id ? updatedSiswa : s));
     setShowEditSiswaModal(false);
-    alert("Data siswa berhasil diperbarui!");
+    alert("Data siswa (Kelas & Rombel) berhasil diperbarui!");
   };
 
   const defaultReminderText = `Yth. Bapak/Ibu Wali dari *{NAMA_SISWA}* ({KELAS}),\n\nMenginformasikan tagihan :\n• *No. Invoice*: {NO_INVOICE}\n• *{TAGIHAN}* sebesar *Rp {NOMINAL}*\n• *Jatuh tempo pada* {JATUH_TEMPO}\n• *Status saat ini*: {STATUS}.\n\nMohon dapat melakukan pembayaran melalui Rekening Kasir Sekolah / QRIS / Transfer.\n\nTerima kasih atas perhatian Bapak/Ibu.\n• *Bendahara SMPI MODERN AL FAKHIR*`;
@@ -1335,9 +1597,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     setTagihanList(prevTagihanList => {
       let hasChanged = false;
       const newList = prevTagihanList.map(tagihan => {
-        const txsForTagihan = transaksiList.filter(tx => tx.tagihanId === tagihan.id);
+        if (!tagihan || tagihan.isDeleted) return tagihan;
+        const txsForTagihan = transaksiList.filter(tx => tx && tx.tagihanId === tagihan.id);
         if (txsForTagihan.length > 0) {
-          const terbayarFromTx = txsForTagihan.reduce((sum, tx) => sum + tx.nominal, 0);
+          const terbayarFromTx = txsForTagihan.reduce((sum, tx) => sum + (tx.nominal || 0), 0);
           const sisa = tagihan.nominal - terbayarFromTx;
           const status = sisa <= 0 ? 'Lunas' : (terbayarFromTx > 0 ? 'Dicicil' : 'Belum Lunas');
           const latestTx = txsForTagihan[txsForTagihan.length - 1];
@@ -1346,6 +1609,12 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
           if (tagihan.terbayar !== terbayarFromTx || tagihan.status !== status || tagihan.tanggalBayar !== latestTanggalBayar) {
             hasChanged = true;
             return { ...tagihan, terbayar: terbayarFromTx, status, tanggalBayar: latestTanggalBayar };
+          }
+        } else if ((tagihan.terbayar && tagihan.terbayar > 0) || tagihan.status === 'Lunas' || tagihan.status === 'Dicicil') {
+          // If all transactions were deleted for this bill, revert back to Belum Lunas
+          if (!tagihan.id.startsWith('syn-')) {
+            hasChanged = true;
+            return { ...tagihan, terbayar: 0, status: 'Belum Lunas', tanggalBayar: '' };
           }
         }
         return tagihan;
@@ -2218,7 +2487,13 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   disabled={!selectedSiswa}
                   onClick={() => {
                     if (!selectedSiswa) return;
-                    setEditingSiswaData({ ...selectedSiswa });
+                    const { tingkatKelas, rombel } = getStudentTingkatDanRombel(selectedSiswa);
+                    setEditingSiswaData({ 
+                      ...selectedSiswa,
+                      tingkatKelas,
+                      rombel: selectedSiswa.rombel || selectedSiswa.kelas || rombel,
+                      kelas: selectedSiswa.kelas || rombel
+                    });
                     setShowEditSiswaModal(true);
                   }}
                   className={`px-3 py-1.5 font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md ${!selectedSiswa ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50' : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/20'}`}
@@ -2232,13 +2507,14 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   disabled={!selectedSiswa}
                   onClick={() => {
                     if (!selectedSiswa) return;
+                    const { tingkatKelas, rombel } = getStudentTingkatDanRombel(selectedSiswa);
                     setPrintReceiptData({
                       noNota: generateInvoiceNumber(),
                       tahunAjaran,
                       nis: selectedSiswa.nis,
                       nama: selectedSiswa.nama,
                       namaIbu: selectedSiswa.namaIbu || selectedSiswa.namaWali,
-                      kelas: selectedSiswa.kelas,
+                      kelas: `${tingkatKelas} - ${rombel}`,
                       pembayaranTitle: `Rekap Seluruh Tagihan T.A ${tahunAjaran}`,
                       nominal: totalSisaBulanan + 650000,
                       dibayar: totalSisaBulanan + 650000,
@@ -2275,9 +2551,13 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   <span className="col-span-4 font-semibold text-slate-400">Nama Ibu Kandung</span>
                   <span className="col-span-8 font-bold text-slate-200">: {selectedSiswa ? (selectedSiswa.namaIbu || selectedSiswa.namaWali || '-') : '-'}</span>
                 </div>
-                <div className="grid grid-cols-12 py-1">
+                <div className="grid grid-cols-12 py-1 border-b border-slate-800/60">
                   <span className="col-span-4 font-semibold text-slate-400">Kelas</span>
-                  <span className="col-span-8 font-bold text-slate-200">: {selectedSiswa ? selectedSiswa.kelas : '-'}</span>
+                  <span className="col-span-8 font-bold text-slate-200">: {selectedSiswa ? getStudentTingkatDanRombel(selectedSiswa).tingkatKelas : '-'}</span>
+                </div>
+                <div className="grid grid-cols-12 py-1">
+                  <span className="col-span-4 font-semibold text-slate-400">Rombel</span>
+                  <span className="col-span-8 font-bold text-slate-200">: {selectedSiswa ? getStudentTingkatDanRombel(selectedSiswa).rombel : '-'}</span>
                 </div>
               </div>
 
@@ -2310,7 +2590,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
               <span className="text-[11px] font-semibold text-slate-400">Total SPP Terbayar</span>
               <span className="text-sm font-mono font-extrabold text-emerald-400 mt-1">Rp {totalSppPaid.toLocaleString('id-ID')}</span>
-              <span className="text-[10px] text-slate-500 mt-1">{Object.keys(paidMonthsState).length} bulan lunas</span>
+              <span className="text-[10px] text-slate-500 mt-1">{selectedSiswa ? Object.keys(paidMonthsState).length : 0} bulan lunas</span>
             </div>
             <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
               <span className="text-[11px] font-semibold text-slate-400">Total UKT / Masuk</span>
@@ -2631,111 +2911,9 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    if (t.status === 'Lunas' || t.status === 'Dicicil') {
-                                      // Search with multiple extremely robust fallbacks across global and local transactions
-                                      const sName = selectedSiswa ? selectedSiswa.nama.toLowerCase().trim() : '';
-                                      
-                                      // Strategy A: Find in global transactions first
-                                      const globalTx = transaksiList.find(tx => {
-                                        if (!tx || !tx.siswaNama) return false;
-                                        if (tx.siswaNama.toLowerCase().trim() !== sName) return false;
-                                        
-                                        // 1. Match by exact tagihanId / itemId
-                                        if (tx.tagihanId && tx.tagihanId === t.id) return true;
-                                        
-                                        // 2. Match by exact tipe matching
-                                        if ((tx.tipe || '').toLowerCase() === (t.tipe || '').toLowerCase()) {
-                                          // Match the month for SPP if available
-                                          if ((t.tipe || '').toLowerCase() === 'spp' && tx.pembayaran && t.namaTagihan) {
-                                            const txPay = tx.pembayaran.toLowerCase();
-                                            const tName = t.namaTagihan.toLowerCase();
-                                            return txPay.includes(tName) || tName.includes(txPay);
-                                          }
-                                          // Verify name similarity for other types
-                                          if (tx.pembayaran && t.namaTagihan) {
-                                            const txPay = tx.pembayaran.toLowerCase();
-                                            const tName = t.namaTagihan.toLowerCase();
-                                            if (txPay.includes(tName) || tName.includes(txPay)) return true;
-                                          }
-                                          return true;
-                                        }
-                                        return false;
-                                      });
-
-                                      // Map to clean format expected by confirmation modal
-                                      let cleanTxToModal: any = null;
-                                      if (globalTx) {
-                                        cleanTxToModal = {
-                                          id: globalTx.id,
-                                          pembayaran: globalTx.pembayaran || (globalTx.tipe === 'spp' ? 'Pembayaran SPP' : 'Pembayaran Tagihan'),
-                                          tagihan: globalTx.nominal,
-                                          tanggal: globalTx.tanggal,
-                                          itemId: globalTx.tagihanId,
-                                          type: globalTx.tipe === 'spp' ? ('spp' as const) : ('bebas' as const)
-                                        };
-                                      } else {
-                                        // Strategy B: Fallback to studentTransactions list
-                                        const matchingTx = studentTransactions.find(tx => {
-                                          if (!tx) return false;
-                                          if (tx.itemId && tx.itemId === t.id) return true;
-                                          if (tx.pembayaran && t.namaTagihan && tx.pembayaran.toLowerCase().trim() === t.namaTagihan.toLowerCase().trim()) return true;
-                                          
-                                          if (tx.pembayaran && t.namaTagihan) {
-                                            const txPay = tx.pembayaran.toLowerCase().trim();
-                                            const tName = t.namaTagihan.toLowerCase().trim();
-                                            const isSimilar = txPay.includes(tName) || tName.includes(txPay);
-                                            const isSameTipe = (t.tipe || '').toLowerCase() === 'spp' ? (tx.type === 'spp') : (tx.type === 'bebas');
-                                            if (isSimilar && isSameTipe) return true;
-                                          }
-                                          
-                                          if (t.id.startsWith('syn-')) {
-                                            const isSameTipe = (t.tipe || '').toLowerCase() === 'spp' ? (tx.type === 'spp') : (tx.type === 'bebas');
-                                            if (isSameTipe) return true;
-                                          }
-                                          return false;
-                                        });
-
-                                        if (matchingTx) {
-                                          cleanTxToModal = matchingTx;
-                                        }
-                                      }
-
-                                      if (cleanTxToModal) {
-                                        setDeleteTargetTx(cleanTxToModal);
-                                      } else {
-                                        // Strategy C: Direct manual reset fallback
-                                        if (confirm(`Apakah Anda yakin ingin menghapus pembayaran untuk ${t.namaTagihan || 'Tagihan Ini'}?`)) {
-                                          if (!t.id.startsWith('syn-')) {
-                                            setTagihanList(prev => prev.map(item => item.id === t.id ? { ...item, terbayar: 0, status: 'Belum Lunas', tanggalBayar: undefined } : item));
-                                          } else {
-                                            // synthesized
-                                            if (setTransaksiList) {
-                                              setTransaksiList(prev => prev.filter(tx => {
-                                                const isSameStudent = tx.siswaNama && selectedSiswa && (tx.siswaNama.toLowerCase().trim() === selectedSiswa.nama.toLowerCase().trim());
-                                                const isSameType = (tx.tipe || '').toLowerCase() === (t.tipe || '').toLowerCase();
-                                                return !(isSameStudent && isSameType);
-                                              }));
-                                            }
-                                          }
-                                        }
-                                      }
-                                    } else {
-                                      if (confirm(`Apakah Anda yakin ingin menghapus tagihan ${t.namaTagihan || 'Tagihan Ini'} ini secara permanen?`)) {
-                                        if (t.id.startsWith('syn-')) {
-                                          const tombstone: TagihanKeuangan = {
-                                            ...t,
-                                            isDeleted: true
-                                          };
-                                          setTagihanList(prev => [...prev, tombstone]);
-                                        } else {
-                                          setTagihanList(prev => prev.filter(item => item.id !== t.id));
-                                        }
-                                      }
-                                    }
-                                  }}
+                                  onClick={() => setDeleteTargetTagihan(t)}
                                   className="p-1 hover:bg-rose-950/80 text-slate-500 hover:text-rose-400 rounded transition-colors"
-                                  title={t.status === 'Lunas' || t.status === 'Dicicil' ? "Hapus pembayaran" : "Hapus tagihan"}
+                                  title="Hapus atau batalkan pembayaran"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -3123,7 +3301,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   type="button"
                   onClick={() => {
                     setFilterTipeTagihan('all');
-                    setFilterNamaTagihan('all');
+                    setFilterKelas('all');
                   }}
                   className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                     filterTipeTagihan === 'all'
@@ -3137,7 +3315,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   type="button"
                   onClick={() => {
                     setFilterTipeTagihan('spp');
-                    setFilterNamaTagihan('all');
+                    setFilterKelas('all');
                   }}
                   className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                     filterTipeTagihan === 'spp'
@@ -3151,7 +3329,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   type="button"
                   onClick={() => {
                     setFilterTipeTagihan('ukt');
-                    setFilterNamaTagihan('all');
+                    setFilterKelas('all');
                   }}
                   className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                     filterTipeTagihan === 'ukt'
@@ -3165,7 +3343,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   type="button"
                   onClick={() => {
                     setFilterTipeTagihan('ekskul');
-                    setFilterNamaTagihan('all');
+                    setFilterKelas('all');
                   }}
                   className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                     filterTipeTagihan === 'ekskul'
@@ -3177,16 +3355,16 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 </button>
               </div>
 
-              {/* Pilih Nama Tagihan Dropdown */}
+              {/* Pilih Kelas Dropdown */}
               <div className="md:col-span-4">
 
                 <select
-                  value={filterNamaTagihan}
-                  onChange={e => setFilterNamaTagihan(e.target.value)}
+                  value={filterKelas}
+                  onChange={e => setFilterKelas(e.target.value)}
                   className="w-full bg-[#181818] border border-slate-700/80 text-emerald-300 font-bold rounded-xl px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 >
-                  <option value="all">-- Semua Nama Tagihan --</option>
-                  {availableNamaTagihanList.map((name, idx) => (
+                  <option value="all">-- Semua Kelas / Rombel --</option>
+                  {availableKelasList.map((name, idx) => (
                     <option key={idx} value={name}>
                       {name}
                     </option>
@@ -3365,39 +3543,14 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                                <Edit3 className="w-4 h-4" />
                              </button>
                              <button
-                              type="button"
-                              onClick={() => {
-                                try {
-                                  console.log('Delete button clicked for tagihan ID:', t.id, 'Siswa:', t.siswaNama);
-                                  if (confirm(`Apakah Anda yakin ingin menghapus tagihan ${t.namaTagihan || 'Tagihan Ini'} ini secara permanen?`)) {
-                                    // 1. Remove the billing item
-                                    if (t.id.startsWith('syn-')) {
-                                      const tombstone: TagihanKeuangan = {
-                                        ...t,
-                                        isDeleted: true
-                                      };
-                                      setTagihanList(prev => [...prev, tombstone]);
-                                    } else {
-                                      setTagihanList(prev => prev.filter(item => item.id !== t.id));
-                                    }
-                                    
-                                    // 2. Remove associated payment/transaction records
-                                    setTransaksiList(prev => {
-                                      const updated = prev.filter(tx => tx.tagihanId !== t.id);
-                                      console.log('Updated transaksiList length:', updated.length);
-                                      return updated;
-                                    });
-                                  }
-                                } catch (error) {
-                                  console.error('Error deleting tagihan:', error);
-                                }
-                              }}
-                              className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 rounded-lg transition-all"
-                              title="Hapus Tagihan"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
+                               type="button"
+                               onClick={() => setDeleteTargetTagihan(t)}
+                               className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 rounded-lg transition-all"
+                               title="Hapus Tagihan"
+                             >
+                               <Trash2 className="w-4 h-4" />
+                             </button>
+                           </td>
                           <td className="px-4 py-3 text-center">
                             {!isLunas ? (
                               <button
@@ -4402,6 +4555,91 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         </div>
       )}
 
+      {/* MODAL KONFIRMASI HAPUS / BATALKAN TAGIHAN & PEMBAYARAN */}
+      {deleteTargetTagihan && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#121212] border border-slate-800 text-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="font-extrabold text-sm flex items-center gap-2 text-rose-400">
+                <Trash2 className="w-4 h-4" />
+                Hapus Tagihan / Batalkan Pembayaran
+              </h3>
+              <button
+                onClick={() => setDeleteTargetTagihan(null)}
+                className="text-slate-400 hover:text-white font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-300 space-y-3">
+              <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Nama Siswa</span>
+                  <span className="font-bold text-slate-200">{deleteTargetTagihan.siswaNama}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Item Tagihan</span>
+                  <span className="font-bold text-slate-100">{deleteTargetTagihan.namaTagihan}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Tagihan</span>
+                  <span className="font-mono font-bold text-slate-300">Rp {deleteTargetTagihan.nominal.toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Terbayar</span>
+                  <span className="font-mono font-bold text-emerald-400">Rp {(deleteTargetTagihan.terbayar || 0).toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Status Saat Ini</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                    deleteTargetTagihan.status === 'Lunas' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
+                    deleteTargetTagihan.status === 'Dicicil' ? 'bg-blue-950 text-blue-300 border border-blue-800' :
+                    'bg-amber-950 text-amber-300 border border-amber-800'
+                  }`}>
+                    {deleteTargetTagihan.status}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-300">
+                Silakan pilih tindakan penghapusan yang ingin Anda lakukan:
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2 border-t border-slate-800">
+              {((deleteTargetTagihan.terbayar && deleteTargetTagihan.terbayar > 0) || deleteTargetTagihan.status === 'Lunas' || deleteTargetTagihan.status === 'Dicicil') && (
+                <button
+                  type="button"
+                  onClick={() => handleExecuteResetPaymentOnly(deleteTargetTagihan)}
+                  className="w-full px-4 py-2.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Batalkan Pembayaran Saja (Ubah ke Belum Lunas)
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => handleExecuteDeleteTagihanPermanen(deleteTargetTagihan)}
+                className="w-full px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold rounded-xl text-xs transition-all shadow-md shadow-rose-600/30 flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Hapus Tagihan Permanen dari Daftar
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDeleteTargetTagihan(null)}
+                className="w-full px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs mt-1"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL KONFIRMASI HAPUS TRANSAKSI */}
       {deleteTargetTx && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -4500,14 +4738,41 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 font-bold block mb-1">Kelas</label>
+                  <label className="text-slate-400 font-bold block mb-1">Kelas (Tingkat)</label>
+                  <select
+                    value={editingSiswaData.tingkatKelas || 'Kelas 7'}
+                    onChange={e => {
+                      const newTingkat = e.target.value;
+                      const matchingRombel = rombelList.find(r => r.tingkatKelas === newTingkat);
+                      setEditingSiswaData(prev => ({
+                        ...prev,
+                        tingkatKelas: newTingkat,
+                        ...(matchingRombel && !prev.rombel ? { rombel: matchingRombel.namaRombel, kelas: matchingRombel.namaRombel } : {})
+                      }));
+                    }}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-semibold"
+                  >
+                    <option value="Kelas 7">Kelas 7</option>
+                    <option value="Kelas 8">Kelas 8</option>
+                    <option value="Kelas 9">Kelas 9</option>
+                    <option value="Kelas 10">Kelas 10</option>
+                    <option value="Kelas 11">Kelas 11</option>
+                    <option value="Kelas 12">Kelas 12</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-slate-400 font-bold block mb-1">Rombel (Rombongan Belajar)</label>
                   <input
                     type="text"
-                    value={editingSiswaData.kelas || ''}
-                    onChange={e => setEditingSiswaData(prev => ({ ...prev, kelas: e.target.value }))}
+                    placeholder="Contoh: Ibnu Sina, VII-A"
+                    value={editingSiswaData.rombel || editingSiswaData.kelas || ''}
+                    onChange={e => setEditingSiswaData(prev => ({ ...prev, rombel: e.target.value, kelas: e.target.value }))}
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    required
                   />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-400 font-bold block mb-1">No. WhatsApp Wali</label>
                   <input
@@ -4517,15 +4782,15 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-mono"
                   />
                 </div>
-              </div>
-              <div>
-                <label className="text-slate-400 font-bold block mb-1">Nama Ibu Kandung</label>
-                <input
-                  type="text"
-                  value={editingSiswaData.namaIbu || ''}
-                  onChange={e => setEditingSiswaData(prev => ({ ...prev, namaIbu: e.target.value }))}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                />
+                <div>
+                  <label className="text-slate-400 font-bold block mb-1">Nama Ibu Kandung</label>
+                  <input
+                    type="text"
+                    value={editingSiswaData.namaIbu || ''}
+                    onChange={e => setEditingSiswaData(prev => ({ ...prev, namaIbu: e.target.value }))}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">

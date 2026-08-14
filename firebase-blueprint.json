@@ -83,6 +83,31 @@
       },
       "required": ["id", "kodeMapel", "namaMapel", "tingkatKelas", "guruPengampuNama", "kkm"]
     },
+    "Ekstrakurikuler": {
+      "title": "Ekstrakurikuler",
+      "description": "Extracurricular clubs, schedule, and membership data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "kodeEkskul": { "type": "string" },
+        "namaEkskul": { "type": "string" },
+        "kategori": { "type": "string", "enum": ["Olahraga", "Seni & Budaya", "Keagamaan", "Sains & Teknologi", "Kepanduan & Bela Negara", "Bahasa & Komunikasi"] },
+        "pembinaNama": { "type": "string" },
+        "nipPembina": { "type": "string" },
+        "kontakPembina": { "type": "string" },
+        "hariLatihan": { "type": "string" },
+        "jamMulai": { "type": "string" },
+        "jamSelesai": { "type": "string" },
+        "tempat": { "type": "string" },
+        "tingkatTarget": { "type": "string" },
+        "kuotaMaksimal": { "type": "number" },
+        "anggotaSiswaIds": { "type": "array" },
+        "status": { "type": "string", "enum": ["Aktif", "Nonaktif"] },
+        "biayaIuran": { "type": "number" },
+        "deskripsi": { "type": "string" }
+      },
+      "required": ["id", "kodeEkskul", "namaEkskul", "kategori", "pembinaNama", "hariLatihan", "jamMulai", "jamSelesai", "tempat", "status"]
+    },
     "AbsensiSiswaHarian": {
       "title": "AbsensiSiswaHarian",
       "description": "Daily student attendance records",
@@ -269,6 +294,10 @@
     "edu_mapelList": {
       "schema": { "$ref": "#/entities/MataPelajaran" },
       "description": "List of school subject courses"
+    },
+    "edu_ekskulList": {
+      "schema": { "$ref": "#/entities/Ekstrakurikuler" },
+      "description": "List of extracurricular clubs and classes"
     },
     "edu_absensiHarian": {
       "schema": { "$ref": "#/entities/AbsensiSiswaHarian" },

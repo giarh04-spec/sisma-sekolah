@@ -24,7 +24,8 @@ import {
   Cloud,
   MessageSquare,
   Clock,
-  Building
+  Building,
+  Trophy
 } from 'lucide-react';
 import { Role, SubTab, AbsensiSubTab, CbtSubTab, KeuanganSubTab, PengaturanSubTab } from '../types/school';
 
@@ -50,6 +51,7 @@ interface SidebarProps {
   stafCount: number;
   rombelCount: number;
   mapelCount: number;
+  ekskulCount?: number;
   bankSoalCount?: number;
 }
 
@@ -73,6 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   stafCount,
   rombelCount,
   mapelCount,
+  ekskulCount = 0,
   bankSoalCount
 }) => {
   const allMenuItems: { id: TabType; label: string; icon: React.ReactNode; badge?: string; desc: string }[] = [
@@ -283,6 +286,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </div>
                         <span className="text-[9px] bg-slate-800/80 text-slate-400 px-1.5 py-0.5 rounded font-mono">
                           {mapelCount}
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => setDatabaseSubTab('ekskul')}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
+                          databaseSubTab === 'ekskul'
+                            ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Trophy className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Kelas Ekstrakurikuler</span>
+                        </div>
+                        <span className="text-[9px] bg-slate-800/80 text-slate-400 px-1.5 py-0.5 rounded font-mono">
+                          {ekskulCount}
                         </span>
                       </button>
                     </div>

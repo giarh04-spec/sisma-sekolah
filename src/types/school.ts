@@ -14,7 +14,7 @@ export interface RombelKelas {
 }
 
 export type Role = 'admin' | 'guru' | 'siswa' | 'staf';
-export type SubTab = 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel';
+export type SubTab = 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel' | 'ekskul';
 export type AbsensiSubTab = 'scan_barcode' | 'harian_siswa' | 'kelas_mapel' | 'absensi_guru' | 'redaksi';
 export type CbtSubTab = 'bank_soal' | 'jadwal_kartu' | 'ai_generator' | 'simulasi_ujian' | 'hasil_ujian';
 export type KeuanganSubTab = 'pembayaran' | 'pengaturan_biaya' | 'rekap' | 'redaksi';
@@ -38,6 +38,8 @@ export interface Siswa {
   nik?: string;
   nama: string;
   kelas: string;
+  tingkatKelas?: string;
+  rombel?: string;
   jenisKelamin: 'L' | 'P';
   tempatLahir: string;
   tanggalLahir: string;
@@ -134,6 +136,26 @@ export interface MataPelajaranItem {
   kurikulum: 'Kurikulum Merdeka' | 'Kurikulum 2013';
   jadwalMengajar: ScheduleSlot[];
   catatan?: string;
+}
+
+export interface EkstrakurikulerItem {
+  id: string;
+  kodeEkskul: string; // e.g. "EKS-PRA-01"
+  namaEkskul: string; // e.g. "Pramuka"
+  kategori: 'Olahraga' | 'Seni & Budaya' | 'Keagamaan' | 'Sains & Teknologi' | 'Kepanduan & Bela Negara' | 'Bahasa & Komunikasi';
+  pembinaNama: string; // e.g. "Drs. H. Bambang Sutrisno"
+  nipPembina?: string;
+  kontakPembina?: string;
+  hariLatihan: 'Senin' | 'Selasa' | 'Rabu' | 'Kamis' | 'Jumat' | 'Sabtu' | 'Minggu';
+  jamMulai: string; // e.g. "15:00"
+  jamSelesai: string; // e.g. "16:30"
+  tempat: string; // e.g. "Lapangan Utama"
+  tingkatTarget: string; // e.g. "Semua Tingkat", "Kelas 7", "Kelas 8", "Kelas 9"
+  kuotaMaksimal: number;
+  anggotaSiswaIds: string[];
+  status: 'Aktif' | 'Nonaktif';
+  biayaIuran: number;
+  deskripsi?: string;
 }
 
 export type StatusAbsensi = 'Hadir' | 'Sakit' | 'Izin' | 'Alpha';

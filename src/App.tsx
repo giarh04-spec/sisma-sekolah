@@ -32,7 +32,8 @@ import {
   AdministrasiGuru, 
   TagihanKeuangan, 
   TransaksiKeuangan,
-  SchoolSettings
+  SchoolSettings,
+  EkstrakurikulerItem
 } from './types/school';
 
 import { 
@@ -50,7 +51,8 @@ import {
   INITIAL_TAGIHAN, 
   INITIAL_TRANSAKSI,
   INITIAL_SCHOOL_SETTINGS,
-  INITIAL_TARIF_BIAYA
+  INITIAL_TARIF_BIAYA,
+  INITIAL_EKSKUL
 } from './data/mockData';
 
 import { initAuth, googleSignOut, db } from './lib/firebase';
@@ -107,6 +109,7 @@ export default function App() {
   const [guruList, setGuruList] = useState<Guru[]>(() => getSavedData('edu_guruList', INITIAL_GURU));
   const [stafList, setStafList] = useState<Staf[]>(() => getSavedData('edu_stafList', INITIAL_STAF));
   const [mapelList, setMapelList] = useState<MataPelajaranItem[]>(() => getSavedData('edu_mapelList', INITIAL_MAPEL));
+  const [ekskulList, setEkskulList] = useState<EkstrakurikulerItem[]>(() => getSavedData('edu_ekskulList', INITIAL_EKSKUL));
 
   // Attendance State
   const [absensiHarian, setAbsensiHarian] = useState<AbsensiSiswaHarian[]>(() => getSavedData('edu_absensiHarian', INITIAL_ABSENSI_SISWA_HARIAN));
@@ -156,6 +159,7 @@ export default function App() {
           const guruData = await dbFetchCollection<Guru>('edu_guruList');
           const stafData = await dbFetchCollection<Staf>('edu_stafList');
           const mapelData = await dbFetchCollection<MataPelajaranItem>('edu_mapelList');
+          const ekskulData = await dbFetchCollection<EkstrakurikulerItem>('edu_ekskulList');
           const absensiData = await dbFetchCollection<AbsensiSiswaHarian>('edu_absensiHarian');
           const absensiKelasData = await dbFetchCollection<AbsensiSiswaKelas>('edu_absensiKelasList');
           const absensiGuruData = await dbFetchCollection<AbsensiGuru>('edu_absensiGuruList');
@@ -183,6 +187,9 @@ export default function App() {
 
           if (mapelData.length > 0) setMapelList(mapelData);
           else await dbSaveCollection('edu_mapelList', mapelList);
+
+          if (ekskulData.length > 0) setEkskulList(ekskulData);
+          else await dbSaveCollection('edu_ekskulList', ekskulList);
 
           if (absensiData.length > 0) setAbsensiHarian(absensiData);
           else await dbSaveCollection('edu_absensiHarian', absensiHarian);
@@ -300,6 +307,13 @@ export default function App() {
   }, [mapelList, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
+    localStorage.setItem('edu_ekskulList', JSON.stringify(ekskulList));
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_ekskulList', ekskulList);
+    }
+  }, [ekskulList, isDbLoaded, isLoggedIn]);
+
+  useEffect(() => {
     localStorage.setItem('edu_absensiHarian', JSON.stringify(absensiHarian));
     if (isDbLoaded && isLoggedIn) {
       saveCollectionWithStatus('edu_absensiHarian', absensiHarian);
@@ -412,6 +426,7 @@ export default function App() {
     listenCollection<Guru>('edu_guruList', setGuruList);
     listenCollection<Staf>('edu_stafList', setStafList);
     listenCollection<MataPelajaranItem>('edu_mapelList', setMapelList);
+    listenCollection<EkstrakurikulerItem>('edu_ekskulList', setEkskulList);
     listenCollection<AbsensiSiswaHarian>('edu_absensiHarian', setAbsensiHarian);
     listenCollection<AbsensiSiswaKelas>('edu_absensiKelasList', setAbsensiKelasList);
     listenCollection<AbsensiGuru>('edu_absensiGuruList', setAbsensiGuruList);
@@ -618,6 +633,7 @@ export default function App() {
           stafCount={stafList.length}
           rombelCount={rombelList.length}
           mapelCount={mapelList.length}
+          ekskulCount={ekskulList.length}
           bankSoalCount={bankSoalList.length}
         />
 
@@ -651,6 +667,8 @@ export default function App() {
               setStafList={setStafList}
               mapelList={mapelList}
               setMapelList={setMapelList}
+              ekskulList={ekskulList}
+              setEkskulList={setEkskulList}
               subTab={databaseSubTab}
               setSubTab={setDatabaseSubTab}
               userGoogleToken={userGoogleToken}
@@ -718,6 +736,7 @@ export default function App() {
               setTransaksiList={setTransaksiList}
               userGoogleToken={userGoogleToken}
               siswaList={siswaList}
+              rombelList={rombelList}
               subTab={keuanganSubTab}
               setSubTab={setKeuanganSubTab}
               tarifBiayaList={tarifBiayaList}
