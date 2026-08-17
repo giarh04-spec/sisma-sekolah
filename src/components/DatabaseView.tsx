@@ -71,6 +71,14 @@ interface DatabaseViewProps {
   currentRole?: string;
 }
 
+const normalizeDateForInput = (d: string | undefined): string => {
+  if (!d) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  const p = d.split(/[\/\-]/);
+  if (p.length === 3 && p[2].length === 4) return `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+  return d;
+};
+
 export const DatabaseView: React.FC<DatabaseViewProps> = ({
   rombelList: propsRombelList,
   setRombelList: setPropsRombelList,
@@ -385,6 +393,44 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     else if (subTab === 'staf') setFormStaf(prev => ({ ...prev, fotoUrl: url }));
   };
 
+  const compressImageToBase64 = (file: File, callback: (base64: string) => void) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 400;
+        const MAX_HEIGHT = 400;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          callback(canvas.toDataURL('image/jpeg', 0.7));
+        } else {
+          callback(dataUrl); // Fallback
+        }
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handlePhotoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -394,12 +440,9 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
+    compressImageToBase64(file, (dataUrl) => {
       setCurrentFotoUrl(dataUrl);
-    };
-    reader.readAsDataURL(file);
+    });
   };
 
   const applyPhotoToPerson = (id: string, type: 'siswa' | 'guru' | 'staf', fotoUrl: string) => {
@@ -1551,7 +1594,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                                 setSelectedSiswaDetail(s);
                                 setDetailTab('biodata');
                               }}
-                              className="text-white font-extrabold hover:text-blue-400 cursor-pointer block transition-colors hover:underline"
+                              className="text-white font-extrabold hover:text-blue-400 cursor-pointer block transition-colors hover:underline whitespace-nowrap"
                             >
                               {s.nama}
                             </span>
@@ -1561,12 +1604,12 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-xs font-medium">
+                      <td className="px-4 py-3 text-xs font-medium whitespace-nowrap">
                         <div className="font-mono text-slate-300 font-bold">{s.nisn}</div>
-                        <div className="text-[10px] text-slate-500 font-mono">NIS: {s.nis}</div>
+                        <div className="text-[10px] text-slate-500 font-mono mt-0.5">NIS: {s.nis}</div>
                       </td>
-                      <td className="px-4 py-3 text-xs font-semibold">
-                        <span className="px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono text-[11px]">
+                      <td className="px-4 py-3 text-xs font-semibold whitespace-nowrap">
+                        <span className="inline-block px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono text-[11px] whitespace-nowrap">
                           {s.kelas}
                         </span>
                       </td>
@@ -1581,13 +1624,13 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-xs font-medium">
+                      <td className="px-4 py-3 text-xs font-medium whitespace-nowrap">
                         <div className="text-slate-300 font-bold">{s.namaWali}</div>
                         <div className="text-[10px] text-slate-500 flex items-center gap-1">
                           <User className="w-3 h-3 text-slate-600 shrink-0" /> Orang Tua / Wali
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-xs font-medium">
+                      <td className="px-4 py-3 text-xs font-medium whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-slate-400">{s.teleponWali}</span>
                           {s.teleponWali && (
@@ -1633,6 +1676,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                                   setEditingId(s.id);
                                   setFormSiswa({
                                     ...s,
+                                    tanggalLahir: normalizeDateForInput(s.tanggalLahir),
                                     email: s.email || '',
                                     asalSekolah: s.asalSekolah || '',
                                     anakKe: s.anakKe !== undefined ? s.anakKe : 1,
@@ -1642,7 +1686,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                                     namaAyah: s.namaAyah || '',
                                     namaIbu: s.namaIbu || '',
                                     tempatLahirOrtu: s.tempatLahirOrtu || '',
-                                    tanggalLahirOrtu: s.tanggalLahirOrtu || '',
+                                    tanggalLahirOrtu: normalizeDateForInput(s.tanggalLahirOrtu || ''),
                                     pendidikanOrtu: s.pendidikanOrtu || '',
                                     pekerjaanOrtu: s.pekerjaanOrtu || '',
                                     nikOrtu: s.nikOrtu || ''
@@ -1754,7 +1798,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                             telepon: g.telepon || '',
                             jenisKelamin: g.jenisKelamin || 'L',
                             tempatLahir: g.tempatLahir || 'Jakarta',
-                            tanggalLahir: g.tanggalLahir || '1985-01-01',
+                            tanggalLahir: normalizeDateForInput(g.tanggalLahir || '1985-01-01'),
                             agama: g.agama || 'Islam',
                             alamatLengkap: g.alamatLengkap || '',
                             pendidikanTerakhir: g.pendidikanTerakhir || 'S1 Pendidikan',
@@ -1858,7 +1902,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                             telepon: st.telepon || '',
                             jenisKelamin: st.jenisKelamin || 'L',
                             tempatLahir: st.tempatLahir || 'Jakarta',
-                            tanggalLahir: st.tanggalLahir || '1990-01-01',
+                            tanggalLahir: normalizeDateForInput(st.tanggalLahir || '1990-01-01'),
                             agama: st.agama || 'Islam',
                             alamatLengkap: st.alamatLengkap || '',
                             pendidikanTerakhir: st.pendidikanTerakhir || 'D3 / S1',
@@ -2752,13 +2796,23 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       </div>
                       <div>
                         <label className="text-[11px] font-bold text-slate-400">Tanggal Lahir</label>
-                        <input 
-                          type="date" 
-                          required 
-                          value={formSiswa.tanggalLahir} 
-                          onChange={e => setFormSiswa({ ...formSiswa, tanggalLahir: e.target.value })}
-                          className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
-                        />
+                        <div className="relative w-full">
+                          <input 
+                            type="date" 
+                            required 
+                            value={formSiswa.tanggalLahir} 
+                            onChange={e => setFormSiswa({ ...formSiswa, tanggalLahir: e.target.value })}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                          />
+                          <div className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white flex justify-between items-center group focus-within:border-amber-500 transition-colors">
+                            <span>
+                              {formSiswa.tanggalLahir 
+                                ? formSiswa.tanggalLahir.split('-').reverse().join('/') 
+                                : <span className="text-slate-500">dd/mm/yyyy</span>}
+                            </span>
+                            <Calendar className="w-3.5 h-3.5 text-slate-500 group-hover:text-amber-500 transition-colors" />
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -4172,7 +4226,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                               />
                               {s.nama}
                             </td>
-                            <td className="px-4 py-2.5 font-mono text-slate-400">{s.nisn} / {s.nis}</td>
+                            <td className="px-4 py-2.5 font-mono text-slate-400 whitespace-nowrap">{s.nisn} / {s.nis}</td>
                             <td className="px-4 py-2.5 font-semibold text-slate-300">{s.jenisKelamin}</td>
                             <td className="px-4 py-2.5">
                               <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
@@ -4357,9 +4411,9 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                                 />
                                 {s.nama}
                               </td>
-                              <td className="px-4 py-2.5 font-mono text-slate-400">{s.nisn} / {s.nis}</td>
-                              <td className="px-4 py-2.5 font-semibold text-slate-200">
-                                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px]">
+                              <td className="px-4 py-2.5 font-mono text-slate-400 whitespace-nowrap">{s.nisn} / {s.nis}</td>
+                              <td className="px-4 py-2.5 font-semibold text-slate-200 whitespace-nowrap">
+                                <span className="inline-block px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] whitespace-nowrap">
                                   {s.kelas}
                                 </span>
                               </td>
@@ -4436,9 +4490,9 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                                 />
                                 {s.nama}
                               </td>
-                              <td className="px-4 py-2.5 font-mono text-slate-400">{s.nisn} / {s.nis}</td>
-                              <td className="px-4 py-2.5 font-semibold text-slate-200">
-                                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px]">
+                              <td className="px-4 py-2.5 font-mono text-slate-400 whitespace-nowrap">{s.nisn} / {s.nis}</td>
+                              <td className="px-4 py-2.5 font-semibold text-slate-200 whitespace-nowrap">
+                                <span className="inline-block px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] whitespace-nowrap">
                                   {s.kelas}
                                 </span>
                               </td>
@@ -4694,12 +4748,9 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                     alert('Ukuran file foto maksimal 5MB.');
                     return;
                   }
-                  const reader = new FileReader();
-                  reader.onload = (event) => {
-                    const dataUrl = event.target?.result as string;
+                  compressImageToBase64(file, (dataUrl) => {
                     applyPhotoToPerson(quickPhotoData.data.id, quickPhotoData.type, dataUrl);
-                  };
-                  reader.readAsDataURL(file);
+                  });
                 }}
                 accept="image/*"
                 className="hidden"
@@ -5041,6 +5092,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                     setEditingId(selectedSiswaDetail.id);
                     setFormSiswa({
                       ...selectedSiswaDetail,
+                      tanggalLahir: normalizeDateForInput(selectedSiswaDetail.tanggalLahir),
                       email: selectedSiswaDetail.email || '',
                       asalSekolah: selectedSiswaDetail.asalSekolah || '',
                       anakKe: selectedSiswaDetail.anakKe !== undefined ? selectedSiswaDetail.anakKe : 1,
@@ -5050,7 +5102,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       namaAyah: selectedSiswaDetail.namaAyah || '',
                       namaIbu: selectedSiswaDetail.namaIbu || '',
                       tempatLahirOrtu: selectedSiswaDetail.tempatLahirOrtu || '',
-                      tanggalLahirOrtu: selectedSiswaDetail.tanggalLahirOrtu || '',
+                      tanggalLahirOrtu: normalizeDateForInput(selectedSiswaDetail.tanggalLahirOrtu || ''),
                       pendidikanOrtu: selectedSiswaDetail.pendidikanOrtu || '',
                       pekerjaanOrtu: selectedSiswaDetail.pekerjaanOrtu || '',
                       nikOrtu: selectedSiswaDetail.nikOrtu || ''

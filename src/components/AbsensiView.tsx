@@ -28,6 +28,7 @@ import {
   Bell,
   Sliders,
   RefreshCw
+, Calendar
 } from 'lucide-react';
 import { 
   Siswa, 
@@ -1386,12 +1387,22 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
 
               <div>
                 <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Tanggal</label>
-                <input
-                  type="date"
-                  value={selectedTanggal}
-                  onChange={e => setSelectedTanggal(e.target.value)}
-                  className="bg-[#181818] border border-slate-800 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-200 focus:outline-none focus:border-blue-500"
-                />
+                <div className="relative w-full min-w-[140px]">
+                  <input
+                    type="date"
+                    value={selectedTanggal}
+                    onChange={e => setSelectedTanggal(e.target.value)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  <div className="bg-[#181818] border border-slate-800 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-200 flex justify-between items-center group focus-within:border-blue-500 transition-colors">
+                    <span>
+                      {selectedTanggal
+                        ? selectedTanggal.split('-').reverse().join('/')
+                        : <span className="text-slate-500">dd/mm/yyyy</span>}
+                    </span>
+                    <Calendar className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-500 transition-colors ml-2" />
+                  </div>
+                </div>
               </div>
             </div>
 

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { downloadCSV } from '../lib/exportUtils';
+import { dbClearCollection } from '../lib/firebaseSync';
 import { 
   Wallet, 
   FileSpreadsheet, 
@@ -3287,6 +3288,27 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   <Download className="w-4 h-4 text-emerald-400" />
                   Unduh CSV / Excel
                 </button>
+                <button
+                  onClick={async () => {
+                    if (window.confirm('PERINGATAN! Anda akan MENGHAPUS SEMUA DATA TAGIHAN DAN TRANSAKSI! Apakah Anda yakin?')) {
+                      setTagihanList([]);
+                      setTransaksiList([]);
+                      localStorage.setItem('edu_tagihan_force_clear', 'true');
+                      localStorage.setItem('edu_transaksi_force_clear', 'true');
+                      const s1 = await dbClearCollection('edu_tagihanList');
+                      const s2 = await dbClearCollection('edu_transaksiList');
+                      if (s1 && s2) {
+                        localStorage.removeItem('edu_tagihan_force_clear');
+                        localStorage.removeItem('edu_transaksi_force_clear');
+                      }
+                    }
+                  }}
+                  className="px-4 py-2 bg-rose-600/20 hover:bg-rose-500/30 text-rose-400 font-bold rounded-xl text-xs transition-all flex items-center gap-2 border border-rose-500/30 shadow-md cursor-pointer"
+                  title="Hapus Semua Data Tagihan"
+                >
+                  <Trash2 className="w-4 h-4 text-rose-400" />
+                  Kosongkan Data
+                </button>
               </div>
             </div>
 
@@ -4286,12 +4308,22 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               </div>
               <div>
                 <label className="text-slate-300 font-bold block mb-1">Jatuh Tempo</label>
-                <input
-                  type="date"
-                  value={editTagihanForm.jatuhTempo}
-                  onChange={e => setEditTagihanForm({ ...editTagihanForm, jatuhTempo: e.target.value })}
-                  className="w-full bg-[#181818] border border-slate-700/80 text-white font-bold rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
+                <div className="relative w-full">
+                  <input
+                    type="date"
+                    value={editTagihanForm.jatuhTempo}
+                    onChange={e => setEditTagihanForm({ ...editTagihanForm, jatuhTempo: e.target.value })}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  <div className="w-full bg-[#181818] border border-slate-700/80 text-white font-bold rounded-xl px-3 py-2 text-xs flex justify-between items-center group focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-colors">
+                    <span>
+                      {editTagihanForm.jatuhTempo
+                        ? editTagihanForm.jatuhTempo.split('-').reverse().join('/')
+                        : <span className="text-slate-500">dd/mm/yyyy</span>}
+                    </span>
+                    <Calendar className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-400 transition-colors" />
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="text-slate-300 font-bold block mb-1">Status Pembayaran</label>
@@ -4521,12 +4553,22 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
                 <div>
                   <label className="text-slate-300 font-bold block mb-1">Tanggal Jatuh Tempo</label>
-                  <input
-                    type="date"
-                    value={genJatuhTempo}
-                    onChange={e => setGenJatuhTempo(e.target.value)}
-                    className="w-full bg-[#181818] border border-slate-700/80 text-white font-bold rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
+                  <div className="relative w-full">
+                    <input
+                      type="date"
+                      value={genJatuhTempo}
+                      onChange={e => setGenJatuhTempo(e.target.value)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
+                    <div className="w-full bg-[#181818] border border-slate-700/80 text-white font-bold rounded-xl px-3 py-2 text-xs flex justify-between items-center group focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500 transition-colors">
+                      <span>
+                        {genJatuhTempo
+                          ? genJatuhTempo.split('-').reverse().join('/')
+                          : <span className="text-slate-500">dd/mm/yyyy</span>}
+                      </span>
+                      <Calendar className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-400 transition-colors" />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="p-3 bg-indigo-950/40 rounded-xl border border-indigo-800/60 text-[11px] text-indigo-200">

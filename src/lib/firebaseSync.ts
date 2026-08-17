@@ -9,6 +9,9 @@ import {
 } from 'firebase/firestore';
 import { db, OperationType, handleFirestoreError } from './firebase';
 
+// Memory cache for differential sync to drastically reduce Firestore write quota
+const collectionCache = new Map<string, Map<string, string>>();
+
 /**
  * Validates connection to Firestore at app startup (Critical constraint)
  */
@@ -36,6 +39,15 @@ function cleanObject<T>(obj: T): T {
   if (Array.isArray(obj)) {
     return obj.map(cleanObject) as unknown as T;
   }
+  if (typeof obj === 'string') {
+    // Firestore has a 1MB document size limit. 
+    // Prevent huge base64 data strings (e.g. >800KB) from causing a crash.
+    if (obj.length > 800000 && obj.startsWith('data:image')) {
+      console.warn('Skipping oversized image data string to prevent Firestore limit error');
+      return '' as unknown as T;
+    }
+    return obj;
+  }
   if (typeof obj === 'object') {
     const cleaned: any = {};
     for (const key in obj) {
@@ -60,6 +72,11 @@ export async function dbSaveItem<T extends { id: string }>(collectionName: strin
     const docRef = doc(db, collectionName, item.id);
     const cleanedItem = cleanObject(item);
     await setDoc(docRef, cleanedItem);
+    
+    // Update cache
+    const cacheMap = collectionCache.get(collectionName) || new Map<string, string>();
+    cacheMap.set(item.id, JSON.stringify(cleanedItem));
+    collectionCache.set(collectionName, cacheMap);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -73,6 +90,12 @@ export async function dbDeleteItem(collectionName: string, id: string) {
   try {
     const docRef = doc(db, collectionName, id);
     await deleteDoc(docRef);
+    
+    // Update cache
+    const cacheMap = collectionCache.get(collectionName);
+    if (cacheMap) {
+      cacheMap.delete(id);
+    }
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
@@ -85,9 +108,14 @@ export async function dbFetchCollection<T>(collectionName: string): Promise<T[]>
   try {
     const querySnapshot = await getDocs(collection(db, collectionName));
     const items: T[] = [];
+    const cacheMap = new Map<string, string>();
     querySnapshot.forEach((doc) => {
-      items.push({ ...doc.data() } as T);
+      const docData = doc.data();
+      const data = { id: doc.id, ...docData } as unknown as T;
+      items.push(data);
+      cacheMap.set(doc.id, JSON.stringify(data));
     });
+    collectionCache.set(collectionName, cacheMap);
     return items;
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, collectionName);
@@ -96,17 +124,85 @@ export async function dbFetchCollection<T>(collectionName: string): Promise<T[]>
 }
 
 /**
+ * Clears all documents from a Firestore collection
+ */
+export async function dbClearCollection(collectionName: string): Promise<boolean> {
+  try {
+    const querySnapshot = await getDocs(collection(db, collectionName));
+    const batch = writeBatch(db);
+    querySnapshot.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+    collectionCache.set(collectionName, new Map());
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, collectionName);
+    return false;
+  }
+}
+
+/**
  * Performs a batch save of a collection (e.g. for initial seeding or bulk import)
+ * Uses a memory cache to perform a differential sync, drastically reducing Firestore writes.
  */
 export async function dbSaveCollection<T extends { id: string }>(collectionName: string, items: T[]) {
   try {
-    const batch = writeBatch(db);
-    items.forEach((item) => {
-      const docRef = doc(db, collectionName, item.id);
+    const cacheMap = collectionCache.get(collectionName) || new Map<string, string>();
+    const newCacheMap = new Map<string, string>();
+    const itemsToWrite: T[] = [];
+    const itemsToDelete: string[] = [];
+
+    // 1. Find additions and modifications
+    for (const item of items) {
       const cleanedItem = cleanObject(item);
-      batch.set(docRef, cleanedItem);
-    });
-    await batch.commit();
+      const itemStr = JSON.stringify(cleanedItem);
+      newCacheMap.set(item.id, itemStr);
+      
+      if (cacheMap.get(item.id) !== itemStr) {
+        itemsToWrite.push(cleanedItem);
+      }
+    }
+
+    // 2. Find deletions (in old cache but not in new array)
+    for (const oldId of cacheMap.keys()) {
+      if (!newCacheMap.has(oldId)) {
+        itemsToDelete.push(oldId);
+      }
+    }
+
+    // If nothing changed, exit early to save quota
+    if (itemsToWrite.length === 0 && itemsToDelete.length === 0) {
+      return; 
+    }
+
+    const CHUNK_SIZE = 450;
+    
+    // Process writes
+    for (let i = 0; i < itemsToWrite.length; i += CHUNK_SIZE) {
+      const chunk = itemsToWrite.slice(i, i + CHUNK_SIZE);
+      const batch = writeBatch(db);
+      chunk.forEach((item) => {
+        const docRef = doc(db, collectionName, item.id);
+        batch.set(docRef, item);
+      });
+      await batch.commit();
+    }
+    
+    // Process deletes
+    for (let i = 0; i < itemsToDelete.length; i += CHUNK_SIZE) {
+      const chunk = itemsToDelete.slice(i, i + CHUNK_SIZE);
+      const batch = writeBatch(db);
+      chunk.forEach((id) => {
+        const docRef = doc(db, collectionName, id);
+        batch.delete(docRef);
+      });
+      await batch.commit();
+    }
+    
+    // Update cache
+    collectionCache.set(collectionName, newCacheMap);
+
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, collectionName);
   }

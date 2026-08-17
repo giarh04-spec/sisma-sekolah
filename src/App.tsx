@@ -209,11 +209,30 @@ export default function App() {
           if (administrasiData.length > 0) setAdministrasiList(administrasiData);
           else await dbSaveCollection('edu_administrasiList', administrasiList);
 
-          if (tagihanData.length > 0) setTagihanList(tagihanData);
-          else await dbSaveCollection('edu_tagihanList', tagihanList);
+          const isTagihanForceCleared = localStorage.getItem('edu_tagihan_force_clear') === 'true';
+          const isTransaksiForceCleared = localStorage.getItem('edu_transaksi_force_clear') === 'true';
 
-          if (transaksiData.length > 0) setTransaksiList(transaksiData);
-          else await dbSaveCollection('edu_transaksiList', transaksiList);
+          if (isTagihanForceCleared) {
+            // Keep local state, but retry deleting from Firebase in the background
+            dbClearCollection('edu_tagihanList').then(success => {
+              if (success) localStorage.removeItem('edu_tagihan_force_clear');
+            });
+          } else if (tagihanData.length > 0) {
+            setTagihanList(tagihanData);
+          } else {
+            await dbSaveCollection('edu_tagihanList', tagihanList);
+          }
+
+          if (isTransaksiForceCleared) {
+            // Keep local state, but retry deleting from Firebase in the background
+            dbClearCollection('edu_transaksiList').then(success => {
+              if (success) localStorage.removeItem('edu_transaksi_force_clear');
+            });
+          } else if (transaksiData.length > 0) {
+            setTransaksiList(transaksiData);
+          } else {
+            await dbSaveCollection('edu_transaksiList', transaksiList);
+          }
 
           if (tarifBiayaData.length > 0) setTarifBiayaList(tarifBiayaData);
           else await dbSaveCollection('edu_tarifBiayaList', tarifBiayaList);
@@ -248,7 +267,7 @@ export default function App() {
       const timer = setTimeout(() => setFirebaseSyncStatus('idle'), 2000);
       return () => clearTimeout(timer);
     } catch (e) {
-      console.error(`Error syncing ${collectionName} to Firebase:`, e);
+      if (!String(e).includes('resource-exhausted')) { console.error(`Error syncing ${collectionName} to Firebase:`, e); }
       setFirebaseSyncStatus('error');
     }
   };
@@ -261,7 +280,7 @@ export default function App() {
       const timer = setTimeout(() => setFirebaseSyncStatus('idle'), 2000);
       return () => clearTimeout(timer);
     } catch (e) {
-      console.error(`Error syncing item ${collectionName} to Firebase:`, e);
+      if (!String(e).includes('resource-exhausted')) { console.error(`Error syncing item ${collectionName} to Firebase:`, e); }
       setFirebaseSyncStatus('error');
     }
   };
@@ -400,6 +419,10 @@ export default function App() {
       try {
         const unsub = onSnapshot(collection(db, colName), (snapshot) => {
           if (snapshot.metadata.hasPendingWrites) return;
+          
+          if (colName === 'edu_tagihanList' && localStorage.getItem('edu_tagihan_force_clear') === 'true') return;
+          if (colName === 'edu_transaksiList' && localStorage.getItem('edu_transaksi_force_clear') === 'true') return;
+
           const items: T[] = [];
           snapshot.forEach((doc) => {
             items.push(doc.data() as T);
