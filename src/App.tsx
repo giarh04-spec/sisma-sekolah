@@ -213,6 +213,7 @@ export default function App() {
           const isTransaksiForceCleared = localStorage.getItem('edu_transaksi_force_clear') === 'true';
 
           if (isTagihanForceCleared) {
+            setTagihanList([]);
             // Keep local state, but retry deleting from Firebase in the background
             dbClearCollection('edu_tagihanList').then(success => {
               if (success) localStorage.removeItem('edu_tagihan_force_clear');
@@ -224,6 +225,7 @@ export default function App() {
           }
 
           if (isTransaksiForceCleared) {
+            setTransaksiList([]);
             // Keep local state, but retry deleting from Firebase in the background
             dbClearCollection('edu_transaksiList').then(success => {
               if (success) localStorage.removeItem('edu_transaksi_force_clear');
