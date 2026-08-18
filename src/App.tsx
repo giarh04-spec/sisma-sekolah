@@ -210,8 +210,29 @@ export default function App() {
           if (administrasiData.length > 0) setAdministrasiList(administrasiData);
           else await dbSaveCollection('edu_administrasiList', administrasiList);
 
-          const isTagihanForceCleared = localStorage.getItem('edu_tagihan_force_clear') === 'true';
-          const isTransaksiForceCleared = localStorage.getItem('edu_transaksi_force_clear') === 'true';
+          const isSystemReset = localStorage.getItem('edu_system_reset') === 'true';
+          const isTagihanForceCleared = localStorage.getItem('edu_tagihan_force_clear') === 'true' || isSystemReset;
+          const isTransaksiForceCleared = localStorage.getItem('edu_transaksi_force_clear') === 'true' || isSystemReset;
+
+          if (isSystemReset) {
+            setRombelList([]); setSiswaList([]); setGuruList([]); setStafList([]); setMapelList([]); setEkskulList([]);
+            setAbsensiHarian([]); setAbsensiKelasList([]); setAbsensiGuruList([]); setBankSoalList([]); setUjianList([]); setAdministrasiList([]);
+            setTagihanList([]); setTransaksiList([]); setTarifBiayaList([]); setHasilUjianList([]);
+            
+            const collectionsToClear = [
+              'edu_rombelList', 'edu_siswaList', 'edu_guruList', 'edu_stafList', 'edu_mapelList', 'edu_ekskulList',
+              'edu_absensiHarian', 'edu_absensiKelasList', 'edu_absensiGuruList', 'edu_bankSoalList', 'edu_ujianList',
+              'edu_administrasiList', 'edu_tagihanList', 'edu_transaksiList', 'edu_tarifBiayaList', 'edu_hasilUjianList'
+            ];
+            
+            Promise.all(collectionsToClear.map(c => dbClearCollection(c))).then(() => {
+              localStorage.removeItem('edu_system_reset');
+              localStorage.removeItem('edu_tagihan_force_clear');
+              localStorage.removeItem('edu_transaksi_force_clear');
+            });
+            setIsDbLoaded(true);
+            return;
+          }
 
           if (isTagihanForceCleared) {
             setTagihanList([]);
@@ -794,7 +815,7 @@ export default function App() {
               absensiHarian={absensiHarian}
               absensiKelasList={absensiKelasList}
               activeSubTab={pengaturanSubTab}
-              setSubTab={setPengaturanSubTab}
+              setActiveSubTab={setPengaturanSubTab}
             />
           )}
         </main>

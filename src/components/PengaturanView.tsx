@@ -59,8 +59,8 @@ interface PengaturanViewProps {
   mapelList?: MataPelajaranItem[];
   absensiHarian?: AbsensiSiswaHarian[];
   absensiKelasList?: AbsensiSiswaKelas[];
-  activeSubTab: 'identitas' | 'logo' | 'google_drive' | 'fonnte' | 'jadwal';
-  setActiveSubTab: (tab: 'identitas' | 'logo' | 'google_drive' | 'fonnte' | 'jadwal') => void;
+  activeSubTab: 'identitas' | 'logo' | 'google_drive' | 'fonnte' | 'jadwal' | 'sistem';
+  setActiveSubTab: (tab: 'identitas' | 'logo' | 'google_drive' | 'fonnte' | 'jadwal' | 'sistem') => void;
 }
 
 export const PengaturanView: React.FC<PengaturanViewProps> = ({
@@ -1500,6 +1500,73 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* SUBTAB 6: SISTEM & DATABASE (RESET) */}
+      {activeSubTab === 'sistem' && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="bg-[#121212] border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-slate-800 bg-[#151515] flex items-center justify-between">
+              <div>
+                <h3 className="font-extrabold text-sm flex items-center gap-2 text-rose-400">
+                  <ShieldAlert className="w-4 h-4 text-rose-500" />
+                  Manajemen Database & Reset Sistem
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">Hapus data demo dan bersihkan database untuk mulai dari awal</p>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              <div className="p-4 bg-rose-950/20 border border-rose-500/30 rounded-xl space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-rose-500/20 rounded-lg shrink-0">
+                    <AlertCircle className="w-5 h-5 text-rose-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-xs text-rose-200">Hapus Seluruh Data Demo (Factory Reset)</h4>
+                    <p className="text-[11px] text-rose-300/80 leading-relaxed">
+                      Tindakan ini akan menghapus <strong>SELURUH</strong> data yang ada di database Firestore Anda, termasuk:
+                      Siswa, Guru, Staf, Rombel, Mata Pelajaran, Tagihan Keuangan, Transaksi, dan Absensi.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      const confirmText = "HAPUS_SEMUA_DATA";
+                      const userInput = window.prompt(`Ketik "${confirmText}" untuk mengkonfirmasi penghapusan seluruh data sistem secara permanen:`);
+                      
+                      if (userInput === confirmText) {
+                        localStorage.setItem('edu_system_reset', 'true');
+                        alert('Sistem akan direset. Aplikasi akan memuat ulang untuk membersihkan database.');
+                        window.location.reload();
+                      }
+                    }}
+                    className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold rounded-xl text-xs transition-all shadow-lg shadow-rose-600/20 flex items-center gap-2 cursor-pointer w-full sm:w-auto justify-center"
+                  >
+                    <Zap className="w-4 h-4 text-amber-300" />
+                    Reset Data & Bersihkan Database
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 bg-indigo-950/20 border border-indigo-500/30 rounded-xl space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-indigo-500/20 rounded-lg shrink-0">
+                    <Database className="w-5 h-5 text-indigo-400" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-xs text-indigo-200">Mode Persiapan Produksi</h4>
+                    <p className="text-[11px] text-indigo-300/80 leading-relaxed">
+                      Setelah melakukan reset, sistem tidak akan memuat data demo (INITIAL DATA) lagi. Anda harus menginput data Siswa dan Rombel secara manual atau melalui impor Excel.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

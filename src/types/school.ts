@@ -18,7 +18,7 @@ export type SubTab = 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel' | 'ekskul';
 export type AbsensiSubTab = 'scan_barcode' | 'harian_siswa' | 'kelas_mapel' | 'absensi_guru' | 'redaksi';
 export type CbtSubTab = 'bank_soal' | 'jadwal_kartu' | 'ai_generator' | 'simulasi_ujian' | 'hasil_ujian';
 export type KeuanganSubTab = 'pembayaran' | 'pengaturan_biaya' | 'rekap' | 'redaksi';
-export type PengaturanSubTab = 'identitas' | 'logo' | 'google_drive' | 'fonnte' | 'jadwal';
+export type PengaturanSubTab = 'identitas' | 'logo' | 'google_drive' | 'fonnte' | 'jadwal' | 'sistem';
 
 export interface TarifBiaya {
   id: string;

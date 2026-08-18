@@ -817,6 +817,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <span>Jadwal Masuk/Pulang</span>
                         </div>
                       </button>
+
+                      <button
+                        onClick={() => {
+                          setActiveTab('pengaturan');
+                          if (setPengaturanSubTab) setPengaturanSubTab('sistem');
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
+                          pengaturanSubTab === 'sistem'
+                            ? 'bg-rose-600/10 text-rose-400 border border-rose-500/20 shadow-sm'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="w-3.5 h-3.5 text-rose-400" />
+                          <span>Sistem & Database</span>
+                        </div>
+                        <span className="text-[9px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-1 py-0.5 rounded font-bold">
+                          Reset
+                        </span>
+                      </button>
                     </div>
                   )}
                 </div>
