@@ -2034,6 +2034,28 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   const totalSisaBulanan = unpaidMonthsCount * monthlyFee;
 
   // Fee Rates CRUD Handlers
+  // Delete All Confirmation State
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+
+  const handleExecuteDeleteAll = async () => {
+    try {
+      localStorage.setItem('edu_tagihan_force_clear', 'true');
+      localStorage.setItem('edu_transaksi_force_clear', 'true');
+      
+      setTagihanList([]);
+      setTransaksiList([]);
+      
+      await dbClearCollection('edu_tagihanList');
+      await dbClearCollection('edu_transaksiList');
+      
+      setShowDeleteAllModal(false);
+      alert('Seluruh data tagihan dan transaksi berhasil dikosongkan!');
+    } catch (error) {
+      console.error('Error during mass deletion:', error);
+      alert('Gagal mengosongkan data. Silakan coba lagi.');
+    }
+  };
+
   const handleOpenAddTarif = () => {
     setEditingTarif(null);
     setTarifForm({
@@ -3305,17 +3327,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   Unduh CSV / Excel
                 </button>
                 <button
-                  onClick={() => {
-                    if (window.confirm('PERINGATAN! Anda akan MENGHAPUS SEMUA DATA TAGIHAN DAN TRANSAKSI! Apakah Anda yakin?')) {
-                      localStorage.setItem('edu_tagihan_force_clear', 'true');
-                      localStorage.setItem('edu_transaksi_force_clear', 'true');
-                      setTagihanList([]);
-                      setTransaksiList([]);
-                      dbClearCollection('edu_tagihanList').catch(() => {});
-                      dbClearCollection('edu_transaksiList').catch(() => {});
-                      alert('Seluruh data tagihan berhasil dikosongkan!');
-                    }
-                  }}
+                  onClick={() => setShowDeleteAllModal(true)}
                   className="px-4 py-2 bg-rose-600/20 hover:bg-rose-500/30 text-rose-400 font-bold rounded-xl text-xs transition-all flex items-center gap-2 border border-rose-500/30 shadow-md cursor-pointer"
                   title="Hapus Semua Data Tagihan"
                 >
@@ -4889,6 +4901,44 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KONFIRMASI HAPUS SEMUA DATA */}
+      {showDeleteAllModal && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="bg-[#121212] border-2 border-rose-900/50 text-white rounded-2xl max-w-md w-full p-8 shadow-[0_0_50px_-12px_rgba(225,29,72,0.5)] space-y-6 animate-in fade-in zoom-in duration-300">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-20 h-20 bg-rose-500/20 rounded-full flex items-center justify-center border border-rose-500/30 animate-pulse">
+                <AlertCircle className="w-10 h-10 text-rose-500" />
+              </div>
+              <h2 className="text-xl font-black text-rose-500 tracking-tight">HAPUS SEMUA DATA?</h2>
+              <p className="text-sm text-slate-300 leading-relaxed">
+                Tindakan ini akan <span className="text-rose-400 font-bold underline decoration-rose-500/50 underline-offset-4">MENGHAPUS PERMANEN</span> seluruh data tagihan dan transaksi keuangan yang ada di sistem.
+              </p>
+              <div className="p-4 bg-rose-500/5 rounded-xl border border-rose-500/10 w-full">
+                <p className="text-[11px] text-rose-300 font-medium italic">
+                  *Data yang sudah dihapus tidak dapat dikembalikan. Pastikan Anda sudah melakukan pencadangan (Export CSV) jika diperlukan.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 pt-2">
+              <button
+                onClick={handleExecuteDeleteAll}
+                className="w-full px-6 py-3.5 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl text-sm transition-all shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 transform active:scale-[0.98]"
+              >
+                <Trash2 className="w-5 h-5" />
+                YA, HAPUS SEMUA SEKARANG
+              </button>
+              <button
+                onClick={() => setShowDeleteAllModal(false)}
+                className="w-full px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-sm transition-all border border-slate-700"
+              >
+                Batalkan
+              </button>
+            </div>
           </div>
         </div>
       )}
