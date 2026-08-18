@@ -62,7 +62,8 @@ import {
   validateFirestoreConnection, 
   dbSaveItem, 
   dbFetchCollection, 
-  dbSaveCollection 
+  dbSaveCollection,
+  dbClearCollection
 } from './lib/firebaseSync';
 
 function getSavedData<T>(key: string, initial: T): T {

@@ -1585,13 +1585,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     keterangan: '',
     status: 'Aktif'
   });
-
-  // Modal Generator Tagihan Massal
-  const [showGeneratorModal, setShowGeneratorModal] = useState(false);
-  const [genSelectedTarifId, setGenSelectedTarifId] = useState<string>('');
-  const [genBulanTahun, setGenBulanTahun] = useState<string>('Agustus 2026');
-  const [genJatuhTempo, setGenJatuhTempo] = useState<string>('2026-08-10');
-  const [genSuccessMsg, setGenSuccessMsg] = useState<string | null>(null);
   
   // Effect to automatically update tagihan status and terbayar amount when transactions change
   useEffect(() => {
@@ -1670,6 +1663,9 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     bayar: number,
     payDate: string
   ) => {
+    localStorage.removeItem('edu_tagihan_force_clear');
+    localStorage.removeItem('edu_transaksi_force_clear');
+    
     let targetTagihanId = `tag-${Date.now()}`;
     setTagihanList(prev => {
       const normName = sName.trim().toLowerCase();
@@ -2093,52 +2089,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       }
       return t;
     }));
-  };
-
-  // Mass Tagihan Generator Handler
-  const handleRunMassGenerator = (e: React.FormEvent) => {
-    e.preventDefault();
-    const selectedTarif = tarifList.find(t => t.id === genSelectedTarifId);
-    if (!selectedTarif) {
-      alert('Pilih tarif biaya yang ingin digenerate.');
-      return;
-    }
-
-    const targetStudents = siswaList.length > 0 ? siswaList : [
-      { id: 'sis-01', nis: '20261001', nama: 'Ahmad Rizky Pratama', kelas: 'X-IPA-1' },
-      { id: 'sis-02', nis: '20261002', nama: 'Siti Nurhaliza', kelas: 'X-IPA-1' },
-      { id: 'sis-03', nis: '20261003', nama: 'Bagus Dewantara', kelas: 'XI-IPA-2' }
-    ];
-
-    let createdCount = 0;
-    const newBills: TagihanKeuangan[] = [];
-
-    targetStudents.forEach(siswa => {
-      const billId = `tag-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      const newBill: TagihanKeuangan = {
-        id: billId,
-        siswaId: siswa.id,
-        siswaNama: siswa.nama,
-        kelas: siswa.kelas || 'X-IPA-1',
-        tipe: selectedTarif.tipe,
-        namaTagihan: `${selectedTarif.namaBiaya} (${genBulanTahun})`,
-        bulanTahun: genBulanTahun,
-        nominal: selectedTarif.nominal,
-        terbayar: 0,
-        status: 'Belum Lunas',
-        jatuhTempo: genJatuhTempo
-      };
-      newBills.push(newBill);
-      createdCount++;
-    });
-
-    setTagihanList(prev => [...newBills, ...prev]);
-    setGenSuccessMsg(`Berhasil membuat ${createdCount} tagihan ${selectedTarif.namaBiaya} untuk seluruh siswa!`);
-    
-    setTimeout(() => {
-      setShowGeneratorModal(false);
-      setGenSuccessMsg(null);
-    }, 2000);
   };
 
   // WhatsApp Fonnte Notification Handlers
@@ -2955,19 +2905,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
-                onClick={() => {
-                  if (tarifList.length > 0) {
-                    setGenSelectedTarifId(tarifList[0].id);
-                  }
-                  setShowGeneratorModal(true);
-                }}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/20"
-              >
-                <Zap className="w-4 h-4 text-amber-300" />
-                Generate Tagihan Massal
-              </button>
-
-              <button
                 onClick={handleOpenAddTarif}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md shadow-emerald-600/20"
               >
@@ -3269,18 +3206,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               </div>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => {
-                    if (tarifList.length > 0) {
-                      setGenSelectedTarifId(tarifList[0].id);
-                    }
-                    setShowGeneratorModal(true);
-                  }}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer shadow-md"
-                >
-                  <Zap className="w-4 h-4 text-amber-300" />
-                  Generate Tagihan
-                </button>
-                <button
                   onClick={handleExportCSV}
                   className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition-all flex items-center gap-2 border border-slate-700 shadow-md cursor-pointer"
                   title="Unduh File CSV / Excel Langsung"
@@ -3289,18 +3214,15 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   Unduh CSV / Excel
                 </button>
                 <button
-                  onClick={async () => {
+                  onClick={() => {
                     if (window.confirm('PERINGATAN! Anda akan MENGHAPUS SEMUA DATA TAGIHAN DAN TRANSAKSI! Apakah Anda yakin?')) {
-                      setTagihanList([]);
-                      setTransaksiList([]);
                       localStorage.setItem('edu_tagihan_force_clear', 'true');
                       localStorage.setItem('edu_transaksi_force_clear', 'true');
-                      const s1 = await dbClearCollection('edu_tagihanList');
-                      const s2 = await dbClearCollection('edu_transaksiList');
-                      if (s1 && s2) {
-                        localStorage.removeItem('edu_tagihan_force_clear');
-                        localStorage.removeItem('edu_transaksi_force_clear');
-                      }
+                      setTagihanList([]);
+                      setTransaksiList([]);
+                      dbClearCollection('edu_tagihanList').catch(() => {});
+                      dbClearCollection('edu_transaksiList').catch(() => {});
+                      alert('Seluruh data tagihan berhasil dikosongkan!');
                     }
                   }}
                   className="px-4 py-2 bg-rose-600/20 hover:bg-rose-500/30 text-rose-400 font-bold rounded-xl text-xs transition-all flex items-center gap-2 border border-rose-500/30 shadow-md cursor-pointer"
@@ -4489,6 +4411,9 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     }
                   });
 
+                  localStorage.removeItem('edu_tagihan_force_clear');
+                  localStorage.removeItem('edu_transaksi_force_clear');
+                  
                   alert('Perubahan tagihan berhasil disimpan!');
                   setShowEditTagihanModal(false);
                 }}
@@ -4497,102 +4422,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 Simpan Perubahan
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL GENERATE TAGIHAN MASSAL */}
-      {showGeneratorModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#121212] border border-slate-800 text-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="font-extrabold text-sm flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-300" />
-                Generate Tagihan Massal Otomatis
-              </h3>
-              <button
-                onClick={() => setShowGeneratorModal(false)}
-                className="text-slate-400 hover:text-white font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            {genSuccessMsg ? (
-              <div className="p-4 bg-emerald-950/80 border border-emerald-500/40 rounded-xl text-emerald-200 text-xs font-bold text-center space-y-2">
-                <CheckCircle2 className="w-6 h-6 text-emerald-400 mx-auto" />
-                <p>{genSuccessMsg}</p>
-              </div>
-            ) : (
-              <form onSubmit={handleRunMassGenerator} className="space-y-3.5 text-xs">
-                <div>
-                  <label className="text-slate-300 font-bold block mb-1">Pilih Parameter Biaya *</label>
-                  <select
-                    value={genSelectedTarifId}
-                    onChange={e => setGenSelectedTarifId(e.target.value)}
-                    className="w-full bg-[#181818] border border-slate-700/80 text-white font-bold rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  >
-                    {tarifList.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.namaBiaya} - Rp {t.nominal.toLocaleString('id-ID')} ({t.tingkatKelas})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-slate-300 font-bold block mb-1">Bulan & Tahun Tagihan</label>
-                  <input
-                    type="text"
-                    value={genBulanTahun}
-                    onChange={e => setGenBulanTahun(e.target.value)}
-                    className="w-full bg-[#181818] border border-slate-700/80 text-white font-bold rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    placeholder="misal: Agustus 2026, Semester Ganjil 2026..."
-                  />
-                </div>
-
-                <div>
-                  <label className="text-slate-300 font-bold block mb-1">Tanggal Jatuh Tempo</label>
-                  <div className="relative w-full">
-                    <input
-                      type="date"
-                      value={genJatuhTempo}
-                      onChange={e => setGenJatuhTempo(e.target.value)}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                    />
-                    <div className="w-full bg-[#181818] border border-slate-700/80 text-white font-bold rounded-xl px-3 py-2 text-xs flex justify-between items-center group focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500 transition-colors">
-                      <span>
-                        {genJatuhTempo
-                          ? genJatuhTempo.split('-').reverse().join('/')
-                          : <span className="text-slate-500">dd/mm/yyyy</span>}
-                      </span>
-                      <Calendar className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-400 transition-colors" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-indigo-950/40 rounded-xl border border-indigo-800/60 text-[11px] text-indigo-200">
-                  Sistem akan membuat tagihan secara otomatis untuk seluruh siswa aktif berdasarkan nominal yang dikonfigurasi.
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setShowGeneratorModal(false)}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/30 flex items-center gap-1.5"
-                  >
-                    <Zap className="w-3.5 h-3.5 text-amber-300" />
-                    Proses Massal
-                  </button>
-                </div>
-              </form>
-            )}
           </div>
         </div>
       )}
