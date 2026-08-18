@@ -790,6 +790,7 @@ export default function App() {
               setTarifBiayaList={setTarifBiayaList}
               schoolSettings={schoolSettings}
               setSchoolSettings={setSchoolSettings}
+              ekskulList={ekskulList}
               onRefresh={() => {
                 setTagihanList(getSavedData('edu_tagihanList', INITIAL_TAGIHAN));
                 setTransaksiList(getSavedData('edu_transaksiList', INITIAL_TRANSAKSI));

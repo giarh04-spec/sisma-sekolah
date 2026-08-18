@@ -29,6 +29,7 @@ export interface TarifBiaya {
   periode: 'Bulanan' | 'Sekali Bayar (Uang Masuk / UKT)' | 'Per Semester';
   keterangan?: string;
   status: 'Aktif' | 'Nonaktif';
+  ekskulId?: string;
 }
 
 export interface Siswa {

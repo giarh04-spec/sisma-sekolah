@@ -38,7 +38,7 @@ import {
   Smartphone,
   Bell
 } from 'lucide-react';
-import { TagihanKeuangan, TransaksiKeuangan, Siswa, KeuanganSubTab, TarifBiaya, TipeKeuangan, SchoolSettings, RombelKelas } from '../types/school';
+import { TagihanKeuangan, TransaksiKeuangan, Siswa, KeuanganSubTab, TarifBiaya, TipeKeuangan, SchoolSettings, RombelKelas, EkstrakurikulerItem } from '../types/school';
 import { sendFonnteMessage } from '../lib/fonnte';
 import { INITIAL_FONNTE_CONFIG, INITIAL_TARIF_BIAYA, INITIAL_ROMBEL } from '../data/mockData';
 
@@ -57,6 +57,7 @@ interface KeuanganViewProps {
   setTarifBiayaList?: React.Dispatch<React.SetStateAction<TarifBiaya[]>>;
   schoolSettings?: SchoolSettings;
   setSchoolSettings?: React.Dispatch<React.SetStateAction<SchoolSettings>>;
+  ekskulList?: EkstrakurikulerItem[];
   onRefresh?: () => void;
 }
 
@@ -75,6 +76,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   setTarifBiayaList: propSetTarifBiayaList,
   schoolSettings,
   setSchoolSettings,
+  ekskulList = [],
   onRefresh
 }) => {
   console.log('KeuanganView rendered with tagihanList.length:', tagihanList.length);
@@ -1567,6 +1569,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   // Fee Rates Settings View States
   const [feeCategoryFilter, setFeeCategoryFilter] = useState<'semua' | 'spp' | 'ukt' | 'ekskul'>('semua');
   const [showTarifModal, setShowTarifModal] = useState(false);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generateMonth, setGenerateMonth] = useState<string>(new Date().toLocaleString('id-ID', { month: 'long' }));
+  const [generateYear, setGenerateYear] = useState<string>(new Date().getFullYear().toString());
+  const [generateTypes, setGenerateTypes] = useState<TipeKeuangan[]>(['spp', 'ukt', 'ekskul']);
   const [editingTarif, setEditingTarif] = useState<TarifBiaya | null>(null);
   const [tarifForm, setTarifForm] = useState<{
     namaBiaya: string;
@@ -1576,6 +1582,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     periode: 'Bulanan' | 'Sekali Bayar (Uang Masuk / UKT)' | 'Per Semester';
     keterangan: string;
     status: 'Aktif' | 'Nonaktif';
+    ekskulId: string;
   }>({
     namaBiaya: '',
     tipe: 'spp',
@@ -1583,7 +1590,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     nominal: 100000,
     periode: 'Bulanan',
     keterangan: '',
-    status: 'Aktif'
+    status: 'Aktif',
+    ekskulId: ''
   });
   
   // Effect to automatically update tagihan status and terbayar amount when transactions change
@@ -2035,7 +2043,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       nominal: 100000,
       periode: 'Bulanan',
       keterangan: '',
-      status: 'Aktif'
+      status: 'Aktif',
+      ekskulId: ''
     });
     setShowTarifModal(true);
   };
@@ -2049,7 +2058,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       nominal: tarif.nominal,
       periode: tarif.periode,
       keterangan: tarif.keterangan || '',
-      status: tarif.status
+      status: tarif.status,
+      ekskulId: tarif.ekskulId || ''
     });
     setShowTarifModal(true);
   };
@@ -2089,6 +2099,75 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       }
       return t;
     }));
+  };
+
+  const handleGenerateTagihanMassal = () => {
+    if (!siswaList || siswaList.length === 0) {
+      alert('Data siswa kosong. Tidak dapat membuat tagihan.');
+      return;
+    }
+
+    const activeTarifs = tarifList.filter(t => t.status === 'Aktif' && generateTypes.includes(t.tipe));
+    if (activeTarifs.length === 0) {
+      alert('Tidak ada tarif aktif untuk kategori yang dipilih.');
+      return;
+    }
+
+    let createdCount = 0;
+    const newTagihan: TagihanKeuangan[] = [];
+
+    siswaList.forEach(siswa => {
+      const { tingkatKelas } = getStudentTingkatDanRombel(siswa);
+      
+      const matchingTarifs = activeTarifs.filter(t => {
+        if (t.tingkatKelas === 'Peserta Ekskul') {
+          if (t.ekskulId) {
+            const eks = ekskulList.find(e => e.id === t.ekskulId);
+            return eks?.anggotaSiswaIds?.includes(siswa.id);
+          }
+          return false;
+        }
+        return t.tingkatKelas === tingkatKelas || t.tingkatKelas === 'Semua Tingkat';
+      });
+
+      matchingTarifs.forEach(tarif => {
+        const bulanTahun = tarif.tipe === 'spp' ? `${generateMonth} ${generateYear}` : generateYear;
+        
+        // Cek apakah sudah ada tagihan yang sama untuk siswa ini
+        const isExist = tagihanList.some(t => 
+          t.siswaId === siswa.id && 
+          t.namaTagihan === tarif.namaBiaya && 
+          t.bulanTahun === bulanTahun &&
+          !t.isDeleted
+        );
+
+        if (!isExist) {
+          createdCount++;
+          newTagihan.push({
+            id: `tg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            siswaId: siswa.id,
+            siswaNama: siswa.nama,
+            kelas: siswa.kelas || tingkatKelas,
+            tipe: tarif.tipe,
+            namaTagihan: tarif.namaBiaya,
+            bulanTahun: bulanTahun,
+            nominal: tarif.nominal,
+            terbayar: 0,
+            status: 'Belum Lunas',
+            jatuhTempo: `10 ${bulanTahun}`,
+          });
+        }
+      });
+    });
+
+    if (newTagihan.length > 0) {
+      setTagihanList(prev => [...newTagihan, ...prev]);
+      alert(`Berhasil membuat ${createdCount} tagihan baru secara otomatis sesuai tarif & kelas masing-masing.`);
+    } else {
+      alert('Tidak ada tagihan baru yang dibuat. Semua tagihan untuk kriteria ini sudah ada sebelumnya.');
+    }
+    
+    setShowGenerateModal(false);
   };
 
   // WhatsApp Fonnte Notification Handlers
@@ -2905,6 +2984,13 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
+                onClick={() => setShowGenerateModal(true)}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20"
+              >
+                <Sparkles className="w-4 h-4" />
+                Generate Tagihan Otomatis
+              </button>
+              <button
                 onClick={handleOpenAddTarif}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md shadow-emerald-600/20"
               >
@@ -3048,6 +3134,11 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                           }`}>
                             {item.tipe === 'spp' ? 'SPP Bulanan' : item.tipe === 'ukt' ? 'UKT / Uang Masuk' : 'Ekskul / Kegiatan'}
                           </span>
+                          {item.ekskulId && (
+                            <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-[10px] font-bold uppercase">
+                              {ekskulList.find(e => e.id === item.ekskulId)?.namaEkskul || 'Ekskul'}
+                            </span>
+                          )}
                           {item.keterangan && (
                             <span className="text-[11px] text-slate-500 italic truncate max-w-xs">{item.keterangan}</span>
                           )}
@@ -4123,6 +4214,27 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 </div>
               </div>
 
+              {tarifForm.tipe === 'ekskul' && (
+                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                  <label className="text-slate-300 font-bold block mb-1">Pilih Ekstrakurikuler (Opsional)</label>
+                  <select
+                    value={tarifForm.ekskulId}
+                    onChange={e => setTarifForm({ ...tarifForm, ekskulId: e.target.value })}
+                    className="w-full bg-[#181818] border border-blue-500/50 text-blue-400 font-bold rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="">-- Semua Ekstrakurikuler --</option>
+                    {ekskulList.map(eks => (
+                      <option key={eks.id} value={eks.id}>
+                        {eks.namaEkskul} ({eks.pembinaNama})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-500 mt-1 italic">
+                    Pilih ekskul spesifik jika tarif ini hanya berlaku untuk ekskul tersebut.
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-300 font-bold block mb-1">Nominal Tarif (Rp) *</label>
@@ -4189,6 +4301,102 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL GENERATE TAGIHAN OTOMATIS */}
+      {showGenerateModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#121212] border border-slate-800 text-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="font-extrabold text-sm flex items-center gap-2 text-amber-400">
+                <Sparkles className="w-4 h-4" />
+                Generate Tagihan Otomatis
+              </h3>
+              <button
+                onClick={() => setShowGenerateModal(false)}
+                className="text-slate-400 hover:text-white font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                <p className="text-amber-200 leading-relaxed italic">
+                  Fitur ini akan membuat tagihan secara otomatis untuk seluruh siswa berdasarkan tarif biaya aktif yang sesuai dengan tingkat kelas mereka.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1">Bulan (Untuk SPP)</label>
+                  <select
+                    value={generateMonth}
+                    onChange={e => setGenerateMonth(e.target.value)}
+                    className="w-full bg-[#181818] border border-slate-700/80 text-white font-bold rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  >
+                    {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1">Tahun</label>
+                  <select
+                    value={generateYear}
+                    onChange={e => setGenerateYear(e.target.value)}
+                    className="w-full bg-[#181818] border border-slate-700/80 text-white font-bold rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  >
+                    <option value="2026">2026</option>
+                    <option value="2027">2027</option>
+                    <option value="2025">2025</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-bold block mb-1.5">Kategori Tagihan yang Dibuat</label>
+                <div className="flex flex-wrap gap-2">
+                  {['spp', 'ukt', 'ekskul'].map(type => (
+                    <button
+                      key={type}
+                      onClick={() => {
+                        setGenerateTypes(prev => 
+                          prev.includes(type as TipeKeuangan) 
+                            ? prev.filter(t => t !== type)
+                            : [...prev, type as TipeKeuangan]
+                        )
+                      }}
+                      className={`px-3 py-1.5 rounded-lg border font-bold transition-all ${
+                        generateTypes.includes(type as TipeKeuangan)
+                          ? 'bg-amber-500 border-amber-600 text-slate-950'
+                          : 'bg-slate-900 border-slate-700 text-slate-400'
+                      }`}
+                    >
+                      {type.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-800 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGenerateModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleGenerateTagihanMassal}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-xl text-xs transition-all shadow-md shadow-emerald-600/20"
+                >
+                  Generate Sekarang
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
