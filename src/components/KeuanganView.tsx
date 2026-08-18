@@ -199,114 +199,9 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
   // Synthesize complete list of tagihan covering SPP, UKT, and Ekskul for all students
   const allEffectiveTagihanList = useMemo(() => {
-    const combined: TagihanKeuangan[] = tagihanList.filter(t => !t.isDeleted);
-
-    // Build map of existing tagihan and deleted markers
-    const existingKeySet = new Set<string>();
-    const deletedSynIds = new Set<string>();
-    const deletedKeys = new Set<string>();
-
-    tagihanList.forEach(t => {
-      if (t) {
-        if (t.isDeleted) {
-          deletedSynIds.add(t.id);
-          if (t.siswaId && t.tipe) {
-            deletedKeys.add(`${t.siswaId}-${t.tipe.toLowerCase()}`);
-          }
-          if (t.siswaNama && t.tipe) {
-            const sName = (t.siswaNama || '').trim().toLowerCase();
-            const sTipe = (t.tipe || '').toLowerCase();
-            deletedKeys.add(`${sName}-${sTipe}`);
-            if (t.namaTagihan) {
-              deletedKeys.add(`${sName}-${t.namaTagihan.toLowerCase()}`);
-            }
-          }
-        } else if (t.siswaNama) {
-          const sName = (t.siswaNama || '').trim().toLowerCase();
-          const sTipe = (t.tipe || '').toLowerCase();
-          existingKeySet.add(`${sName}-${sTipe}`);
-          if (t.siswaId) {
-            existingKeySet.add(`${t.siswaId}-${sTipe}`);
-          }
-        }
-      }
-    });
-
-    const tipesToEnsure: Array<'spp' | 'ukt' | 'ekskul'> = ['spp', 'ukt', 'ekskul'];
-
-    siswaList.forEach(siswa => {
-      if (!siswa || !siswa.nama) return;
-      const sNameNorm = (siswa.nama || '').trim().toLowerCase();
-
-      tipesToEnsure.forEach(tipe => {
-        const key = `${sNameNorm}-${tipe}`;
-        const idKey = `${siswa.id}-${tipe}`;
-        const synId = `syn-${tipe}-${siswa.id}`;
-
-        if (!existingKeySet.has(key) && !existingKeySet.has(idKey) && !deletedSynIds.has(synId) && !deletedKeys.has(key) && !deletedKeys.has(idKey)) {
-          // Find tariff if available (class-specific for SPP)
-          const matchingTarif = tarifList.find(tr => {
-            if (!tr || (tr.tipe || '').toLowerCase() !== tipe || tr.status !== 'Aktif') return false;
-            if (tipe === 'spp' && siswa.kelas) {
-              const k = siswa.kelas.toLowerCase();
-              const tk = tr.tingkatKelas.toLowerCase();
-              if ((k.includes('7') || k.includes('vii')) && (tk.includes('7') || tk.includes('vii'))) return true;
-              if ((k.includes('8') || k.includes('viii')) && (tk.includes('8') || tk.includes('viii'))) return true;
-              if ((k.includes('9') || k.includes('ix')) && (tk.includes('9') || tk.includes('ix'))) return true;
-              if ((k.includes('10') || k.includes('x')) && (tk.includes('10') || tk.includes('x'))) return true;
-              if ((k.includes('11') || k.includes('xi')) && (tk.includes('11') || tk.includes('xi'))) return true;
-              if ((k.includes('12') || k.includes('xii')) && (tk.includes('12') || tk.includes('xii'))) return true;
-              return false;
-            }
-            return true;
-          });
-          let defaultNominal = 350000;
-          let defaultNama = 'SPP Bulanan Kelas 7 (Agustus 2026)';
-
-          if (tipe === 'ukt') {
-            defaultNominal = matchingTarif ? matchingTarif.nominal : 2500000;
-            defaultNama = matchingTarif ? `${matchingTarif.namaBiaya} (T.A ${tahunAjaran})` : `Uang Gedung & Pengembangan (UKT) (T.A ${tahunAjaran})`;
-          } else if (tipe === 'ekskul') {
-            defaultNominal = matchingTarif ? matchingTarif.nominal : 100000;
-            defaultNama = matchingTarif ? `${matchingTarif.namaBiaya} (T.A ${tahunAjaran})` : `Kegiatan Ekstrakurikuler & Pramuka (T.A ${tahunAjaran})`;
-          } else if (tipe === 'spp') {
-            defaultNominal = matchingTarif ? matchingTarif.nominal : 350000;
-            defaultNama = matchingTarif ? `${matchingTarif.namaBiaya} (Agustus 2026)` : `SPP Bulanan Kelas 7 (Agustus 2026)`;
-          }
-
-          if (deletedKeys.has(`${sNameNorm}-${defaultNama.toLowerCase()}`)) {
-            return;
-          }
-
-          // Check if there's any transaction for this student and tipe in transaksiList
-          const txs = transaksiList.filter(tx => 
-            tx && tx.siswaNama && (tx.siswaNama || '').trim().toLowerCase() === sNameNorm && (tx.tipe || '').toLowerCase() === tipe
-          );
-          const terbayarFromTx = txs.reduce((sum, tx) => sum + (tx.nominal || 0), 0);
-          const nominalFinal = terbayarFromTx > defaultNominal ? terbayarFromTx : defaultNominal;
-          const isLunas = terbayarFromTx >= nominalFinal;
-          const latestTx = txs.length > 0 ? txs[txs.length - 1] : null;
-
-          combined.push({
-            id: synId,
-            siswaId: siswa.id,
-            siswaNama: siswa.nama,
-            kelas: siswa.kelas || '',
-            tipe: tipe,
-            namaTagihan: (latestTx && latestTx.pembayaran) ? latestTx.pembayaran : defaultNama,
-            bulanTahun: tahunAjaran,
-            nominal: nominalFinal,
-            terbayar: terbayarFromTx,
-            status: isLunas ? 'Lunas' : (terbayarFromTx > 0 ? 'Dicicil' : 'Belum Lunas'),
-            tanggalBayar: latestTx ? latestTx.tanggal : '',
-            jatuhTempo: '2026-08-10'
-          });
-        }
-      });
-    });
-
-    return combined;
-  }, [tagihanList, siswaList, tarifList, transaksiList, tahunAjaran]);
+    // We only show bills that have been explicitly created/inputted by finance
+    return tagihanList.filter(t => t && !t.isDeleted);
+  }, [tagihanList]);
 
   // Dynamically derive list of available classes for the dropdown
   const availableKelasList = useMemo(() => {
@@ -2041,30 +1936,25 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     try {
       localStorage.setItem('edu_tagihan_force_clear', 'true');
       localStorage.setItem('edu_transaksi_force_clear', 'true');
-      localStorage.setItem('edu_tarif_force_clear', 'true');
-      localStorage.setItem('edu_siswa_force_clear', 'true');
       
       setTagihanList([]);
       setTransaksiList([]);
-      if (setTarifList) setTarifList([]);
-      if (setSiswaList) setSiswaList([]);
       
       const clearPromises = [
         dbClearCollection('edu_tagihanList'),
-        dbClearCollection('edu_transaksiList'),
-        dbClearCollection('edu_tarifBiayaList'),
-        dbClearCollection('edu_siswaList')
+        dbClearCollection('edu_transaksiList')
       ];
       
       await Promise.all(clearPromises);
       
-      localStorage.removeItem('edu_tagihan_force_clear');
-      localStorage.removeItem('edu_transaksi_force_clear');
-      localStorage.removeItem('edu_tarif_force_clear');
-      localStorage.removeItem('edu_siswa_force_clear');
+      // Delay removal of force-clear flags to ensure onSnapshot listeners ignore any stale data propagation
+      setTimeout(() => {
+        localStorage.removeItem('edu_tagihan_force_clear');
+        localStorage.removeItem('edu_transaksi_force_clear');
+      }, 3000);
       
       setShowDeleteAllModal(false);
-      alert('Seluruh data tagihan, transaksi, tarif, dan siswa berhasil dikosongkan!');
+      alert('Seluruh data tagihan dan transaksi berhasil dikosongkan!');
     } catch (error) {
       console.error('Error during mass deletion:', error);
       alert('Gagal mengosongkan data. Silakan coba lagi.');
@@ -4926,9 +4816,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               <div className="w-20 h-20 bg-rose-500/20 rounded-full flex items-center justify-center border border-rose-500/30 animate-pulse">
                 <AlertCircle className="w-10 h-10 text-rose-500" />
               </div>
-              <h2 className="text-xl font-black text-rose-500 tracking-tight">HAPUS SEMUA DATA?</h2>
+              <h2 className="text-xl font-black text-rose-500 tracking-tight uppercase">Hapus Semua Tagihan?</h2>
               <p className="text-sm text-slate-300 leading-relaxed">
-                Tindakan ini akan <span className="text-rose-400 font-bold underline decoration-rose-500/50 underline-offset-4">MENGHAPUS PERMANEN</span> seluruh data tagihan dan transaksi keuangan yang ada di sistem.
+                Tindakan ini akan <span className="text-rose-400 font-bold underline decoration-rose-500/50 underline-offset-4">MENGHAPUS PERMANEN</span> seluruh daftar tagihan dan riwayat transaksi. <br/>
+                <span className="text-emerald-400 font-bold">Data Siswa & Pengaturan Tarif tetap tersimpan.</span>
               </p>
               <div className="p-4 bg-rose-500/5 rounded-xl border border-rose-500/10 w-full">
                 <p className="text-[11px] text-rose-300 font-medium italic">
