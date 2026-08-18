@@ -3307,7 +3307,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   title="Hapus Semua Data Tagihan"
                 >
                   <Trash2 className="w-4 h-4 text-rose-400" />
-                  Kosongkan Data
+                  Hapus Semua
                 </button>
               </div>
             </div>
