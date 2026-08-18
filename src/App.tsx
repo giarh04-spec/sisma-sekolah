@@ -77,11 +77,7 @@ function getSavedData<T>(key: string, initial: T): T {
         return saved as unknown as T;
       }
     }
-    const parsed = JSON.parse(saved);
-    if (Array.isArray(parsed) && parsed.length === 0 && Array.isArray(initial) && initial.length > 0) {
-      return initial;
-    }
-    return parsed;
+    return JSON.parse(saved);
   } catch (e) {
     console.error(`Error loading ${key} from localStorage:`, e);
     return initial;
@@ -177,9 +173,6 @@ export default function App() {
           if (rombelData.length > 0) setRombelList(rombelData);
           else await dbSaveCollection('edu_rombelList', rombelList);
 
-          if (siswaData.length > 0) setSiswaList(siswaData);
-          else await dbSaveCollection('edu_siswaList', siswaList);
-
           if (guruData.length > 0) setGuruList(guruData);
           else await dbSaveCollection('edu_guruList', guruList);
 
@@ -213,6 +206,8 @@ export default function App() {
           const isSystemReset = localStorage.getItem('edu_system_reset') === 'true';
           const isTagihanForceCleared = localStorage.getItem('edu_tagihan_force_clear') === 'true' || isSystemReset;
           const isTransaksiForceCleared = localStorage.getItem('edu_transaksi_force_clear') === 'true' || isSystemReset;
+          const isTarifForceCleared = localStorage.getItem('edu_tarif_force_clear') === 'true' || isSystemReset;
+          const isSiswaForceCleared = localStorage.getItem('edu_siswa_force_clear') === 'true' || isSystemReset;
 
           if (isSystemReset) {
             setRombelList([]); setSiswaList([]); setGuruList([]); setStafList([]); setMapelList([]); setEkskulList([]);
@@ -229,17 +224,35 @@ export default function App() {
               localStorage.removeItem('edu_system_reset');
               localStorage.removeItem('edu_tagihan_force_clear');
               localStorage.removeItem('edu_transaksi_force_clear');
+              localStorage.removeItem('edu_tarif_force_clear');
+              localStorage.removeItem('edu_siswa_force_clear');
             });
             setIsDbLoaded(true);
             return;
           }
 
+          // Optimized load logic with force_clear guards
+          if (isSiswaForceCleared) {
+            setSiswaList([]);
+            dbClearCollection('edu_siswaList').then(success => { if (success) localStorage.removeItem('edu_siswa_force_clear'); });
+          } else if (siswaData.length > 0) {
+            setSiswaList(siswaData);
+          } else {
+            await dbSaveCollection('edu_siswaList', siswaList);
+          }
+
+          if (isTarifForceCleared) {
+            setTarifBiayaList([]);
+            dbClearCollection('edu_tarifBiayaList').then(success => { if (success) localStorage.removeItem('edu_tarif_force_clear'); });
+          } else if (tarifBiayaData.length > 0) {
+            setTarifBiayaList(tarifBiayaData);
+          } else {
+            await dbSaveCollection('edu_tarifBiayaList', tarifBiayaList);
+          }
+
           if (isTagihanForceCleared) {
             setTagihanList([]);
-            // Keep local state, but retry deleting from Firebase in the background
-            dbClearCollection('edu_tagihanList').then(success => {
-              if (success) localStorage.removeItem('edu_tagihan_force_clear');
-            });
+            dbClearCollection('edu_tagihanList').then(success => { if (success) localStorage.removeItem('edu_tagihan_force_clear'); });
           } else if (tagihanData.length > 0) {
             setTagihanList(tagihanData);
           } else {
@@ -248,18 +261,12 @@ export default function App() {
 
           if (isTransaksiForceCleared) {
             setTransaksiList([]);
-            // Keep local state, but retry deleting from Firebase in the background
-            dbClearCollection('edu_transaksiList').then(success => {
-              if (success) localStorage.removeItem('edu_transaksi_force_clear');
-            });
+            dbClearCollection('edu_transaksiList').then(success => { if (success) localStorage.removeItem('edu_transaksi_force_clear'); });
           } else if (transaksiData.length > 0) {
             setTransaksiList(transaksiData);
           } else {
             await dbSaveCollection('edu_transaksiList', transaksiList);
           }
-
-          if (tarifBiayaData.length > 0) setTarifBiayaList(tarifBiayaData);
-          else await dbSaveCollection('edu_tarifBiayaList', tarifBiayaList);
 
           if (hasilUjianData.length > 0) setHasilUjianList(hasilUjianData);
 
@@ -446,6 +453,8 @@ export default function App() {
           
           if (colName === 'edu_tagihanList' && localStorage.getItem('edu_tagihan_force_clear') === 'true') return;
           if (colName === 'edu_transaksiList' && localStorage.getItem('edu_transaksi_force_clear') === 'true') return;
+          if (colName === 'edu_tarifBiayaList' && localStorage.getItem('edu_tarif_force_clear') === 'true') return;
+          if (colName === 'edu_siswaList' && localStorage.getItem('edu_siswa_force_clear') === 'true') return;
 
           const items: T[] = [];
           snapshot.forEach((doc) => {

@@ -2041,15 +2041,30 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     try {
       localStorage.setItem('edu_tagihan_force_clear', 'true');
       localStorage.setItem('edu_transaksi_force_clear', 'true');
+      localStorage.setItem('edu_tarif_force_clear', 'true');
+      localStorage.setItem('edu_siswa_force_clear', 'true');
       
       setTagihanList([]);
       setTransaksiList([]);
+      if (setTarifList) setTarifList([]);
+      if (setSiswaList) setSiswaList([]);
       
-      await dbClearCollection('edu_tagihanList');
-      await dbClearCollection('edu_transaksiList');
+      const clearPromises = [
+        dbClearCollection('edu_tagihanList'),
+        dbClearCollection('edu_transaksiList'),
+        dbClearCollection('edu_tarifBiayaList'),
+        dbClearCollection('edu_siswaList')
+      ];
+      
+      await Promise.all(clearPromises);
+      
+      localStorage.removeItem('edu_tagihan_force_clear');
+      localStorage.removeItem('edu_transaksi_force_clear');
+      localStorage.removeItem('edu_tarif_force_clear');
+      localStorage.removeItem('edu_siswa_force_clear');
       
       setShowDeleteAllModal(false);
-      alert('Seluruh data tagihan dan transaksi berhasil dikosongkan!');
+      alert('Seluruh data tagihan, transaksi, tarif, dan siswa berhasil dikosongkan!');
     } catch (error) {
       console.error('Error during mass deletion:', error);
       alert('Gagal mengosongkan data. Silakan coba lagi.');
@@ -4218,8 +4233,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     <option value="Kelas 10">Kelas 10 (Tingkat X)</option>
                     <option value="Kelas 11">Kelas 11 (Tingkat XI)</option>
                     <option value="Kelas 12">Kelas 12 (Tingkat XII)</option>
-                    <option value="Siswa Baru (Kelas 7)">Siswa Baru (Kelas 7)</option>
-                    <option value="Siswa Baru (Kelas 10)">Siswa Baru (Kelas 10)</option>
                     <option value="Peserta Ekskul">Peserta Ekskul</option>
                     <option value="Semua Tingkat">Semua Tingkat Kelas</option>
                   </select>
