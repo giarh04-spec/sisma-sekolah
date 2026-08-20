@@ -1,29 +1,29 @@
 # Security Specification - EduSmart Pro Firestore Security
 
 ## 1. Data Invariants
-- Only signed-in users can write or read school administration and student database entries.
-- Student identities must be unique, and their barcode matching values must meet character limits.
-- Transactions and payment values must be positive numbers.
-- Timestamps must correspond to the correct server time, preventing historical injection attacks.
+- All master data (Siswa, Guru, Staf, Rombel, Mapel, Ekskul) can only be managed by authenticated users.
+- Attendance records (AbsensiHarian, AbsensiKelas, AbsensiGuru) require authentication and must validate user roles if applicable.
+- Financial records (Tagihan, Transaksi, Tarif) are highly sensitive and restricted to authenticated administration staff.
+- CBT data (BankSoal, Ujian, HasilUjian) must prevent cross-student leakage.
+- School settings are restricted to administrative users.
 
 ## 2. The "Dirty Dozen" Payloads (Threat Vectors Rejected)
-1. **Unauthenticated Siswa Read**: Request to fetch student records without authentication.
-2. **Anonymous Teacher Injection**: Creating a teacher record using an unverified/anonymous auth token.
-3. **Ghost Tuition Creation**: Creating a financial tuition record with negative or empty amount fields.
-4. **Incorrect ID Spoofing**: Creating a record where `id` inside payload doesn't match the URL document ID.
-5. **PII Data Scraping**: Attempting to read all phone numbers / addresses of students without being an administrative role.
-6. **Transaction Falsification**: Mutating a paid bill's `terbayar` sum back to 0 without admin permissions.
-7. **System Configuration Tampering**: Overwriting school settings with arbitrary junk properties.
-8. **CBT Exam Sheet Manipulation**: Modifying exam result or answers of another student.
-9. **Fake Attendance Injection**: Spoofing daily student attendance using historical dates or future timestamps.
-10. **ID Poisoning Attack**: Trying to inject a document ID of length > 256 or containing special characters to trigger memory exhaustion.
-11. **Malicious Role Escalation**: Writing `role: admin` inside the user profile directly on sign up.
-12. **Double Refund/Charge Void**: Submitting a payment transaction with non-server-validated timestamps.
+1. **Unauthenticated Read**: Attempting to read any collection without being signed in.
+2. **Anonymous Write**: Attempting to create a student record without a verified auth token.
+3. **ID Mismatch**: Creating a document where the `id` field in the data does not match the document ID in the path.
+4. **Invalid Type Injection**: Sending a number to a field that expects a string (e.g., `nama`).
+5. **Oversized String Attack**: Sending a 1MB string to a field with a 100-character limit.
+6. **Cross-User Data Access**: Student A attempting to read Student B's exam results.
+7. **Negative Nominal**: Creating a financial transaction with a negative amount.
+8. **Future Timestamp Spoofing**: Setting `createdAt` to a future date instead of `request.time`.
+9. **Role Escalation**: Setting `isAdmin` or `role` fields in a user profile.
+10. **Unauthorized Settings Update**: Changing school name or NPSN without proper permissions.
+11. **Orphaned Attendance**: Creating attendance for a student ID that doesn't exist.
+12. **Status Skipping**: Manually setting a bill to "Lunas" without a corresponding transaction.
 
 ## 3. Test Runner Design (`firestore.rules.test.ts`)
-The `firestore.rules.test.ts` file acts as the primary validation harness to ensure that permissions are locked down tight.
-
-```typescript
-// Test suites will confirm that ALL "Dirty Dozen" malicious payload combinations
-// return PERMISSION_DENIED under zero-trust authorization policies.
-```
+The test suite will verify:
+- Deny all unauthenticated access.
+- Deny writes with missing required fields.
+- Deny updates to immutable fields like `id` or `createdAt`.
+- Allow read/write for authenticated users on school data.

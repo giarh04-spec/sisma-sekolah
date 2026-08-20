@@ -20,9 +20,13 @@ export async function validateFirestoreConnection() {
     const testDoc = doc(db, 'test', 'connection');
     await getDocFromServer(testDoc);
     // console.log('Firestore connection validation succeeded.');
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration.");
+  } catch (error: any) {
+    console.error('Firestore connection error detail:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('the client is offline')) {
+      console.error("Firebase is offline. This usually means the browser/iframe is blocking the connection or the project configuration is invalid.");
+    } else {
+      console.error(`Firestore connection failed: ${errorMessage}`);
     }
     // Gracing connectivity checks to prevent total app blockage
   }

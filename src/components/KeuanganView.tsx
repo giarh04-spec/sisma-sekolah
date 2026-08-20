@@ -81,7 +81,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   ekskulList = [],
   onRefresh
 }) => {
-  console.log('KeuanganView rendered with tagihanList.length:', tagihanList.length);
   // Navigation Subtab State
   const [localActiveTab, setLocalActiveTab] = useState<KeuanganSubTab>('pembayaran');
   const activeTab = subTab || localActiveTab;
@@ -509,10 +508,56 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   const studentBills = useMemo(() => {
     if (!selectedSiswa) return [];
     const normName = selectedSiswa.nama.trim().toLowerCase();
-    return allEffectiveTagihanList.filter(t => 
+    
+    // 1. Get all explicit bills for this student
+    const explicitBills = allEffectiveTagihanList.filter(t => 
       t && !t.isDeleted && (t.siswaId === selectedSiswa.id || (t.siswaNama && t.siswaNama.trim().toLowerCase() === normName))
-    );
-  }, [selectedSiswa, allEffectiveTagihanList]);
+    ).map(t => {
+      // Calculate dynamic terbayar from transaksiList to ensure accuracy
+      const txsForThisBill = transaksiList.filter(tx => 
+        tx && (tx.tagihanId === t.id || (tx.pembayaran === t.namaTagihan && tx.siswaNama && tx.siswaNama.trim().toLowerCase() === normName))
+      );
+      const totalPaid = txsForThisBill.reduce((sum, tx) => sum + (tx.nominal || 0), 0);
+      const displayTerbayar = Math.max(t.terbayar || 0, totalPaid);
+      
+      return {
+        ...t,
+        terbayar: displayTerbayar,
+        status: displayTerbayar >= t.nominal ? 'Lunas' : (displayTerbayar > 0 ? 'Dicicil' : 'Belum Lunas'),
+        tanggalBayar: t.tanggalBayar || (txsForThisBill.length > 0 ? txsForThisBill[0].tanggal : undefined)
+      };
+    });
+
+    // 2. Identify "orphan" transactions (transactions without a corresponding bill in tagihanList)
+    const orphanTxs = transaksiList.filter(tx => {
+      if (!tx || (tx.siswaNama || '').trim().toLowerCase() !== normName) return false;
+      const hasMatchingBill = explicitBills.some(b => b.id === tx.tagihanId || b.namaTagihan === tx.pembayaran);
+      return !hasMatchingBill;
+    });
+
+    // 3. Convert orphan transactions to bill-like objects for display
+    const orphanBills: TagihanKeuangan[] = orphanTxs.map(tx => ({
+      id: tx.id,
+      siswaId: selectedSiswa.id,
+      siswaNama: selectedSiswa.nama,
+      kelas: selectedSiswa.kelas || '',
+      tipe: tx.tipe || 'other',
+      namaTagihan: tx.pembayaran || 'Pembayaran Lainnya',
+      bulanTahun: tahunAjaran,
+      nominal: tx.nominal,
+      terbayar: tx.nominal,
+      status: 'Lunas',
+      tanggalBayar: tx.tanggal,
+      jatuhTempo: tx.tanggal
+    }));
+
+    // Combine and sort by date (newest first)
+    return [...explicitBills, ...orphanBills].sort((a, b) => {
+      const dateA = new Date(a.tanggalBayar || a.jatuhTempo || 0).getTime();
+      const dateB = new Date(b.tanggalBayar || b.jatuhTempo || 0).getTime();
+      return dateB - dateA;
+    });
+  }, [selectedSiswa, allEffectiveTagihanList, transaksiList, tahunAjaran]);
 
   // Execute Permanent Bill Deletion (Deletes bill & removes all associated transaction records)
   const handleExecuteDeleteTagihanPermanen = (t: TagihanKeuangan) => {
@@ -1392,7 +1437,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     alert("Data siswa (Kelas & Rombel) berhasil diperbarui!");
   };
 
-  const defaultReminderText = `Yth. Bapak/Ibu Wali dari *{NAMA_SISWA}* ({KELAS}),\n\nMenginformasikan tagihan :\n• *No. Invoice*: {NO_INVOICE}\n• *{TAGIHAN}* sebesar *Rp {NOMINAL}*\n• *Jatuh tempo pada* {JATUH_TEMPO}\n• *Status saat ini*: {STATUS}.\n\nMohon dapat melakukan pembayaran melalui Rekening Kasir Sekolah / QRIS / Transfer.\n\nTerima kasih atas perhatian Bapak/Ibu.\n• *Bendahara SMPI MODERN AL FAKHIR*`;
+  const defaultReminderText = `Yth. Bapak/Ibu Wali dari *{NAMA_SISWA}* ({KELAS}),\n\nMenginformasikan tagihan :\n• *No. Invoice*: {NO_INVOICE}\n• *{TAGIHAN}* : *Rp {NOMINAL}*\n• *Jatuh tempo* : {JATUH_TEMPO}\n• *Status saat ini*: {STATUS}.\n\nMohon dapat melakukan pembayaran melalui Rekening Kasir Sekolah / QRIS / Transfer Bank :\n• *{BANK_VA_NAME}*\n• No. Rek/VA : *{BANK_VA_NUMBER}*\n• a.n *{BANK_VA_OWNER}*\n\nTerima kasih atas perhatian Bapak/Ibu.\n• *Bendahara SMPI MODERN AL FAKHIR*`;
   
   const defaultReceiptText = `Yth. Bapak/Ibu Wali dari *{NAMA_SISWA}* ({KELAS}),\n\nTerima kasih, pembayaran *{NAMA_TAGIHAN}* sebesar *{NOMINAL_BAYAR}* telah *KAMI TERIMA* dengan baik pada *{TANGGAL_BAYAR}*.\n• *No. Invoice* : {NO_INVOICE}\n• *Metode*: {METODE_BAYAR}\n\n*Status Tagihan*: {STATUS}.\n• *Bendahara SMPI MODERN AL FAKHIR*`;
 
@@ -2156,6 +2201,9 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       STATUS?: string;
       NO_INVOICE?: string;
       METODE_BAYAR?: string;
+      BANK_VA_NAME?: string;
+      BANK_VA_NUMBER?: string;
+      BANK_VA_OWNER?: string;
     }
   ) => {
     let result = template;
@@ -2166,7 +2214,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       JATUH_TEMPO: vars.JATUH_TEMPO || "10 Agustus 2026",
       STATUS: vars.STATUS || "BELUM LUNAS",
       NO_INVOICE: vars.NO_INVOICE || "0001/C-ALFAKHIR/VIII/2026",
-      METODE_BAYAR: vars.METODE_BAYAR || "Cash / Kasir"
+      METODE_BAYAR: vars.METODE_BAYAR || "Cash / Kasir",
+      BANK_VA_NAME: vars.BANK_VA_NAME || schoolSettings?.bankVaName || "-",
+      BANK_VA_NUMBER: vars.BANK_VA_NUMBER || schoolSettings?.bankVaNumber || "-",
+      BANK_VA_OWNER: vars.BANK_VA_OWNER || schoolSettings?.bankVaOwner || "-"
     };
     Object.entries(fullVars).forEach(([key, val]) => {
       result = result.replace(new RegExp(`{${key}}`, 'gi'), val);
@@ -2195,7 +2246,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       NOMINAL: `${tagihan.nominal.toLocaleString('id-ID')}`,
       JATUH_TEMPO: tagihan.jatuhTempo || new Date().toLocaleDateString('id-ID'),
       STATUS: tagihan.status === 'Lunas' ? 'LUNAS' : tagihan.status === 'Dicicil' ? 'DICICIL' : 'BELUM LUNAS',
-      NO_INVOICE: getStableInvoiceNumber(tagihan)
+      NO_INVOICE: getStableInvoiceNumber(tagihan),
+      BANK_VA_NAME: schoolSettings?.bankVaName,
+      BANK_VA_NUMBER: schoolSettings?.bankVaNumber,
+      BANK_VA_OWNER: schoolSettings?.bankVaOwner
     });
     
     setWaSendingStatus(`Mengirim WA Tagihan ke ${tagihan.siswaNama} (${phone})...`);
@@ -2230,7 +2284,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       JATUH_TEMPO: tagihan.jatuhTempo || new Date().toLocaleDateString('id-ID'),
       STATUS: 'LUNAS',
       NO_INVOICE: getStableInvoiceNumber(tagihan),
-      METODE_BAYAR: latestTx?.metodePembayaran || (tagihan as any).metodePembayaran || 'Cash / Kasir'
+      METODE_BAYAR: latestTx?.metodePembayaran || (tagihan as any).metodePembayaran || 'Cash / Kasir',
+      BANK_VA_NAME: schoolSettings?.bankVaName,
+      BANK_VA_NUMBER: schoolSettings?.bankVaNumber,
+      BANK_VA_OWNER: schoolSettings?.bankVaOwner
     });
     
     setWaSendingStatus(`Mengirim WA Konfirmasi Lunas ke ${tagihan.siswaNama} (${phone})...`);
@@ -3717,6 +3774,9 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                       JATUH_TEMPO: "13 Agustus 2026",
                       STATUS: "BELUM LUNAS",
                       NO_INVOICE: "0001/C-ALFAKHIR/VIII/2026",
+                      BANK_VA_NAME: bankVaName,
+                      BANK_VA_NUMBER: bankVaNumber,
+                      BANK_VA_OWNER: bankVaOwner,
                       NAMA_SEKOLAH: schoolSettings?.namaSekolah || "SMP Islam Modern Al-Fakhir"
                     }).map(vKey => {
                       if (activeRedaksiTab === 'reminder' && vKey === 'NOMINAL_BAYAR') return null;
@@ -3844,7 +3904,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                                 JATUH_TEMPO: "13 Agustus 2026",
                                 STATUS: "BELUM LUNAS",
                                 NO_INVOICE: "0001/C-ALFAKHIR/VIII/2026",
-                                METODE_BAYAR: "Cash / Kasir"
+                                METODE_BAYAR: "Cash / Kasir",
+                                BANK_VA_NAME: bankVaName,
+                                BANK_VA_NUMBER: bankVaNumber,
+                                BANK_VA_OWNER: bankVaOwner
                               }
                             )
                           ) 

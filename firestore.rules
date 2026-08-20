@@ -1,9 +1,99 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read/write access on all collections for sandbox demo environment
+    // 1. Global Safety Net
     match /{document=**} {
       allow read, write: if true;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- Entity Validations ---
+    function isValidSiswa(data) {
+      return data.keys().hasAll(['id', 'nisn', 'nis', 'nama', 'kelas', 'status']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.nama is string && data.nama.size() <= 200 &&
+             data.status in ['Aktif', 'Alumni', 'Pindah'];
+    }
+
+    function isValidTagihan(data) {
+      return data.keys().hasAll(['id', 'siswaId', 'siswaNama', 'kelas', 'tipe', 'namaTagihan', 'nominal', 'terbayar', 'status']) &&
+             data.nominal is number && data.nominal >= 0 &&
+             data.terbayar is number && data.terbayar >= 0 &&
+             data.status in ['Lunas', 'Belum Lunas', 'Dicicil'];
+    }
+
+    // --- Collections ---
+    match /edu_siswaList/{siswaId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_rombelList/{rombelId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_guruList/{guruId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_stafList/{stafId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_mapelList/{mapelId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_ekskulList/{ekskulId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_absensiHarian/{absensiId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_absensiKelasList/{absensiId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_absensiGuruList/{absensiId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_bankSoalList/{soalId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_ujianList/{ujianId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_administrasiList/{adminId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_tagihanList/{tagihanId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_transaksiList/{transaksiId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_tarifBiayaList/{tarifId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_hasilUjianList/{hasilId} {
+      allow read, write: if isSignedIn();
+    }
+    match /edu_schoolSettings/{settingsId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Test collection for connectivity check
+    match /test/connection {
+      allow read: if true;
     }
   }
 }

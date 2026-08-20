@@ -451,9 +451,16 @@ Terima kasih dan selamat beristirahat.
 _{NAMA_SEKOLAH}_`,
   templateReminder: `Yth. Bapak/Ibu Wali dari {NAMA_SISWA} ({KELAS}),
 
-Menginformasikan tagihan {TAGIHAN} sebesar Rp {NOMINAL} akan jatuh tempo pada {JATUH_TEMPO}.
-Status saat ini: {STATUS}.
-Mohon dapat melakukan pembayaran melalui Rekening Kasir Sekolah / QRIS / Transfer Bank.
+Menginformasikan tagihan :
+- No. Invoice   : {NO_INVOICE}
+- {TAGIHAN} : Rp {NOMINAL}
+- Jatuh tempo   : {JATUH_TEMPO}
+- Status saat ini : {STATUS}.
+
+Mohon dapat melakukan pembayaran melalui Rekening Kasir Sekolah / QRIS / Transfer Bank :
+- {BANK_VA_NAME}
+- No. Rek/VA : {BANK_VA_NUMBER}
+- a.n {BANK_VA_OWNER}
 
 Terima kasih atas perhatian Bapak/Ibu.
 - Bendahara {NAMA_SEKOLAH}`,

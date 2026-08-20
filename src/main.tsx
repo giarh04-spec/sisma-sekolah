@@ -7,7 +7,16 @@ import './index.css';
 if (typeof window !== 'undefined') {
   const isViteError = (msg: any) => {
     const text = String(msg).toLowerCase();
-    return text.includes('websocket') || text.includes('vite') || text.includes('hmr') || text.includes('web socket') || text.includes('closed without opened');
+    return (
+      text.includes('websocket') || 
+      text.includes('vite') || 
+      text.includes('hmr') || 
+      text.includes('web socket') || 
+      text.includes('closed without opened') ||
+      text.includes('could not reach cloud firestore') ||
+      text.includes('client is offline') ||
+      text.includes('failed to connect to websocket')
+    );
   };
 
   // Prevent console.error and console.warn from printing these benign errors
