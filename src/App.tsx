@@ -122,8 +122,8 @@ export default function App() {
   const [administrasiList, setAdministrasiList] = useState<AdministrasiGuru[]>(() => getSavedData('edu_administrasiList', INITIAL_ADMINISTRASI));
 
   // Financial State
-  const [tagihanList, setTagihanList] = useState<TagihanKeuangan[]>(() => getSavedData('edu_tagihanList', INITIAL_TAGIHAN));
-  const [transaksiList, setTransaksiList] = useState<TransaksiKeuangan[]>(() => getSavedData('edu_transaksiList', INITIAL_TRANSAKSI));
+  const [tagihanList, setTagihanList] = useState<TagihanKeuangan[]>(() => getSavedData('edu_tagihanList', []));
+  const [transaksiList, setTransaksiList] = useState<TransaksiKeuangan[]>(() => getSavedData('edu_transaksiList', []));
   const [tarifBiayaList, setTarifBiayaList] = useState<TarifBiaya[]>(() => getSavedData('edu_tarifBiayaList', INITIAL_TARIF_BIAYA));
 
   // School Identity & Settings State
@@ -801,8 +801,8 @@ export default function App() {
               setSchoolSettings={setSchoolSettings}
               ekskulList={ekskulList}
               onRefresh={() => {
-                setTagihanList(getSavedData('edu_tagihanList', INITIAL_TAGIHAN));
-                setTransaksiList(getSavedData('edu_transaksiList', INITIAL_TRANSAKSI));
+                setTagihanList(getSavedData('edu_tagihanList', []));
+                setTransaksiList(getSavedData('edu_transaksiList', []));
                 setTarifBiayaList(getSavedData('edu_tarifBiayaList', INITIAL_TARIF_BIAYA));
               }}
             />

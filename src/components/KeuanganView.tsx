@@ -36,7 +36,9 @@ import {
   RotateCcw,
   MessageSquare,
   Smartphone,
-  Bell
+  Bell,
+  Building2,
+  QrCode
 } from 'lucide-react';
 import { TagihanKeuangan, TransaksiKeuangan, Siswa, KeuanganSubTab, TarifBiaya, TipeKeuangan, SchoolSettings, RombelKelas, EkstrakurikulerItem } from '../types/school';
 import { sendFonnteMessage } from '../lib/fonnte';
@@ -1328,6 +1330,13 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   const [exportingSheets, setExportingSheets] = useState(false);
   const [exportResult, setExportResult] = useState<{ success: boolean; url?: string; message?: string } | null>(null);
 
+  // VA & QRIS Settings
+  const [bankVaName, setBankVaName] = useState(schoolSettings?.bankVaName || 'Bank BRI');
+  const [bankVaNumber, setBankVaNumber] = useState(schoolSettings?.bankVaNumber || '1234-5678-9012-3456');
+  const [bankVaOwner, setBankVaOwner] = useState(schoolSettings?.bankVaOwner || schoolSettings?.namaSekolah || 'SMP Islam Modern Al Fakhír');
+  const [qrisUrl, setQrisUrl] = useState(schoolSettings?.qrisUrl || 'https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg');
+  const [showVaConfigModal, setShowVaConfigModal] = useState(false);
+
   const getStudentTingkatDanRombel = (siswa: Siswa | null) => {
     if (!siswa) return { tingkatKelas: '-', rombel: '-' };
     
@@ -1401,7 +1410,24 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     if (schoolSettings?.fonnteConfig?.templateReceipt) {
       setLocalTemplateReceipt(schoolSettings.fonnteConfig.templateReceipt);
     }
+    if (schoolSettings?.bankVaName) setBankVaName(schoolSettings.bankVaName);
+    if (schoolSettings?.bankVaNumber) setBankVaNumber(schoolSettings.bankVaNumber);
+    if (schoolSettings?.bankVaOwner) setBankVaOwner(schoolSettings.bankVaOwner);
+    if (schoolSettings?.qrisUrl) setQrisUrl(schoolSettings.qrisUrl);
   }, [schoolSettings]);
+
+  const handleSaveVaConfig = () => {
+    if (!setSchoolSettings) return;
+    setSchoolSettings(prev => ({
+      ...prev,
+      bankVaName,
+      bankVaNumber,
+      bankVaOwner,
+      qrisUrl
+    }));
+    setShowVaConfigModal(false);
+    alert("Pengaturan Virtual Account & QRIS berhasil disimpan!");
+  };
 
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
@@ -2717,6 +2743,54 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 </div>
               </div>
 
+              {/* PANEL NEW: PENGATURAN VA & QRIS (IN BETWEEN) */}
+              <div className="bg-[#121212] p-5 rounded-2xl border border-slate-800/80 shadow-lg space-y-3.5 flex flex-col justify-between">
+                <div>
+                  <h4 className="text-sm font-extrabold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <QrCode className="w-4 h-4 text-emerald-400" />
+                      VA & QRIS Bank
+                    </span>
+                    <button 
+                      onClick={() => setShowVaConfigModal(true)}
+                      className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-emerald-400 rounded-lg border border-slate-700 transition-all"
+                      title="Ubah Pengaturan VA & QRIS"
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                    </button>
+                  </h4>
+                  
+                  <div className="mt-3 space-y-3">
+                    <div className="p-3 bg-slate-900/50 rounded-xl border border-slate-800/50 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">{bankVaName}</span>
+                        <div className="w-5 h-5 rounded bg-white/10 flex items-center justify-center">
+                          <Building2 className="w-3 h-3 text-slate-400" />
+                        </div>
+                      </div>
+                      <p className="text-sm font-mono font-bold text-white tracking-wider">{bankVaNumber}</p>
+                      <p className="text-[9px] text-slate-400 font-medium italic">a.n {bankVaOwner}</p>
+                    </div>
+
+                    <div className="flex items-center gap-3 p-2.5 bg-emerald-950/20 rounded-xl border border-emerald-500/10">
+                      <div className="w-10 h-10 bg-white rounded-lg p-1 shrink-0 overflow-hidden">
+                        <img src={qrisUrl} alt="QRIS" className="w-full h-full object-contain" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-tighter">QRIS PEMBAYARAN</p>
+                        <p className="text-[9px] text-slate-400 leading-tight">Tampilkan QRIS di kwitansi atau kirim via WA.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <p className="text-[9px] text-slate-500 italic text-center leading-relaxed">
+                    *Nomor Virtual Account & QRIS ini akan otomatis terlampir pada rincian tagihan yang dikirim ke orang tua.
+                  </p>
+                </div>
+              </div>
+
               {/* PANEL C: CETAK BUKTI PEMBAYARAN */}
               <div className="bg-[#121212] p-5 rounded-2xl border border-slate-800/80 shadow-lg space-y-3.5 flex flex-col justify-between">
                 <div>
@@ -4017,6 +4091,96 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
           </div>
         </div>
     )}
+
+      {/* MODAL: PENGATURAN VA & QRIS */}
+      {showVaConfigModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-[#121212] border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-emerald-600 px-6 py-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                  <QrCode className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white leading-tight">Pengaturan VA & QRIS</h3>
+                  <p className="text-[11px] text-emerald-100 font-medium">Konfigurasi Pembayaran Digital</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowVaConfigModal(false)}
+                className="text-white/70 hover:text-white transition-colors"
+              >
+                <RotateCcw className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-400">Nama Bank</label>
+                  <input
+                    type="text"
+                    value={bankVaName}
+                    onChange={(e) => setBankVaName(e.target.value)}
+                    placeholder="Contoh: Bank BRI, Bank BCA..."
+                    className="w-full bg-[#181818] border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-400">Nomor Virtual Account</label>
+                  <input
+                    type="text"
+                    value={bankVaNumber}
+                    onChange={(e) => setBankVaNumber(e.target.value)}
+                    placeholder="Masukkan nomor VA lengkap..."
+                    className="w-full bg-[#181818] border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm font-mono font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-400">Nama Pemilik / Merchant</label>
+                  <input
+                    type="text"
+                    value={bankVaOwner}
+                    onChange={(e) => setBankVaOwner(e.target.value)}
+                    placeholder="Contoh: Bendahara SMP Al Fakhir"
+                    className="w-full bg-[#181818] border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-400">URL Gambar QRIS</label>
+                  <input
+                    type="text"
+                    value={qrisUrl}
+                    onChange={(e) => setQrisUrl(e.target.value)}
+                    placeholder="https://link-gambar-qris-anda.png"
+                    className="w-full bg-[#181818] border border-slate-700 text-white rounded-xl px-4 py-2.5 text-[11px] focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                  <p className="text-[10px] text-slate-500 italic">Gunakan link gambar QRIS statis sekolah Anda.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowVaConfigModal(false)}
+                  className="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-sm transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleSaveVaConfig}
+                  className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
+                >
+                  <CheckCheck className="w-5 h-5" />
+                  Simpan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FONNTE CONFIG MODAL */}
       {showFonnteConfigModal && (

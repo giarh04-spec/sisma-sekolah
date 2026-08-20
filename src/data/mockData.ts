@@ -503,7 +503,11 @@ export const INITIAL_SCHOOL_SETTINGS: SchoolSettings = {
   googleSyncSpreadsheetId: '',
   googleSyncSpreadsheetUrl: '',
   googleSyncLastTime: '',
-  googleSyncStatus: 'idle'
+  googleSyncStatus: 'idle',
+  bankVaName: 'Bank BRI',
+  bankVaNumber: '1234-5678-9012-3456',
+  bankVaOwner: 'SMP Islam Modern Al Fakhír',
+  qrisUrl: 'https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg'
 };
 
 export const INITIAL_MAPEL: MataPelajaranItem[] = [

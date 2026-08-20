@@ -412,4 +412,8 @@ export interface SchoolSettings {
   googleSyncSpreadsheetUrl?: string;
   googleSyncLastTime?: string;
   googleSyncStatus?: 'idle' | 'syncing' | 'success' | 'failed';
+  bankVaName?: string;
+  bankVaNumber?: string;
+  bankVaOwner?: string;
+  qrisUrl?: string;
 }
