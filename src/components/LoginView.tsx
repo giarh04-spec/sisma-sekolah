@@ -369,40 +369,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   </div>
                 </div>
 
-                {/* Dynamic Credentials Helper Hint */}
-                <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl flex items-start gap-2.5">
-                  <span className="text-sm mt-0.5 shrink-0">💡</span>
-                  <div className="text-[11px] leading-relaxed text-slate-300">
-                    {selectedRole === 'admin' && (
-                      <>
-                        <span className="font-bold text-blue-400 block mb-0.5">Kredensial Admin Sekolah:</span>
-                        Username: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">admin</code> atau <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">giar.hermawan4</code> <br/>
-                        Password: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">admin</code> atau <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">admin123</code>
-                      </>
-                    )}
-                    {selectedRole === 'guru' && (
-                      <>
-                        <span className="font-bold text-purple-400 block mb-0.5">Kredensial Guru / Pendidik (Terdaftar):</span>
-                        Username: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">{demoGuruUser}</code> atau Email: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">{demoGuruEmail}</code> <br/>
-                        Password: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">{demoGuruPass}</code>
-                      </>
-                    )}
-                    {selectedRole === 'staf' && (
-                      <>
-                        <span className="font-bold text-amber-400 block mb-0.5">Kredensial Staf TU / Keuangan (Terdaftar):</span>
-                        Username: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">{demoStafUser}</code> atau Email: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">{demoStafEmail}</code> <br/>
-                        Password: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">{demoStafPass}</code>
-                      </>
-                    )}
-                    {selectedRole === 'siswa' && (
-                      <>
-                        <span className="font-bold text-emerald-400 block mb-0.5">Kredensial Siswa / Wali (Terdaftar):</span>
-                        Username: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">{demoSiswaUser}</code> atau Email: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-blue-300 font-mono font-bold">{demoSiswaEmail}</code> <br/>
-                        Password: <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold">{demoSiswaPass}</code>
-                      </>
-                    )}
-                  </div>
-                </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
