@@ -8,8 +8,6 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   AlertCircle,
-  Sun,
-  Moon,
   Database,
   RefreshCw,
   Cloud,
@@ -173,23 +171,6 @@ export const Header: React.FC<HeaderProps> = ({
               }`}></span>
             </span>
           </div>
-
-          {/* Theme Toggle Button */}
-          <button
-            type="button"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
-              theme === 'light'
-                ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
-                : 'bg-[#121212] text-amber-400 border-slate-800 hover:bg-slate-800'
-            }`}
-            title={theme === 'dark' ? 'Beralih ke Tampilan Terang (Light Mode)' : 'Beralih ke Tampilan Gelap (Dark Mode)'}
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-amber-700" />}
-            <span className="hidden sm:inline">{theme === 'dark' ? 'Terang' : 'Gelap'}</span>
-          </button>
-
-
 
           {/* Google Workspace Sign-In / User Status */}
           <div className="flex items-center gap-2">

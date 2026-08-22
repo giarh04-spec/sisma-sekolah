@@ -334,6 +334,7 @@ export interface TagihanKeuangan {
   terbayar: number;
   status: 'Lunas' | 'Belum Lunas' | 'Dicicil';
   jatuhTempo: string;
+  tanggalTagihan?: string;
   tanggalBayar?: string; // Tanggal pembayaran dilakukan (e.g. "2026-08-09" / "09/08/2026")
   waWaliSentAt?: string;
   isDeleted?: boolean;

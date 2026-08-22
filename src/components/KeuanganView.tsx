@@ -259,7 +259,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   // Payment Form Input States
   const [inputTotal, setInputTotal] = useState<number>(0);
   const [inputDibayar, setInputDibayar] = useState<number>(0);
-  const [transactionDate, setTransactionDate] = useState<string>(
+  const [inputTanggalTagihan, setInputTanggalTagihan] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
   const [selectedMetodePembayaran, setSelectedMetodePembayaran] = useState<string>('Cash / Kasir');
@@ -279,8 +279,14 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       const tot = selectedMonths.length > 0 ? selectedMonths.length * monthlyFee : 0;
       setInputTotal(tot);
       setInputDibayar(tot);
+    } else if (quickPayType === 'ekskul') {
+      const found = ekskulTarifs.find(t => t.id === quickPayItemId);
+      const fee = found ? found.nominal : 0;
+      const tot = selectedMonths.length > 0 ? selectedMonths.length * fee : fee;
+      setInputTotal(tot);
+      setInputDibayar(tot);
     } else {
-      const list = quickPayType === 'ukt' ? uktTarifs : ekskulTarifs;
+      const list = uktTarifs;
       const found = list.find(t => t.id === quickPayItemId) || list[0];
       if (found) {
         setInputTotal(found.nominal);
@@ -402,12 +408,24 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
     try {
       const studentName = selectedSiswa.nama;
-      const normName = studentName.trim().toLowerCase();
+      const normName = studentName.trim().toLowerCase().replace(/\s+/g, ' ');
+      const sId = selectedSiswa.id;
 
-      // 1. Transactions List
-      const studentTxs = transaksiList.filter(tx => 
-        tx && tx.siswaNama && (tx.siswaNama || '').trim().toLowerCase() === normName
-      );
+      // 1. Transactions List - Robust Matching
+      const studentTxs = transaksiList.filter(tx => {
+        if (!tx) return false;
+        
+        // Match by ID
+        if (tx.siswaId && sId && tx.siswaId === sId) return true;
+        
+        // Match by Name
+        if (tx.siswaNama) {
+          const txNormName = tx.siswaNama.trim().toLowerCase().replace(/\s+/g, ' ');
+          if (txNormName === normName) return true;
+        }
+        
+        return false;
+      });
 
       const derivedTxs = studentTxs.map(tx => ({
         id: tx.id,
@@ -510,9 +528,22 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     const normName = selectedSiswa.nama.trim().toLowerCase();
     
     // 1. Get all explicit bills for this student
-    const explicitBills = allEffectiveTagihanList.filter(t => 
-      t && !t.isDeleted && (t.siswaId === selectedSiswa.id || (t.siswaNama && t.siswaNama.trim().toLowerCase() === normName))
-    ).map(t => {
+    const explicitBills = allEffectiveTagihanList.filter(t => {
+      if (!t || t.isDeleted) return false;
+      const sId = selectedSiswa.id;
+      const normName = selectedSiswa.nama.trim().toLowerCase().replace(/\s+/g, ' ');
+      
+      // Match by ID
+      if (t.siswaId && sId && t.siswaId === sId) return true;
+      
+      // Match by Name (robust normalization)
+      if (t.siswaNama) {
+        const tNormName = t.siswaNama.trim().toLowerCase().replace(/\s+/g, ' ');
+        if (tNormName === normName) return true;
+      }
+      
+      return false;
+    }).map(t => {
       // Calculate dynamic terbayar from transaksiList to ensure accuracy
       const txsForThisBill = transaksiList.filter(tx => 
         tx && (tx.tagihanId === t.id || (tx.pembayaran === t.namaTagihan && tx.siswaNama && tx.siswaNama.trim().toLowerCase() === normName))
@@ -530,7 +561,14 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
     // 2. Identify "orphan" transactions (transactions without a corresponding bill in tagihanList)
     const orphanTxs = transaksiList.filter(tx => {
-      if (!tx || (tx.siswaNama || '').trim().toLowerCase() !== normName) return false;
+      if (!tx) return false;
+      const sId = selectedSiswa.id;
+      const normName = selectedSiswa.nama.trim().toLowerCase().replace(/\s+/g, ' ');
+      
+      const txStudent = (tx.siswaNama || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      const isThisStudent = txStudent === normName || (tx.siswaId && tx.siswaId === sId);
+      if (!isThisStudent) return false;
+      
       const hasMatchingBill = explicitBills.some(b => b.id === tx.tagihanId || b.namaTagihan === tx.pembayaran);
       return !hasMatchingBill;
     });
@@ -553,8 +591,38 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
     // Combine and sort by date (newest first)
     return [...explicitBills, ...orphanBills].sort((a, b) => {
-      const dateA = new Date(a.tanggalBayar || a.jatuhTempo || 0).getTime();
-      const dateB = new Date(b.tanggalBayar || b.jatuhTempo || 0).getTime();
+      const parseFlexibleDate = (dateStr?: string) => {
+        if (!dateStr) return 0;
+        if (typeof dateStr !== 'string') return 0;
+        
+        // Try standard parsing first
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) return d.getTime();
+        
+        // Manual parsing for Indonesian formats like "10 Agustus 2026"
+        try {
+          const months = [
+            'januari', 'februari', 'maret', 'april', 'mei', 'juni',
+            'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+          ];
+          const parts = dateStr.toLowerCase().split(' ');
+          if (parts.length === 3) {
+            const day = parseInt(parts[0], 10);
+            const monthName = parts[1];
+            const year = parseInt(parts[2], 10);
+            const mIdx = months.indexOf(monthName);
+            if (mIdx !== -1 && !isNaN(day) && !isNaN(year)) {
+              return new Date(year, mIdx, day).getTime();
+            }
+          }
+        } catch (e) {}
+        
+        return 0;
+      };
+
+      const dateA = parseFlexibleDate(a.tanggalBayar || a.jatuhTempo);
+      const dateB = parseFlexibleDate(b.tanggalBayar || b.jatuhTempo);
+      if (dateB === dateA) return b.id.localeCompare(a.id);
       return dateB - dateA;
     });
   }, [selectedSiswa, allEffectiveTagihanList, transaksiList, tahunAjaran]);
@@ -924,6 +992,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
   // Printable Receipt Modal State
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [slipPrintDate, setSlipPrintDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [printReceiptData, setPrintReceiptData] = useState<{
     noNota: string;
     tahunAjaran: string;
@@ -1118,9 +1187,9 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     <div class="info">
       <div class="row"><span class="label">No. Nota / Kwitansi</span><span class="value">${printReceiptData.noNota}</span></div>
       <div class="row"><span class="label">Tahun Ajaran</span><span class="value">${printReceiptData.tahunAjaran}</span></div>
-      <div class="row"><span class="label">NIS & Nama Siswa</span><span class="value">${printReceiptData.nis} - ${printReceiptData.nama}</span></div>
-      <div class="row"><span class="label">Kelas / Nama Ibu</span><span class="value">${printReceiptData.kelas} / ${printReceiptData.namaIbu}</span></div>
-      <div class="row"><span class="label">Tanggal Transaksi</span><span class="value">${printReceiptData.tanggal}</span></div>
+      <div class="row"><span class="label">NISN & Nama Siswa</span><span class="value">${printReceiptData.nis} - ${printReceiptData.nama}</span></div>
+      <div class="row"><span class="label">Kelas</span><span class="value">${printReceiptData.kelas}</span></div>
+      <div class="row"><span class="label">Tanggal Pembayaran</span><span class="value">${printReceiptData.tanggal}</span></div>
     </div>
     <table>
       <thead>
@@ -1239,9 +1308,9 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
       drawRow('No. Nota / Kwitansi', printReceiptData.noNota);
       drawRow('Tahun Ajaran', printReceiptData.tahunAjaran);
-      drawRow('NIS & Nama Siswa', `${printReceiptData.nis} - ${printReceiptData.nama}`);
-      drawRow('Kelas / Nama Ibu', `${printReceiptData.kelas} / ${printReceiptData.namaIbu}`);
-      drawRow('Tanggal Transaksi', printReceiptData.tanggal);
+      drawRow('NISN & Nama Siswa', `${printReceiptData.nis} - ${printReceiptData.nama}`);
+      drawRow('Kelas', `${printReceiptData.kelas}`);
+      drawRow('Tanggal Pembayaran', printReceiptData.tanggal);
 
       y += 8;
 
@@ -1316,6 +1385,14 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
       y += 135;
 
+      // Date of Printing
+      ctx.fillStyle = '#334155';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'right';
+      const cetakDate = new Date(slipPrintDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+      ctx.fillText(`Tanggal Cetak: ${cetakDate}`, canvas.width - 55, y);
+      y += 20;
+
       // Signatures
       ctx.fillStyle = '#334155';
       ctx.font = '12px sans-serif';
@@ -1346,7 +1423,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     const receipt = {
       noNota: generateInvoiceNumber(),
       tahunAjaran,
-      nis: selectedSiswa ? selectedSiswa.nis : '20261001',
+      nis: selectedSiswa ? (selectedSiswa.nisn || selectedSiswa.nis) : '20261001',
       nama: selectedSiswa ? selectedSiswa.nama : 'Ahmad Rizky Pratama',
       namaIbu: selectedSiswa ? (selectedSiswa.namaIbu || selectedSiswa.namaWali) : 'Ibnu Al haytam / Budi Pratama',
       kelas: selectedSiswa ? selectedSiswa.kelas : 'Kelas 7',
@@ -1599,6 +1676,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     nominal: number;
     jatuhTempo: string;
     tanggalBayar: string;
+    tanggalTagihan?: string;
     status: 'Lunas' | 'Belum Lunas' | 'Dicicil';
     terbayar?: number;
     metodePembayaran?: string;
@@ -1607,6 +1685,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     nominal: 0,
     jatuhTempo: '',
     tanggalBayar: '',
+    tanggalTagihan: '',
     status: 'Belum Lunas',
     terbayar: 0,
     metodePembayaran: 'Cash / Kasir'
@@ -1635,16 +1714,20 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     title: string,
     nominal: number,
     bayar: number,
-    payDate: string
+    payDate: string,
+    tglTagihan?: string
   ) => {
     localStorage.removeItem('edu_tagihan_force_clear');
     localStorage.removeItem('edu_transaksi_force_clear');
     
+    const normName = sName.trim().toLowerCase().replace(/\s+/g, ' ');
+    const sIdNorm = (sId || '').trim();
+    
     let targetTagihanId = `tag-${Date.now()}`;
     setTagihanList(prev => {
-      const normName = sName.trim().toLowerCase();
       const existingIndex = prev.findIndex(t => {
-        const isSameStudent = t.siswaId === sId || (t.siswaNama && t.siswaNama.trim().toLowerCase() === normName);
+        const tNormName = (t.siswaNama || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        const isSameStudent = (t.siswaId && sIdNorm && t.siswaId === sIdNorm) || tNormName === normName;
         if (!isSameStudent) return false;
 
         // Must match exact same type
@@ -1681,13 +1764,23 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
           nominal: finalNominal,
           terbayar: newTerbayar,
           status: isLunas ? 'Lunas' : (newTerbayar > 0 ? 'Dicicil' : 'Belum Lunas'),
-          tanggalBayar: payDate
+          tanggalBayar: payDate,
+          ...(tglTagihan ? { tanggalTagihan: tglTagihan } : {})
         };
         const newArr = [...prev];
         newArr[existingIndex] = updatedItem;
         return newArr;
       } else {
         const isLunas = bayar >= nominal;
+        const months = [
+          'juli', 'agustus', 'september', 'oktober', 'november', 'desember',
+          'januari', 'februari', 'maret', 'april', 'mei', 'juni'
+        ];
+        const matchedMonth = months.find(m => title.toLowerCase().includes(m));
+        const finalBulanTagihan = matchedMonth 
+          ? (matchedMonth.charAt(0).toUpperCase() + matchedMonth.slice(1)) 
+          : (tipe === 'spp' || tipe === 'ekskul' ? 'Bulanan' : tahunAjaran);
+
         const newBill: TagihanKeuangan = {
           id: targetTagihanId,
           siswaId: sId || `sis-${Date.now()}`,
@@ -1695,11 +1788,12 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
           kelas: sKelas || 'Umum',
           tipe: tipe,
           namaTagihan: title,
-          bulanTahun: tahunAjaran,
+          bulanTahun: finalBulanTagihan,
           nominal: nominal,
           terbayar: Math.min(nominal, bayar),
           status: isLunas ? 'Lunas' : (bayar > 0 ? 'Dicicil' : 'Belum Lunas'),
           tanggalBayar: payDate,
+          tanggalTagihan: tglTagihan || payDate,
           jatuhTempo: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
         };
         return [newBill, ...prev];
@@ -1716,7 +1810,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     }
 
     const studentName = selectedSiswa ? selectedSiswa.nama : '';
-    const [tYear, tMonth, tDay] = (transactionDate || new Date().toISOString().split('T')[0]).split('-').map(Number);
+    const [tYear, tMonth, tDay] = (inputTanggalTagihan || new Date().toISOString().split('T')[0]).split('-').map(Number);
     const dateObj = (tYear && tMonth && tDay) ? new Date(tYear, tMonth - 1, tDay) : new Date();
     const todayFormatted = dateObj.toLocaleDateString('id-ID', {
       day: '2-digit', month: 'long', year: 'numeric'
@@ -1728,34 +1822,42 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       day: '2-digit', month: '2-digit', year: 'numeric'
     });
 
-    if (quickPayType === 'spp') {
+    if (quickPayType === 'spp' || quickPayType === 'ekskul') {
       if (selectedMonths.length === 0) {
-        alert('Silakan pilih bulan SPP pada Jenis Tagihan terlebih dahulu.');
+        alert(`Silakan pilih bulan ${quickPayType === 'spp' ? 'SPP' : 'Ekskul'} pada Jenis Tagihan terlebih dahulu.`);
         return;
       }
-      const totalToPay = selectedMonths.length * monthlyFee;
+      if (quickPayType === 'ekskul' && !quickPayItemId) {
+        alert('Silakan pilih item ekskul terlebih dahulu.');
+        return;
+      }
+      const fee = quickPayType === 'spp' ? monthlyFee : (ekskulTarifs.find(t => t.id === quickPayItemId)?.nominal || 0);
+      const totalToPay = selectedMonths.length * fee;
       if (totalToPay <= 0) {
         alert('Total tagihan harus lebih dari 0.');
         return;
       }
 
+      const ekskulItem = quickPayType === 'ekskul' ? ekskulTarifs.find(t => t.id === quickPayItemId) : null;
+      const ekskulName = ekskulItem ? ekskulItem.namaBiaya : 'Ekskul';
       const itemTitle = selectedMonths.length > 0 
-        ? `SPP - T.A ${tahunAjaran} (${selectedMonths.join(', ')})`
-        : `SPP - T.A ${tahunAjaran} (Bulanan)`;
+        ? `${quickPayType === 'spp' ? `SPP - T.A ${tahunAjaran}` : ekskulName} (${selectedMonths.join(', ')})`
+        : `${quickPayType === 'spp' ? `SPP - T.A ${tahunAjaran}` : ekskulName} (Bulanan)`;
 
       const tagId = updateOrCreateTagihanList(
         studentName,
         selectedSiswa ? selectedSiswa.id : '',
         selectedSiswa ? selectedSiswa.kelas : '',
-        'spp',
+        quickPayType,
         itemTitle,
         totalToPay,
         inputDibayar,
-        transactionDate || dateNumeric
+        inputTanggalTagihan || dateNumeric,
+        inputTanggalTagihan || dateNumeric
       );
 
       if (inputDibayar > 0) {
-        if (selectedMonths.length > 0) {
+        if (quickPayType === 'spp' && selectedMonths.length > 0) {
           const newPaid = { ...paidMonthsState };
           selectedMonths.forEach(m => {
             newPaid[m] = dateShort;
@@ -1769,7 +1871,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
           pembayaran: itemTitle,
           tagihan: totalToPay,
           tanggal: todayFormatted,
-          type: 'spp' as const
+          type: quickPayType as ('spp' | 'ekskul')
         };
         setStudentTransactions(prev => [newTx, ...prev]);
 
@@ -1779,7 +1881,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             tagihanId: tagId,
             siswaNama: studentName,
             pembayaran: itemTitle,
-            tipe: 'spp',
+            tipe: quickPayType,
             nominal: inputDibayar,
             tanggal: dateNumeric,
             metodePembayaran: selectedMetodePembayaran,
@@ -1791,7 +1893,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         const receipt = {
           noNota: generateInvoiceNumber(),
           tahunAjaran,
-          nis: selectedSiswa ? selectedSiswa.nis : '',
+          nis: selectedSiswa ? (selectedSiswa.nisn || selectedSiswa.nis) : '',
           nama: studentName,
           namaIbu: selectedSiswa ? (selectedSiswa.namaIbu || selectedSiswa.namaWali) : '',
           kelas: selectedSiswa ? selectedSiswa.kelas : '',
@@ -1805,6 +1907,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         };
 
         setPrintReceiptData(receipt);
+        setSlipPrintDate(inputTanggalTagihan || new Date().toISOString().split("T")[0]);
         // Jangan tampilkan kuitansi secara otomatis sesuai permintaan user
         // setShowPrintModal(true);
         alert(`Pembayaran ${itemTitle} sebesar Rp ${inputDibayar.toLocaleString('id-ID')} berhasil diproses!`);
@@ -1841,7 +1944,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         itemTitle,
         payNominal,
         inputDibayar,
-        transactionDate || dateNumeric
+        inputTanggalTagihan || dateNumeric,
+        inputTanggalTagihan || dateNumeric
       );
 
       if (inputDibayar > 0) {
@@ -1880,7 +1984,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         const receipt = {
           noNota: generateInvoiceNumber(),
           tahunAjaran,
-          nis: selectedSiswa ? selectedSiswa.nis : '',
+          nis: selectedSiswa ? (selectedSiswa.nisn || selectedSiswa.nis) : '',
           nama: studentName,
           namaIbu: selectedSiswa ? (selectedSiswa.namaIbu || selectedSiswa.namaWali) : '',
           kelas: selectedSiswa ? selectedSiswa.kelas : '',
@@ -1892,7 +1996,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
           tanggal: todayFormatted,
           penerima: 'Bendahara Sekolah'
         };
-
+        setPrintReceiptData(receipt);
+        setSlipPrintDate(inputTanggalTagihan || new Date().toISOString().split("T")[0]);
         setPrintReceiptData(receipt);
         // Jangan tampilkan kuitansi secara otomatis sesuai permintaan user
         // setShowPrintModal(true);
@@ -1923,7 +2028,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       return { ...prev, [itemId]: Math.min(maxTotal, current + payNominal) };
     });
 
-    const [tYear, tMonth, tDay] = (transactionDate || new Date().toISOString().split('T')[0]).split('-').map(Number);
+    const [tYear, tMonth, tDay] = (inputTanggalTagihan || new Date().toISOString().split('T')[0]).split('-').map(Number);
     const dateObj = (tYear && tMonth && tDay) ? new Date(tYear, tMonth - 1, tDay) : new Date();
     const todayFormatted = dateObj.toLocaleDateString('id-ID', {
       day: '2-digit', month: 'long', year: 'numeric'
@@ -1953,7 +2058,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       `${namaItem} (T.A ${tahunAjaran})`,
       payNominal,
       payNominal,
-      transactionDate || dateNumeric
+      inputTanggalTagihan || dateNumeric,
+      inputTanggalTagihan || dateNumeric
     );
 
     if (setTransaksiList) {
@@ -1973,7 +2079,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     const receipt = {
       noNota: generateInvoiceNumber(),
       tahunAjaran,
-      nis: selectedSiswa ? selectedSiswa.nis : '',
+      nis: selectedSiswa ? (selectedSiswa.nisn || selectedSiswa.nis) : '',
       nama: studentName,
       namaIbu: selectedSiswa ? (selectedSiswa.namaIbu || selectedSiswa.namaWali) : '',
       kelas: selectedSiswa ? selectedSiswa.kelas : '',
@@ -2129,7 +2235,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       });
 
       matchingTarifs.forEach(tarif => {
-        const bulanTahun = tarif.tipe === 'spp' ? `${generateMonth} ${generateYear}` : generateYear;
+        const bulanTahun = (tarif.tipe === 'spp' || tarif.tipe === 'ekskul') ? `${generateMonth} ${generateYear}` : generateYear;
         
         // Cek apakah sudah ada tagihan yang sama untuk siswa ini
         const isExist = tagihanList.some(t => 
@@ -2296,18 +2402,45 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     setTimeout(() => setWaSendingStatus(null), 4000);
   };
 
+  const getDisplayBulanTagihan = (t: TagihanKeuangan) => {
+    const months = [
+      'juli', 'agustus', 'september', 'oktober', 'november', 'desember',
+      'januari', 'februari', 'maret', 'april', 'mei', 'juni'
+    ];
+    // Check namaTagihan first (e.g. "SPP - T.A 2026/2027 (Juli)" or "Ekskul Basket (Juli)")
+    const foundNama = months.find(m => (t.namaTagihan || '').toLowerCase().includes(m));
+    if (foundNama) {
+      return foundNama.charAt(0).toUpperCase() + foundNama.slice(1);
+    }
+    // Check bulanTahun
+    if (t.bulanTahun) {
+      const foundBulan = months.find(m => t.bulanTahun.toLowerCase().includes(m));
+      if (foundBulan) {
+        return foundBulan.charAt(0).toUpperCase() + foundBulan.slice(1);
+      }
+    }
+    // If it's Ekskul or UKT / Uang Masuk without month, display '-'
+    const tipe = (t.tipe || '').toLowerCase();
+    if (tipe === 'ekskul' || tipe === 'ukt' || tipe === 'bebas' || tipe === 'lainnya') {
+      return '-';
+    }
+    return t.bulanTahun || '-';
+  };
+
   const handleExportCSV = () => {
     const columns = [
-      'ID Tagihan', 'Nama Siswa', 'Kelas', 'Tipe Keuangan', 'Nama Tagihan', 
-      'Nominal Tagihan (Rp)', 'Total Terbayar (Rp)', 'Sisa Tunggakan (Rp)', 'Tanggal Pembayaran', 'Status'
+      'No. Invoice', 'Nama Siswa', 'Kelas', 'Tipe Keuangan', 'Nama Tagihan', 
+      'Bulan Tagihan', 'Nominal Tagihan (Rp)', 'Total Terbayar (Rp)', 'Sisa Tunggakan (Rp)', 'Tanggal Tagihan', 'Tanggal Pembayaran', 'Status'
     ];
     const rows = tagihanList.map(t => {
       const txs = transaksiList.filter(tx => tx.tagihanId === t.id);
       const latestTx = txs.length > 0 ? txs[txs.length - 1] : null;
-      const tglBayar = t.tanggalBayar || (latestTx ? latestTx.tanggal : (t.status === 'Lunas' ? 'Lunas' : '-'));
+      const isLunas = t.status === 'Lunas' || t.status === 'LUNAS';
+      const tglBayar = isLunas ? (t.tanggalBayar || (latestTx ? latestTx.tanggal : new Date().toLocaleDateString('id-ID'))) : '-';
+      const invoiceNo = getStableInvoiceNumber(t);
       return [
-        t.id, t.siswaNama, t.kelas, t.tipe.toUpperCase(), t.namaTagihan,
-        t.nominal, t.terbayar, t.nominal - t.terbayar, tglBayar, t.status
+        invoiceNo, t.siswaNama, t.kelas, t.tipe.toUpperCase(), t.namaTagihan,
+        getDisplayBulanTagihan(t), t.nominal, t.terbayar || 0, t.nominal - (t.terbayar || 0), t.jatuhTempo || '-', tglBayar, t.status
       ];
     });
     downloadCSV(columns, rows, `Laporan_Keuangan_Sekolah_${new Date().toISOString().slice(0, 10)}.csv`);
@@ -2323,16 +2456,18 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     setExportResult(null);
 
     const columns = [
-      'ID Tagihan', 'Nama Siswa', 'Kelas', 'Tipe Keuangan', 'Nama Tagihan', 
-      'Nominal Tagihan (Rp)', 'Total Terbayar (Rp)', 'Sisa Tunggakan (Rp)', 'Tanggal Pembayaran', 'Status'
+      'No. Invoice', 'Nama Siswa', 'Kelas', 'Tipe Keuangan', 'Nama Tagihan', 
+      'Bulan Tagihan', 'Nominal Tagihan (Rp)', 'Total Terbayar (Rp)', 'Sisa Tunggakan (Rp)', 'Tanggal Tagihan', 'Tanggal Pembayaran', 'Status'
     ];
     const rows = tagihanList.map(t => {
       const txs = transaksiList.filter(tx => tx.tagihanId === t.id);
       const latestTx = txs.length > 0 ? txs[txs.length - 1] : null;
-      const tglBayar = t.tanggalBayar || (latestTx ? latestTx.tanggal : (t.status === 'Lunas' ? 'Lunas' : '-'));
+      const isLunas = t.status === 'Lunas' || t.status === 'LUNAS';
+      const tglBayar = isLunas ? (t.tanggalBayar || (latestTx ? latestTx.tanggal : new Date().toLocaleDateString('id-ID'))) : '-';
+      const invoiceNo = getStableInvoiceNumber(t);
       return [
-        t.id, t.siswaNama, t.kelas, t.tipe.toUpperCase(), t.namaTagihan,
-        t.nominal, t.terbayar, t.nominal - t.terbayar, tglBayar, t.status
+        invoiceNo, t.siswaNama, t.kelas, t.tipe.toUpperCase(), t.namaTagihan,
+        t.bulanTahun || '-', t.nominal, t.terbayar || 0, t.nominal - (t.terbayar || 0), t.jatuhTempo || '-', tglBayar, t.status
       ];
     });
 
@@ -2551,7 +2686,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     setPrintReceiptData({
                       noNota: generateInvoiceNumber(),
                       tahunAjaran,
-                      nis: selectedSiswa.nis,
+                      nis: selectedSiswa.nisn || selectedSiswa.nis,
                       nama: selectedSiswa.nama,
                       namaIbu: selectedSiswa.namaIbu || selectedSiswa.namaWali,
                       kelas: `${tingkatKelas} - ${rombel}`,
@@ -2693,27 +2828,44 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     </div>
                   </div>
 
-                  {quickPayType === 'spp' ? (
+                  {quickPayType === 'spp' || quickPayType === 'ekskul' ? (
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Bulan SPP</label>
+                      {quickPayType === 'ekskul' && (
+                        <div className="space-y-1 mb-1">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Item Ekskul</label>
+                          <select
+                            value={quickPayItemId}
+                            onChange={(e) => setQuickPayItemId(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 text-white rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-bold text-xs"
+                          >
+                            <option value="">-- Pilih Item Ekskul --</option>
+                            {ekskulTarifs.map(t => (
+                              <option key={t.id} value={t.id}>{t.namaBiaya} - Rp {t.nominal.toLocaleString('id-ID')}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        {quickPayType === 'spp' ? 'Pilih Bulan SPP' : 'Pilih Bulan Ekskul'}
+                      </label>
                       <div className="grid grid-cols-4 gap-1">
                         {allMonths.map((m) => {
-                          const isPaid = paidMonthsState[m];
+                          const isPaid = quickPayType === 'spp' ? paidMonthsState[m] : false;
                           const isSelected = selectedMonths.includes(m);
                           return (
                             <button
                               key={m}
                               type="button"
-                              disabled={!!isPaid}
+                              disabled={quickPayType === 'spp' && !!isPaid}
                               onClick={() => toggleMonthSelection(m)}
                               className={`py-1 rounded text-[9px] font-bold border transition-all ${
-                                isPaid 
+                                quickPayType === 'spp' && isPaid 
                                   ? 'bg-emerald-950/30 border-emerald-900/50 text-emerald-500/50 cursor-not-allowed' 
                                   : isSelected
                                     ? 'bg-sky-600 border-sky-500 text-white'
                                     : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
                               }`}
-                              title={isPaid ? `Lunas: ${isPaid}` : m}
+                              title={quickPayType === 'spp' && isPaid ? `Lunas: ${isPaid}` : m}
                             >
                               {m.substring(0, 3)}
                             </button>
@@ -2723,14 +2875,14 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     </div>
                   ) : (
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nama Item {quickPayType.toUpperCase()}</label>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nama Item UKT</label>
                       <select
                         value={quickPayItemId}
                         onChange={(e) => setQuickPayItemId(e.target.value)}
                         className="w-full bg-slate-900 border border-slate-800 text-white rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-bold"
                       >
                         <option value="">-- Pilih Item --</option>
-                        {(quickPayType === 'ukt' ? uktTarifs : ekskulTarifs).map(t => (
+                        {uktTarifs.map(t => (
                           <option key={t.id} value={t.id}>{t.namaBiaya} - Rp {t.nominal.toLocaleString('id-ID')}</option>
                         ))}
                       </select>
@@ -2746,8 +2898,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                           type="number"
                           value={inputTotal || ''}
                           onChange={(e) => setInputTotal(Number(e.target.value))}
-                          readOnly={quickPayType === 'spp'}
-                          className={`w-full bg-slate-900 border border-slate-800 text-white rounded-xl pl-8 pr-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono font-bold ${quickPayType === 'spp' ? 'opacity-70 cursor-not-allowed' : ''}`}
+                          readOnly={quickPayType === 'spp' || quickPayType === 'ekskul'}
+                          className={`w-full bg-slate-900 border border-slate-800 text-white rounded-xl pl-8 pr-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono font-bold ${quickPayType === 'spp' || quickPayType === 'ekskul' ? 'opacity-70 cursor-not-allowed' : ''}`}
                         />
                       </div>
                     </div>
@@ -2762,6 +2914,18 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                           className="w-full bg-slate-900 border border-emerald-900/30 text-emerald-400 rounded-xl pl-8 pr-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono font-bold"
                         />
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tanggal Tagihan</label>
+                      <input
+                        type="date"
+                        value={inputTanggalTagihan}
+                        onChange={(e) => setInputTanggalTagihan(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 text-white rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-bold text-xs"
+                      />
                     </div>
                   </div>
 
@@ -2790,7 +2954,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     <button
                       type="button"
                       onClick={handleProcessPayment}
-                      disabled={!selectedSiswa || (quickPayType === 'spp' && selectedMonths.length === 0) || (quickPayType !== 'spp' && !quickPayItemId && inputTotal <= 0)}
+                      disabled={!selectedSiswa || ((quickPayType === 'spp' || quickPayType === 'ekskul') && selectedMonths.length === 0) || (quickPayType === 'ekskul' && !quickPayItemId) || (quickPayType === 'ukt' && !quickPayItemId && inputTotal <= 0)}
                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-1.5"
                     >
                       <CheckCheck className="w-4 h-4" />
@@ -2860,46 +3024,63 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   </p>
                 </div>
                 
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    disabled={!selectedSiswa || studentTransactions.length === 0}
-                    onClick={() => {
-                      if (studentTransactions.length > 0) {
-                        handleReprintTransaction(studentTransactions[0]);
-                      }
-                    }}
-                    className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl border border-slate-700 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Receipt className="w-4 h-4 text-emerald-400" />
-                    Cetak Kwitansi Terakhir
-                  </button>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold block mb-1">Pilih Tanggal Cetak</label>
+                    <input
+                      type="date"
+                      value={slipPrintDate}
+                      onChange={e => setSlipPrintDate(e.target.value)}
+                      className="w-full bg-[#181818] border border-slate-700/80 text-white text-xs rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+
                   <button
                     type="button"
                     disabled={!selectedSiswa}
                     onClick={() => {
-                      // Slip Tagihan Logic
                       if (!selectedSiswa) return;
+                      const [year, month, day] = slipPrintDate.split('-').map(Number);
+                      const dateObj = new Date(year, month - 1, day);
+                      const normalizeDate = (date: string) => date.replace(/\u00A0/g, ' ').trim();
+                      const selectedDateStr = normalizeDate(dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }));
+                      console.log('DEBUG: Selected Date String:', selectedDateStr);
+                      const txsOnDate = studentTransactions.filter(tx => normalizeDate(tx.tanggal) === selectedDateStr);
+                      
+                      const items = txsOnDate.map((tx, idx) => ({
+                        id: tx.id || String(idx),
+                        uraian: tx.pembayaran || 'Pembayaran Keuangan',
+                        jumlah: tx.tagihan || 0
+                      }));
+
+                      if (items.length === 0) {
+                        alert(`Tidak ada data transaksi untuk tanggal ${selectedDateStr}`);
+                        return;
+                      }
+
+                      const totalNominal = items.reduce((sum, item) => sum + item.jumlah, 0);
+
                       setPrintReceiptData({
                         noNota: generateInvoiceNumber(),
                         tahunAjaran,
-                        nis: selectedSiswa.nis,
+                        nis: selectedSiswa.nisn || selectedSiswa.nis,
                         nama: selectedSiswa.nama,
                         namaIbu: selectedSiswa.namaIbu || selectedSiswa.namaWali,
                         kelas: selectedSiswa.kelas,
-                        pembayaranTitle: `Informasi Tagihan Sisa T.A ${tahunAjaran}`,
-                        nominal: totalSisaBulanan,
-                        dibayar: 0,
+                        pembayaranTitle: `Kwitansi Pembayaran / Tagihan T.A ${tahunAjaran}`,
+                        nominal: totalNominal,
+                        dibayar: totalNominal,
                         kembalian: 0,
-                        tanggal: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }),
-                        penerima: 'Bagian Keuangan'
+                        tanggal: selectedDateStr,
+                        penerima: 'Bagian Keuangan',
+                        items: items
                       });
                       setShowPrintModal(true);
                     }}
-                    className="w-full py-2.5 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 text-xs font-bold rounded-xl border border-emerald-600/30 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <FileText className="w-4 h-4" />
-                    Cetak Slip Tagihan
+                    <Printer className="w-4 h-4" />
+                    Cetak Kwitansi
                   </button>
                 </div>
               </div>
@@ -2949,10 +3130,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                               Rp {(t.terbayar || 0).toLocaleString('id-ID')}
                             </td>
                             <td className="px-2 py-2.5 text-[10px] text-slate-400 whitespace-nowrap">
-                              {formatDate(t.jatuhTempo)}
+                              {t.tanggalTagihan ? formatDate(t.tanggalTagihan) : (t.jatuhTempo ? formatDate(t.jatuhTempo) : '-')}
                             </td>
                             <td className="px-2 py-2.5 text-[10px] text-slate-400 whitespace-nowrap">
-                              {t.tanggalBayar ? formatDate(t.tanggalBayar) : '-'}
+                              {(isLunas || isDicicil) ? (t.tanggalBayar ? formatDate(t.tanggalBayar) : '-') : '-'}
                             </td>
                             <td className="px-2 py-2.5 whitespace-nowrap">
                               {isLunas && (
@@ -3277,27 +3458,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             </div>
           )}
 
-          {/* Export Result Banner */}
-          {exportResult && (
-            <div className={`p-4 rounded-2xl text-xs font-bold border flex flex-wrap items-center justify-between gap-3 ${
-              exportResult.success ? 'bg-emerald-950/90 text-emerald-200 border-emerald-800' : 'bg-rose-950/90 text-rose-200 border-rose-800'
-            }`}>
-              <span>{exportResult.message}</span>
-              <div className="flex items-center gap-2">
-                {exportResult.url && !exportResult.url.includes('demo_') && (
-                  <a href={exportResult.url} target="_blank" rel="noreferrer" className="px-3.5 py-1.5 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-md">
-                    <ExternalLink className="w-3.5 h-3.5" /> Buka Drive
-                  </a>
-                )}
-                <button
-                  onClick={handleExportCSV}
-                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-300 font-bold rounded-lg text-xs flex items-center gap-1.5 border border-slate-700 shadow-md transition-all"
-                >
-                  <Download className="w-3.5 h-3.5" /> Unduh CSV / Excel
-                </button>
-              </div>
-            </div>
-          )}
+
 
           {/* Financial Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-6 gap-4">
@@ -3343,6 +3504,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               </div>
             </div>
           </div>
+
+
 
           {/* Action Header & Tagihan Filter Control */}
           <div className="bg-[#121212] p-4 rounded-2xl border border-slate-800 shadow-md space-y-4">
@@ -3479,6 +3642,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     <th className="px-4 py-3">No. Invoice</th>
                     <th className="px-4 py-3">Tipe</th>
                     <th className="px-4 py-3">Nama Tagihan</th>
+                    <th className="px-4 py-3">Bulan Tagihan</th>
                     <th className="px-4 py-3">Nominal Tagihan</th>
                     <th className="px-4 py-3">Terbayar</th>
                     <th className="px-4 py-3">Sisa</th>
@@ -3523,12 +3687,17 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                             </span>
                           </td>
                           <td className="px-4 py-3 font-semibold uppercase text-slate-400">{t.tipe}</td>
-                          <td className="px-4 py-3">{t.namaTagihan}</td>
+                          <td className="px-4 py-3">
+                            <div className="font-semibold text-white">{t.namaTagihan}</div>
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-purple-300">
+                            {getDisplayBulanTagihan(t)}
+                          </td>
                           <td className="px-4 py-3 font-mono font-bold text-white">Rp {t.nominal.toLocaleString('id-ID')}</td>
                           <td className="px-4 py-3 font-mono text-emerald-400">Rp {totalTerbayar.toLocaleString('id-ID')}</td>
                           <td className="px-4 py-3 font-mono text-amber-400">Rp {sisa.toLocaleString('id-ID')}</td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            {effectiveTanggalBayar ? (
+                            {t.tanggalTagihan ? (
                               <button
                                 type="button"
                                 onClick={() => {
@@ -3539,6 +3708,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                                     terbayar: totalTerbayar,
                                     jatuhTempo: t.jatuhTempo || '',
                                     tanggalBayar: effectiveTanggalBayar,
+                                    tanggalTagihan: t.tanggalTagihan || "",
                                     status: isLunas ? 'Lunas' : (isDicicil ? 'Dicicil' : 'Belum Lunas'),
                                     metodePembayaran: latestTx?.metodePembayaran || 'Cash / Kasir'
                                   });
@@ -3548,7 +3718,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                                 title="Klik untuk ubah Tanggal Tagihan"
                               >
                                 <Calendar className="w-3 h-3 text-emerald-400 group-hover:scale-110 transition-transform" />
-                                <span>{effectiveTanggalBayar}</span>
+                                <span>{t.tanggalTagihan}</span>
                                 <Edit3 className="w-2.5 h-2.5 text-emerald-400/70 opacity-0 group-hover:opacity-100 transition-opacity ml-0.5" />
                               </button>
                             ) : (
@@ -3562,6 +3732,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                                     terbayar: totalTerbayar,
                                     jatuhTempo: t.jatuhTempo || '',
                                     tanggalBayar: new Date().toISOString().slice(0, 10),
+                                    tanggalTagihan: new Date().toISOString().slice(0, 10),
                                     status: isLunas ? 'Lunas' : (isDicicil ? 'Dicicil' : 'Belum Lunas'),
                                     metodePembayaran: latestTx?.metodePembayaran || 'Cash / Kasir'
                                   });
@@ -3615,6 +3786,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                                    terbayar: totalTerbayar,
                                    jatuhTempo: t.jatuhTempo || '',
                                    tanggalBayar: effectiveTanggalBayar,
+                                    tanggalTagihan: t.tanggalTagihan || "",
                                    status: isLunas ? 'Lunas' : (isDicicil ? 'Dicicil' : 'Belum Lunas'),
                                    metodePembayaran: latestTx?.metodePembayaran || 'Cash / Kasir'
                                  });
@@ -3988,15 +4160,15 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   <span className="font-bold">{printReceiptData.tahunAjaran}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">NIS & Nama Siswa</span>
+                  <span className="text-slate-500 font-medium">NISN & Nama Siswa</span>
                   <span className="font-bold text-slate-900">{printReceiptData.nis} - {printReceiptData.nama}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">Kelas / Nama Ibu</span>
-                  <span className="font-bold">{printReceiptData.kelas} / {printReceiptData.namaIbu}</span>
+                  <span className="text-slate-500 font-medium">Kelas</span>
+                  <span className="font-bold">{printReceiptData.kelas}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">Tanggal Transaksi</span>
+                  <span className="text-slate-500 font-medium">Tanggal Pembayaran</span>
                   <span className="font-bold">{printReceiptData.tanggal}</span>
                 </div>
               </div>
@@ -4108,6 +4280,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   <p className="font-bold underline">({printReceiptData.nama})</p>
                 </div>
                 <div>
+                  <p>Tanggal Cetak: {new Date(slipPrintDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
                   <p>Kasir Keuangan,</p>
                   <div className="h-10"></div>
                   <p className="font-bold underline">({printReceiptData.penerima === 'Bendahara Sekolah' ? (schoolSettings?.namaKasir || 'Bendahara Sekolah') : printReceiptData.penerima})</p>
@@ -4145,7 +4318,9 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
               <button
                 type="button"
-                onClick={handlePrint}
+                onClick={() => {
+                  window.print();
+                }}
                 className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md shadow-emerald-600/30 cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" /> Cetak Kwitansi
@@ -4473,7 +4648,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-300 font-bold block mb-1">Bulan (Untuk SPP)</label>
+                  <label className="text-slate-300 font-bold block mb-1">Bulan (Untuk SPP & Ekskul)</label>
                   <select
                     value={generateMonth}
                     onChange={e => setGenerateMonth(e.target.value)}
@@ -4629,8 +4804,24 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               )}
               <div>
                 <label className="text-slate-300 font-bold block mb-1 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                  <Calendar className="w-3.5 h-3.5 text-blue-400" />
                   Tanggal Tagihan
+                </label>
+                <input
+                  type="date"
+                  value={editTagihanForm.tanggalTagihan || ''}
+                  onChange={e => setEditTagihanForm({ ...editTagihanForm, tanggalTagihan: e.target.value })}
+                  className="w-full bg-[#181818] border border-slate-700/80 text-white font-mono font-bold rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Tanggal pembuatan tagihan di sistem.
+                </span>
+              </div>
+              
+              <div>
+                <label className="text-slate-300 font-bold block mb-1 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                  Tanggal Pembayaran
                 </label>
                 <input
                   type="text"
@@ -4640,7 +4831,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   className="w-full bg-[#181818] border border-slate-700/80 text-emerald-300 font-mono font-bold rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
                 <span className="text-[10px] text-slate-400 mt-1 block">
-                  Tanggal tagihan resmi yang tercatat di kasir / sistem.
+                  Tanggal realisasi pembayaran di kasir.
                 </span>
               </div>
               <div>
@@ -4714,6 +4905,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                       namaTagihan: editTagihanForm.namaTagihan,
                       nominal: editTagihanForm.nominal,
                       jatuhTempo: editTagihanForm.jatuhTempo,
+                      tanggalTagihan: editTagihanForm.tanggalTagihan,
                       tanggalBayar: finalTanggalBayar,
                       status: finalStatus,
                       terbayar: updatedTerbayar

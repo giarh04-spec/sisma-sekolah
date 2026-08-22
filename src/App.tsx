@@ -834,7 +834,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className={`${theme === 'light' ? 'bg-white text-slate-500 border-slate-200' : 'bg-[#0A0A0A] text-slate-500 border-slate-800'} border-t py-4 text-center text-xs uppercase font-medium tracking-wider transition-colors`}>
-        <p>© 2026 EduPortal Pro Integrated • Google AI Studio Applet</p>
+        <p>© 2026 Sisma Pro Integrated • by gie-technologi</p>
       </footer>
 
     </div>
