@@ -70,6 +70,7 @@ export const PublicSlipGajiView: React.FC<PublicSlipGajiViewProps> = ({
   const [copiedText, setCopiedText] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
+  const [isTabClosed, setIsTabClosed] = useState<boolean>(false);
 
   const slipRef = useRef<HTMLDivElement>(null);
 
@@ -183,6 +184,56 @@ export const PublicSlipGajiView: React.FC<PublicSlipGajiViewProps> = ({
   const totalPotongan = pAbsensi + pTerlambat + pFinger + pKoperasi + pKasBon;
   const subtotalPenghasilan = (slipData?.gajiPokok || 0) + totalTunjangan;
 
+  // Handle Close Window / Tab
+  const handleCloseWindow = () => {
+    if (onBackToApp) {
+      onBackToApp();
+      return;
+    }
+
+    try {
+      window.close();
+    } catch {}
+
+    try {
+      window.open('', '_self', '');
+      window.close();
+    } catch {}
+
+    try {
+      if (window.opener) {
+        window.opener = null;
+        window.open('', '_self');
+        window.close();
+      }
+    } catch {}
+
+    setIsTabClosed(true);
+  };
+
+  if (isTabClosed) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center text-slate-400 mb-4 shadow-xl">
+          <X className="w-8 h-8 text-rose-400" />
+        </div>
+        <h2 className="text-xl font-bold text-white mb-2">Halaman Slip Gaji Telah Ditutup</h2>
+        <p className="text-sm text-slate-400 max-w-sm mb-6">
+          Jendela halaman ini telah ditutup. Anda dapat menutup tab peramban ini secara manual jika tidak tertutup otomatis oleh browser.
+        </p>
+        <button
+          onClick={() => {
+            try { window.close(); } catch {}
+            try { window.open('', '_self', ''); window.close(); } catch {}
+          }}
+          className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+        >
+          Tutup Tab Ini
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center py-6 px-3 sm:px-6 font-sans print:p-0 print:bg-white print:text-black">
       
@@ -198,19 +249,8 @@ export const PublicSlipGajiView: React.FC<PublicSlipGajiViewProps> = ({
       <div className="w-full max-w-4xl flex items-center justify-between gap-3 mb-6 print:hidden">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => {
-              if (onBackToApp) {
-                onBackToApp();
-              } else {
-                try {
-                  window.close();
-                } catch {
-                  // ignore
-                }
-                window.location.href = window.location.origin + window.location.pathname;
-              }
-            }}
-            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-300 hover:text-white transition-all flex items-center gap-2 text-xs font-bold shadow-sm cursor-pointer"
+            onClick={handleCloseWindow}
+            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-300 hover:text-white transition-all flex items-center gap-2 text-xs font-bold shadow-sm cursor-pointer active:scale-95"
           >
             <X className="w-4 h-4 text-slate-400" />
             <span>Tutup</span>
@@ -555,28 +595,16 @@ export const PublicSlipGajiView: React.FC<PublicSlipGajiViewProps> = ({
           </div>
 
           {/* Bottom Callout / Help Card */}
-          <div className="bg-slate-900/60 border border-slate-800 p-4 rounded-2xl text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-3 print:hidden">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
-                <Building2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-white font-bold">{schoolSettings?.namaSekolah || 'Sistem Informasi Sekolah'}</h4>
-                <p className="text-[11px] text-slate-400">
-                  Untuk konfirmasi perbaikan atau pertanyaan payroll, hubungi Bendahara Tata Usaha.
-                </p>
-              </div>
+          <div className="bg-slate-900/60 border border-slate-800 p-4 rounded-2xl text-xs text-slate-400 flex items-center gap-3 print:hidden">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+              <Building2 className="w-5 h-5" />
             </div>
-
-            <button
-              onClick={() => {
-                window.location.href = window.location.origin + window.location.pathname;
-              }}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shrink-0"
-            >
-              <span>Masuk Portal Utama</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </button>
+            <div>
+              <h4 className="text-white font-bold">{schoolSettings?.namaSekolah || 'Sistem Informasi Sekolah'}</h4>
+              <p className="text-[11px] text-slate-400">
+                Untuk konfirmasi perbaikan atau pertanyaan payroll, hubungi Bendahara Tata Usaha.
+              </p>
+            </div>
           </div>
 
         </div>
