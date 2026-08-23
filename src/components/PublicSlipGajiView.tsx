@@ -191,13 +191,23 @@ export const PublicSlipGajiView: React.FC<PublicSlipGajiViewProps> = ({
       return;
     }
 
+    // Attempt standard window.close
     try {
       window.close();
     } catch {}
 
+    // Attempt self-window reassignment and close (works in many modern browsers)
     try {
       window.open('', '_self', '');
       window.close();
+    } catch {}
+
+    // Attempt about:blank reassignment & close
+    try {
+      const win = window.open('about:blank', '_self');
+      if (win) {
+        win.close();
+      }
     } catch {}
 
     try {
@@ -208,7 +218,16 @@ export const PublicSlipGajiView: React.FC<PublicSlipGajiViewProps> = ({
       }
     } catch {}
 
-    setIsTabClosed(true);
+    // If browser blocks closing via script (e.g. user typed URL directly without window.open):
+    // If there is browser history, navigate back; otherwise show clean closed state
+    setTimeout(() => {
+      if (window.history.length > 1) {
+        try {
+          window.history.back();
+        } catch {}
+      }
+      setIsTabClosed(true);
+    }, 150);
   };
 
   if (isTabClosed) {
