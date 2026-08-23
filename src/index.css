@@ -6,7 +6,9 @@
   }
 
   #printable-receipt,
-  #printable-receipt * {
+  #printable-receipt *,
+  #printable-slip-gaji,
+  #printable-slip-gaji * {
     visibility: visible !important;
   }
 
@@ -23,7 +25,8 @@
     backdrop-filter: none !important;
   }
 
-  #printable-receipt {
+  #printable-receipt,
+  #printable-slip-gaji {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;

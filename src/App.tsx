@@ -33,7 +33,8 @@ import {
   TagihanKeuangan, 
   TransaksiKeuangan,
   SchoolSettings,
-  EkstrakurikulerItem
+  EkstrakurikulerItem,
+  GajiPembayaran
 } from './types/school';
 
 import { 
@@ -125,6 +126,7 @@ export default function App() {
   const [tagihanList, setTagihanList] = useState<TagihanKeuangan[]>(() => getSavedData('edu_tagihanList', []));
   const [transaksiList, setTransaksiList] = useState<TransaksiKeuangan[]>(() => getSavedData('edu_transaksiList', []));
   const [tarifBiayaList, setTarifBiayaList] = useState<TarifBiaya[]>(() => getSavedData('edu_tarifBiayaList', INITIAL_TARIF_BIAYA));
+  const [gajiList, setGajiList] = useState<GajiPembayaran[]>(() => getSavedData('edu_gajiList', []));
 
   // School Identity & Settings State
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings>(() => {
@@ -168,6 +170,7 @@ export default function App() {
           const tarifBiayaData = await dbFetchCollection<TarifBiaya>('edu_tarifBiayaList');
           const hasilUjianData = await dbFetchCollection<HasilUjian>('edu_hasilUjianList');
           const settingsData = await dbFetchCollection<SchoolSettings>('edu_schoolSettings');
+          const gajiData = await dbFetchCollection<GajiPembayaran>('edu_gajiList');
 
           // Sync data back to React state or seed empty Firestore
           if (rombelData.length > 0) setRombelList(rombelData);
@@ -212,12 +215,13 @@ export default function App() {
           if (isSystemReset) {
             setRombelList([]); setSiswaList([]); setGuruList([]); setStafList([]); setMapelList([]); setEkskulList([]);
             setAbsensiHarian([]); setAbsensiKelasList([]); setAbsensiGuruList([]); setBankSoalList([]); setUjianList([]); setAdministrasiList([]);
-            setTagihanList([]); setTransaksiList([]); setTarifBiayaList([]); setHasilUjianList([]);
+            setTagihanList([]); setTransaksiList([]); setTarifBiayaList([]); setHasilUjianList([]); setGajiList([]);
             
             const collectionsToClear = [
               'edu_rombelList', 'edu_siswaList', 'edu_guruList', 'edu_stafList', 'edu_mapelList', 'edu_ekskulList',
               'edu_absensiHarian', 'edu_absensiKelasList', 'edu_absensiGuruList', 'edu_bankSoalList', 'edu_ujianList',
-              'edu_administrasiList', 'edu_tagihanList', 'edu_transaksiList', 'edu_tarifBiayaList', 'edu_hasilUjianList'
+              'edu_administrasiList', 'edu_tagihanList', 'edu_transaksiList', 'edu_tarifBiayaList', 'edu_hasilUjianList',
+              'edu_gajiList'
             ];
             
             Promise.all(collectionsToClear.map(c => dbClearCollection(c))).then(() => {
@@ -269,6 +273,11 @@ export default function App() {
           }
 
           if (hasilUjianData.length > 0) setHasilUjianList(hasilUjianData);
+          if (gajiData.length > 0) {
+            setGajiList(gajiData);
+          } else {
+            await dbSaveCollection('edu_gajiList', gajiList);
+          }
 
           if (settingsData.length > 0) {
             const foundSetting = settingsData.find(s => s.namaSekolah);
@@ -434,6 +443,13 @@ export default function App() {
   }, [hasilUjianList, isDbLoaded, isLoggedIn]);
 
   useEffect(() => {
+    localStorage.setItem('edu_gajiList', JSON.stringify(gajiList));
+    if (isDbLoaded && isLoggedIn) {
+      saveCollectionWithStatus('edu_gajiList', gajiList);
+    }
+  }, [gajiList, isDbLoaded, isLoggedIn]);
+
+  useEffect(() => {
     localStorage.setItem('edu_schoolSettings', JSON.stringify(schoolSettings));
     if (isDbLoaded && isLoggedIn) {
       saveItemWithStatus('edu_schoolSettings', { id: 'current', ...schoolSettings });
@@ -493,6 +509,7 @@ export default function App() {
     listenCollection<TransaksiKeuangan>('edu_transaksiList', setTransaksiList);
     listenCollection<TarifBiaya>('edu_tarifBiayaList', setTarifBiayaList);
     listenCollection<HasilUjian>('edu_hasilUjianList', setHasilUjianList);
+    listenCollection<GajiPembayaran>('edu_gajiList', setGajiList);
 
     // Document listener for school settings
     try {
@@ -797,6 +814,10 @@ export default function App() {
               setSubTab={setKeuanganSubTab}
               tarifBiayaList={tarifBiayaList}
               setTarifBiayaList={setTarifBiayaList}
+              gajiList={gajiList}
+              setGajiList={setGajiList}
+              guruList={guruList}
+              stafList={stafList}
               schoolSettings={schoolSettings}
               setSchoolSettings={setSchoolSettings}
               ekskulList={ekskulList}
@@ -804,6 +825,7 @@ export default function App() {
                 setTagihanList(getSavedData('edu_tagihanList', []));
                 setTransaksiList(getSavedData('edu_transaksiList', []));
                 setTarifBiayaList(getSavedData('edu_tarifBiayaList', INITIAL_TARIF_BIAYA));
+                setGajiList(getSavedData('edu_gajiList', []));
               }}
             />
           )}

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { downloadCSV } from '../lib/exportUtils';
+import { downloadCSV, terbilang } from '../lib/exportUtils';
 import { dbClearCollection } from '../lib/firebaseSync';
 import { 
   Wallet, 
@@ -38,9 +38,10 @@ import {
   Smartphone,
   Bell,
   Building2,
-  QrCode
+  QrCode,
+  Coins
 } from 'lucide-react';
-import { TagihanKeuangan, TransaksiKeuangan, Siswa, KeuanganSubTab, TarifBiaya, TipeKeuangan, SchoolSettings, RombelKelas, EkstrakurikulerItem } from '../types/school';
+import { TagihanKeuangan, TransaksiKeuangan, Siswa, KeuanganSubTab, TarifBiaya, TipeKeuangan, SchoolSettings, RombelKelas, EkstrakurikulerItem, GajiPembayaran, Guru, Staf } from '../types/school';
 import { sendFonnteMessage } from '../lib/fonnte';
 import { INITIAL_FONNTE_CONFIG, INITIAL_TARIF_BIAYA, INITIAL_ROMBEL } from '../data/mockData';
 
@@ -60,6 +61,10 @@ interface KeuanganViewProps {
   schoolSettings?: SchoolSettings;
   setSchoolSettings?: React.Dispatch<React.SetStateAction<SchoolSettings>>;
   ekskulList?: EkstrakurikulerItem[];
+  gajiList?: GajiPembayaran[];
+  setGajiList?: React.Dispatch<React.SetStateAction<GajiPembayaran[]>>;
+  guruList?: Guru[];
+  stafList?: Staf[];
   onRefresh?: () => void;
 }
 
@@ -79,6 +84,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   schoolSettings,
   setSchoolSettings,
   ekskulList = [],
+  gajiList = [],
+  setGajiList,
+  guruList = [],
+  stafList = [],
   onRefresh
 }) => {
   // Navigation Subtab State
@@ -112,6 +121,337 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       setSemester(schoolSettings.semesterAktif);
     }
   }, [schoolSettings]);
+
+  // Gaji (Payroll) State Declarations
+  const [showBayarGajiModal, setShowBayarGajiModal] = useState<boolean>(false);
+  const [showSlipGajiModal, setShowSlipGajiModal] = useState<boolean>(false);
+  const [selectedGajiForSlip, setSelectedGajiForSlip] = useState<GajiPembayaran | null>(null);
+  const [editingGaji, setEditingGaji] = useState<GajiPembayaran | null>(null);
+
+  // Form State for Gaji
+  const [gajiPenerimaTipe, setGajiPenerimaTipe] = useState<'guru' | 'staf'>('guru');
+  const [gajiPenerimaId, setGajiPenerimaId] = useState<string>('');
+  const [gajiPokok, setGajiPokok] = useState<number>(3000000);
+  const [gajiTunjangan, setGajiTunjangan] = useState<number>(500000);
+  const [gajiTunjanganWalas, setGajiTunjanganWalas] = useState<number>(0);
+  const [gajiTunjanganKetepatanWaktu, setGajiTunjanganKetepatanWaktu] = useState<number>(0);
+  const [gajiTunjanganKehadiran, setGajiTunjanganKehadiran] = useState<number>(0);
+  const [gajiTunjanganPiket, setGajiTunjanganPiket] = useState<number>(0);
+  const [gajiTunjanganExcessTime, setGajiTunjanganExcessTime] = useState<number>(0);
+
+  const [gajiPotongan, setGajiPotongan] = useState<number>(0);
+  const [gajiPotonganDendaTerlambat, setGajiPotonganDendaTerlambat] = useState<number>(0);
+  const [gajiPotonganDendaLupaFinger, setGajiPotonganDendaLupaFinger] = useState<number>(0);
+  const [gajiPotonganKoperasi, setGajiPotonganKoperasi] = useState<number>(0);
+  const [gajiPotonganKasBon, setGajiPotonganKasBon] = useState<number>(0);
+
+  const [gajiBulan, setGajiBulan] = useState<string>('Juli');
+  const [gajiTahun, setGajiTahun] = useState<string>(new Date().getFullYear().toString());
+  const [gajiMetode, setGajiMetode] = useState<'Cash' | 'Transfer Bank' | 'E-Wallet'>('Transfer Bank');
+  const [gajiTanggal, setGajiTanggal] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [gajiStatus, setGajiStatus] = useState<'Draft' | 'Paid'>('Paid');
+  const [gajiCatatan, setGajiCatatan] = useState<string>('');
+  const [gajiRekening, setGajiRekening] = useState<string>('');
+
+  // Filters for Gaji list
+  const [gajiSearchQuery, setGajiSearchQuery] = useState<string>('');
+  const [gajiFilterTipe, setGajiFilterTipe] = useState<'semua' | 'guru' | 'staf'>('semua');
+  const [gajiFilterStatus, setGajiFilterStatus] = useState<'semua' | 'Draft' | 'Paid'>('semua');
+  const [gajiFilterBulan, setGajiFilterBulan] = useState<string>('semua');
+
+  // Gaji UI alerts & confirmation states
+  const [gajiToast, setGajiToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [gajiToDeleteId, setGajiToDeleteId] = useState<string | null>(null);
+
+  // Active Bendahara / Keuangan Staff
+  const bendaharaStaf = useMemo(() => {
+    return (stafList || []).find(s => 
+      s.bagian === 'Bendahara / Keuangan' || 
+      (s.bagian && s.bagian.toLowerCase().includes('bendahara')) ||
+      (s.bagian && s.bagian.toLowerCase().includes('keuangan'))
+    ) || null;
+  }, [stafList]);
+
+  const bendaharaNama = bendaharaStaf?.nama || schoolSettings?.namaKasir || 'Nurhidayati, S.Pd';
+  const bendaharaNik = bendaharaStaf?.nik || '-';
+
+  // Auto-clear toast helper
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setGajiToast({ message, type });
+    setTimeout(() => {
+      setGajiToast(null);
+    }, 4000);
+  };
+
+  // Submit/Save Gaji Transaction
+  const handleSaveGaji = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!gajiPenerimaId) {
+      showToast('Pilih penerima gaji terlebih dahulu', 'error');
+      return;
+    }
+
+    let name = '';
+    let nipNik = '';
+    let jab = '';
+
+    if (gajiPenerimaTipe === 'guru') {
+      const g = guruList.find(item => item.id === gajiPenerimaId);
+      if (g) {
+        name = g.nama;
+        nipNik = g.nik || g.nip || '';
+        jab = g.jabatan || 'Guru';
+      }
+    } else {
+      const s = stafList.find(item => item.id === gajiPenerimaId);
+      if (s) {
+        name = s.nama;
+        nipNik = s.nik || s.nip || '';
+        jab = s.bagian || 'Staf';
+      }
+    }
+
+    const totalTunjanganCalc = Number(gajiTunjangan) +
+      Number(gajiTunjanganWalas) +
+      Number(gajiTunjanganKetepatanWaktu) +
+      Number(gajiTunjanganKehadiran) +
+      Number(gajiTunjanganPiket) +
+      Number(gajiTunjanganExcessTime);
+
+    const totalPotonganCalc = Number(gajiPotongan) +
+      Number(gajiPotonganDendaTerlambat) +
+      Number(gajiPotonganDendaLupaFinger) +
+      Number(gajiPotonganKoperasi) +
+      Number(gajiPotonganKasBon);
+
+    const total = Number(gajiPokok) + totalTunjanganCalc - totalPotonganCalc;
+
+    const payload: GajiPembayaran = {
+      id: editingGaji ? editingGaji.id : `GJ-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      penerimaId: gajiPenerimaId,
+      penerimaNama: name,
+      penerimaTipe: gajiPenerimaTipe,
+      penerimaNipNik: nipNik,
+      jabatan: jab,
+      bulan: gajiBulan,
+      tahun: gajiTahun,
+      gajiPokok: Number(gajiPokok),
+      tunjangan: Number(gajiTunjangan),
+      tunjanganWalas: Number(gajiTunjanganWalas),
+      tunjanganKetepatanWaktu: Number(gajiTunjanganKetepatanWaktu),
+      tunjanganKehadiran: Number(gajiTunjanganKehadiran),
+      tunjanganPiket: Number(gajiTunjanganPiket),
+      tunjanganExcessTime: Number(gajiTunjanganExcessTime),
+      potongan: Number(gajiPotongan),
+      potonganDendaTerlambat: Number(gajiPotonganDendaTerlambat),
+      potonganDendaLupaFinger: Number(gajiPotonganDendaLupaFinger),
+      potonganKoperasi: Number(gajiPotonganKoperasi),
+      potonganKasBon: Number(gajiPotonganKasBon),
+      totalDiterima: total,
+      tanggalBayar: gajiTanggal,
+      metodePembayaran: gajiMetode,
+      status: gajiStatus,
+      catatan: gajiCatatan,
+      penerimaRekening: gajiRekening
+    };
+
+    if (setGajiList) {
+      setGajiList(prev => {
+        if (editingGaji) {
+          return prev.map(item => item.id === editingGaji.id ? payload : item);
+        } else {
+          return [payload, ...prev];
+        }
+      });
+      showToast(editingGaji ? 'Transaksi pembayaran gaji berhasil diperbarui!' : 'Transaksi pembayaran gaji baru berhasil ditambahkan!');
+    } else {
+      showToast('Gagal memproses karena setter data gaji tidak terdefinisi', 'error');
+    }
+
+    // Reset Form
+    setShowBayarGajiModal(false);
+    setEditingGaji(null);
+    setGajiPenerimaId('');
+    setGajiPokok(3000000);
+    setGajiTunjangan(500000);
+    setGajiTunjanganWalas(0);
+    setGajiTunjanganKetepatanWaktu(0);
+    setGajiTunjanganKehadiran(0);
+    setGajiTunjanganPiket(0);
+    setGajiTunjanganExcessTime(0);
+    setGajiPotongan(0);
+    setGajiPotonganDendaTerlambat(0);
+    setGajiPotonganDendaLupaFinger(0);
+    setGajiPotonganKoperasi(0);
+    setGajiPotonganKasBon(0);
+    setGajiCatatan('');
+    setGajiRekening('');
+  };
+
+  const handleEditGajiClick = (item: GajiPembayaran) => {
+    setEditingGaji(item);
+    setGajiPenerimaTipe(item.penerimaTipe);
+    setGajiPenerimaId(item.penerimaId);
+    setGajiPokok(item.gajiPokok);
+    setGajiTunjangan(item.tunjangan);
+    setGajiTunjanganWalas(item.tunjanganWalas || 0);
+    setGajiTunjanganKetepatanWaktu(item.tunjanganKetepatanWaktu || 0);
+    setGajiTunjanganKehadiran(item.tunjanganKehadiran || 0);
+    setGajiTunjanganPiket(item.tunjanganPiket || 0);
+    setGajiTunjanganExcessTime(item.tunjanganExcessTime || 0);
+    setGajiPotongan(item.potongan);
+    setGajiPotonganDendaTerlambat(item.potonganDendaTerlambat || 0);
+    setGajiPotonganDendaLupaFinger(item.potonganDendaLupaFinger || 0);
+    setGajiPotonganKoperasi(item.potonganKoperasi || 0);
+    setGajiPotonganKasBon(item.potonganKasBon || 0);
+    setGajiBulan(item.bulan);
+    setGajiTahun(item.tahun);
+    setGajiMetode(item.metodePembayaran);
+    setGajiTanggal(item.tanggalBayar);
+    setGajiStatus(item.status);
+    setGajiCatatan(item.catatan || '');
+    setGajiRekening(item.penerimaRekening || '');
+    setShowBayarGajiModal(true);
+  };
+
+  const handleExecuteDeleteGaji = () => {
+    if (gajiToDeleteId) {
+      if (setGajiList) {
+        setGajiList(prev => prev.filter(item => item.id !== gajiToDeleteId));
+        showToast('Pembayaran gaji berhasil dihapus dari sistem!');
+      }
+      setGajiToDeleteId(null);
+    }
+  };
+
+  // Kirim slip gaji via WhatsApp
+  const handleKirimGajiWA = async (item: GajiPembayaran) => {
+    let phone = '';
+    if (item.penerimaTipe === 'guru') {
+      const g = guruList.find(x => x.id === item.penerimaId);
+      phone = g?.telepon || '';
+    } else {
+      const s = stafList.find(x => x.id === item.penerimaId);
+      phone = s?.telepon || '';
+    }
+
+    if (!phone) {
+      showToast('Nomor telepon penerima tidak ditemukan atau kosong.', 'error');
+      return;
+    }
+
+    const tWalas = item.tunjanganWalas || 0;
+    const tKetepatan = item.tunjanganKetepatanWaktu || 0;
+    const tHadir = item.tunjanganKehadiran || 0;
+    const tPiket = item.tunjanganPiket || 0;
+    const tExcess = item.tunjanganExcessTime || 0;
+    const tJabatan = item.tunjangan || 0;
+
+    const pTerlambat = item.potonganDendaTerlambat || 0;
+    const pFinger = item.potonganDendaLupaFinger || 0;
+    const pKoperasi = item.potonganKoperasi || 0;
+    const pKasBon = item.potonganKasBon || 0;
+    const pAbsensi = item.potongan || 0;
+
+    const totalT = tJabatan + tWalas + tKetepatan + tHadir + tPiket + tExcess;
+    const totalP = pAbsensi + pTerlambat + pFinger + pKoperasi + pKasBon;
+    const subtotalPenghasilan = item.gajiPokok + totalT;
+
+    const formattedGajiPokok = item.gajiPokok.toLocaleString('id-ID');
+    const formattedTotal = item.totalDiterima.toLocaleString('id-ID');
+
+    // Build itemized breakdown texts
+    let tunjanganLines = '';
+    if (tJabatan > 0) tunjanganLines += `  • Tunj. Jabatan & Ops: Rp ${tJabatan.toLocaleString('id-ID')}\n`;
+    if (tWalas > 0) tunjanganLines += `  • Tunj. Wali Kelas: Rp ${tWalas.toLocaleString('id-ID')}\n`;
+    if (tKetepatan > 0) tunjanganLines += `  • Ketepatan Waktu: Rp ${tKetepatan.toLocaleString('id-ID')}\n`;
+    if (tHadir > 0) tunjanganLines += `  • Tunj. Kehadiran: Rp ${tHadir.toLocaleString('id-ID')}\n`;
+    if (tPiket > 0) tunjanganLines += `  • Tunj. Piket: Rp ${tPiket.toLocaleString('id-ID')}\n`;
+    if (tExcess > 0) tunjanganLines += `  • Excess Time: Rp ${tExcess.toLocaleString('id-ID')}\n`;
+
+    let potonganLines = '';
+    if (pAbsensi > 0) potonganLines += `  • Pot. Absensi/Umum: Rp ${pAbsensi.toLocaleString('id-ID')}\n`;
+    if (pTerlambat > 0) potonganLines += `  • Denda Terlambat: Rp ${pTerlambat.toLocaleString('id-ID')}\n`;
+    if (pFinger > 0) potonganLines += `  • Denda Lupa Finger: Rp ${pFinger.toLocaleString('id-ID')}\n`;
+    if (pKoperasi > 0) potonganLines += `  • Potongan Koperasi: Rp ${pKoperasi.toLocaleString('id-ID')}\n`;
+    if (pKasBon > 0) potonganLines += `  • Kas Bon: Rp ${pKasBon.toLocaleString('id-ID')}\n`;
+
+    const msg = `🧾 *SLIP GAJI & HONORARIUM BULANAN*\n` +
+      `*${schoolSettings?.namaSekolah || 'SMP ISLAM MODERN AL FAKHIR'}*\n` +
+      `Periode: *${item.bulan} ${item.tahun}*\n` +
+      `No. Slip: ${item.id}\n` +
+      `─────────────────────────\n` +
+      `👤 *Data Penerima:*\n` +
+      `• Nama: *${item.penerimaNama}*\n` +
+      `• NIP/NIK: ${(item.penerimaNipNik && item.penerimaNipNik !== '-') ? item.penerimaNipNik : '-'}\n` +
+      `• Jabatan: ${item.jabatan}\n\n` +
+      `💰 *1. PENERIMAAN:*\n` +
+      `  • Gaji Pokok: Rp ${formattedGajiPokok}\n` +
+      `${tunjanganLines}` +
+      `  *Subtotal Penerimaan: Rp ${subtotalPenghasilan.toLocaleString('id-ID')}*\n\n` +
+      `🔻 *2. POTONGAN:*\n` +
+      `${potonganLines || '  • (Tidak ada potongan)\n'}` +
+      `  *Total Potongan: Rp ${totalP.toLocaleString('id-ID')}*\n\n` +
+      `─────────────────────────\n` +
+      `💵 *TOTAL BERSIH (NET INCOME): Rp ${formattedTotal}*\n` +
+      `_(${terbilang(item.totalDiterima)})_\n` +
+      `─────────────────────────\n` +
+      `• Status: *${item.status === 'Paid' ? 'LUNAS / TELAH DIBAYAR' : 'DRAFT / PENDING'}*\n` +
+      `• Metode: ${item.metodePembayaran}\n` +
+      `• Tanggal: ${item.tanggalBayar}\n` +
+      `${item.penerimaRekening ? `• No. Rekening: ${item.penerimaRekening}\n` : ''}` +
+      `${item.catatan ? `• Catatan: ${item.catatan}\n` : ''}\n` +
+      `Terima kasih atas dedikasi dan kerja keras Ibu/Bapak.\n\n` +
+      `Salam hangat,\n*Bendahara & Manajemen Keuangan Sekolah*`;
+
+    const apiToken = schoolSettings?.fonnteToken || '';
+    if (apiToken) {
+      try {
+        const result = await sendFonnteMessage(phone, msg, apiToken);
+        if (result.success) {
+          showToast(`Slip gaji berhasil terkirim ke WA ${item.penerimaNama}!`);
+        } else {
+          showToast(`Gagal kirim via Gateway: ${result.message || 'Terjadi kesalahan'}.`, 'error');
+        }
+      } catch (err) {
+        showToast('Koneksi WhatsApp Gateway terputus.', 'error');
+      }
+    } else {
+      // Direct WA Link API fallback
+      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      const waUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`;
+      const newTab = window.open(waUrl, '_blank');
+      if (newTab) {
+        showToast('Membuka WhatsApp untuk mengirim slip gaji...');
+      } else {
+        showToast('Gagal membuka popup WhatsApp, silakan izinkan popup di browser Anda.', 'error');
+      }
+    }
+  };
+
+  // Filtered Gaji List Memo
+  const filteredGajiList = useMemo(() => {
+    return gajiList.filter(item => {
+      // Search Match
+      const searchLower = gajiSearchQuery.toLowerCase();
+      const matchSearch = 
+        (item.penerimaNama || '').toLowerCase().includes(searchLower) ||
+        (item.penerimaNipNik || '').toLowerCase().includes(searchLower) ||
+        (item.jabatan || '').toLowerCase().includes(searchLower) ||
+        (item.id || '').toLowerCase().includes(searchLower);
+
+      // Tipe Match
+      const matchTipe = gajiFilterTipe === 'semua' || item.penerimaTipe === gajiFilterTipe;
+
+      // Status Match
+      const matchStatus = gajiFilterStatus === 'semua' || item.status === gajiFilterStatus;
+
+      // Bulan Match
+      const matchBulan = gajiFilterBulan === 'semua' || item.bulan === gajiFilterBulan;
+
+      return matchSearch && matchTipe && matchStatus && matchBulan;
+    });
+  }, [gajiList, gajiSearchQuery, gajiFilterTipe, gajiFilterStatus, gajiFilterBulan]);
 
   // Search Suggestions memo
   const searchSuggestions = useMemo(() => {
@@ -3012,79 +3352,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 </div>
               </div>
 
-              {/* PANEL C: CETAK BUKTI PEMBAYARAN */}
-              <div className="bg-[#121212] p-5 rounded-2xl border border-slate-800/80 shadow-lg space-y-3.5 flex flex-col justify-between">
-                <div>
-                  <h4 className="text-sm font-extrabold text-white border-b border-slate-800 pb-3 flex items-center gap-2">
-                    <Printer className="w-4 h-4 text-emerald-400" />
-                    Cetak Bukti Pembayaran
-                  </h4>
-                  <p className="text-[10px] text-slate-400 mt-3 leading-relaxed">
-                    Gunakan fitur ini untuk mencetak ulang kwitansi pembayaran terakhir atau slip tagihan sementara untuk siswa yang bersangkutan.
-                  </p>
-                </div>
-                
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-[10px] text-slate-400 font-bold block mb-1">Pilih Tanggal Cetak</label>
-                    <input
-                      type="date"
-                      value={slipPrintDate}
-                      onChange={e => setSlipPrintDate(e.target.value)}
-                      className="w-full bg-[#181818] border border-slate-700/80 text-white text-xs rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={!selectedSiswa}
-                    onClick={() => {
-                      if (!selectedSiswa) return;
-                      const [year, month, day] = slipPrintDate.split('-').map(Number);
-                      const dateObj = new Date(year, month - 1, day);
-                      const normalizeDate = (date: string) => date.replace(/\u00A0/g, ' ').trim();
-                      const selectedDateStr = normalizeDate(dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }));
-                      console.log('DEBUG: Selected Date String:', selectedDateStr);
-                      const txsOnDate = studentTransactions.filter(tx => normalizeDate(tx.tanggal) === selectedDateStr);
-                      
-                      const items = txsOnDate.map((tx, idx) => ({
-                        id: tx.id || String(idx),
-                        uraian: tx.pembayaran || 'Pembayaran Keuangan',
-                        jumlah: tx.tagihan || 0
-                      }));
-
-                      if (items.length === 0) {
-                        alert(`Tidak ada data transaksi untuk tanggal ${selectedDateStr}`);
-                        return;
-                      }
-
-                      const totalNominal = items.reduce((sum, item) => sum + item.jumlah, 0);
-
-                      setPrintReceiptData({
-                        noNota: generateInvoiceNumber(),
-                        tahunAjaran,
-                        nis: selectedSiswa.nisn || selectedSiswa.nis,
-                        nama: selectedSiswa.nama,
-                        namaIbu: selectedSiswa.namaIbu || selectedSiswa.namaWali,
-                        kelas: selectedSiswa.kelas,
-                        pembayaranTitle: `Kwitansi Pembayaran / Tagihan T.A ${tahunAjaran}`,
-                        nominal: totalNominal,
-                        dibayar: totalNominal,
-                        kembalian: 0,
-                        tanggal: selectedDateStr,
-                        penerima: 'Bagian Keuangan',
-                        items: items
-                      });
-                      setShowPrintModal(true);
-                    }}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Printer className="w-4 h-4" />
-                    Cetak Kwitansi
-                  </button>
-                </div>
-              </div>
-
               {/* PANEL A: TRANSAKSI TERAKHIR (Landscape, Wide) */}
               <div className="md:col-span-3 bg-[#121212] p-4 rounded-2xl border border-slate-800/80 shadow-lg space-y-3">
                 <div className="border-b border-slate-800 pb-2 flex items-center justify-between">
@@ -4119,14 +4386,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-emerald-600" /> Struk Kwitansi Pembayaran Resmi
               </h3>
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => setShowPrintModal(false)}
-                  className="text-slate-400 hover:text-slate-700 font-bold text-sm px-1.5 py-0.5 rounded hover:bg-slate-100"
-                >
-                  ✕
-                </button>
-              </div>
             </div>
 
             {/* Print Envelope Area */}
@@ -4280,7 +4539,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   <p className="font-bold underline">({printReceiptData.nama})</p>
                 </div>
                 <div>
-                  <p>Tanggal Cetak: {new Date(slipPrintDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                  <p>Depok, {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
                   <p>Kasir Keuangan,</p>
                   <div className="h-10"></div>
                   <p className="font-bold underline">({printReceiptData.penerima === 'Bendahara Sekolah' ? (schoolSettings?.namaKasir || 'Bendahara Sekolah') : printReceiptData.penerima})</p>
@@ -4315,20 +4574,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               >
                 <FileText className="w-3.5 h-3.5" /> Download File (HTML)
               </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  window.print();
-                }}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md shadow-emerald-600/30 cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5" /> Cetak Kwitansi
-              </button>
             </div>
           </div>
         </div>
-    )}
+      )}
 
       {/* MODAL: PENGATURAN VA & QRIS */}
       {showVaConfigModal && (
@@ -5260,6 +5509,1054 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 className="w-full px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-sm transition-all border border-slate-700"
               >
                 Batalkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUBTAB 5: PEMBAYARAN GAJI & PAYROLL GURU/STAF */}
+      {activeTab === 'gaji' && (
+        <div className="space-y-6">
+          {/* TOAST NOTIFICATION */}
+          {gajiToast && (
+            <div className={`fixed bottom-6 right-6 z-[110] flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl border transition-all animate-in slide-in-from-bottom duration-300 ${
+              gajiToast.type === 'success' 
+                ? 'bg-emerald-950 border-emerald-500/30 text-emerald-300' 
+                : 'bg-rose-950 border-rose-500/30 text-rose-300'
+            }`}>
+              {gajiToast.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+              )}
+              <span className="text-xs font-bold font-sans">{gajiToast.message}</span>
+            </div>
+          )}
+
+          {/* MAIN ACTIONS & STATS */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900/40 p-4 rounded-2xl border border-slate-800/60">
+            <div>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Coins className="w-5 h-5 text-rose-400" />
+                Manajemen Payroll & Pembayaran Gaji
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Kelola transaksi gaji guru dan staf sekolah, cetak slip gaji fisik, dan kirim rincian payroll otomatis via WhatsApp.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setEditingGaji(null);
+                setGajiPenerimaId('');
+                setGajiPokok(3000000);
+                setGajiTunjangan(500000);
+                setGajiPotongan(0);
+                setGajiCatatan('');
+                setGajiRekening('');
+                setShowBayarGajiModal(true);
+              }}
+              className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl text-xs transition-all shadow-md shadow-rose-600/30 flex items-center gap-2 shrink-0 active:scale-[0.98]"
+            >
+              <Plus className="w-4 h-4" />
+              Proses Gaji Baru
+            </button>
+          </div>
+
+          {/* SUMMARY STATISTICS CARDS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Total Gaji Terbayar */}
+            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 shrink-0">
+                <DollarSign className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Gaji Dibayarkan</span>
+                <h4 className="text-lg font-extrabold text-white mt-0.5">
+                  Rp {gajiList.filter(g => g.status === 'Paid').reduce((sum, g) => sum + g.totalDiterima, 0).toLocaleString('id-ID')}
+                </h4>
+                <p className="text-[9px] text-emerald-400 mt-0.5 font-bold">
+                  {gajiList.filter(g => g.status === 'Paid').length} Transaksi Lunas
+                </p>
+              </div>
+            </div>
+
+            {/* Total Pending / Draft */}
+            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 shrink-0">
+                <Clock className="w-6 h-6 text-amber-400" />
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Gaji Pending / Draft</span>
+                <h4 className="text-lg font-extrabold text-white mt-0.5">
+                  Rp {gajiList.filter(g => g.status === 'Draft').reduce((sum, g) => sum + g.totalDiterima, 0).toLocaleString('id-ID')}
+                </h4>
+                <p className="text-[9px] text-amber-400 mt-0.5 font-bold">
+                  {gajiList.filter(g => g.status === 'Draft').length} Transaksi Draft
+                </p>
+              </div>
+            </div>
+
+            {/* Total Guru */}
+            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center border border-purple-500/20 shrink-0">
+                <GraduationCap className="w-6 h-6 text-purple-400" />
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Penerima Tipe Guru</span>
+                <h4 className="text-lg font-extrabold text-white mt-0.5">
+                  {guruList.length} Orang
+                </h4>
+                <p className="text-[9px] text-purple-400 mt-0.5 font-bold">
+                  {gajiList.filter(g => g.penerimaTipe === 'guru').length} Slip Terbit
+                </p>
+              </div>
+            </div>
+
+            {/* Total Staf */}
+            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shrink-0">
+                <User className="w-6 h-6 text-blue-400" />
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Penerima Tipe Staf</span>
+                <h4 className="text-lg font-extrabold text-white mt-0.5">
+                  {stafList.length} Orang
+                </h4>
+                <p className="text-[9px] text-blue-400 mt-0.5 font-bold">
+                  {gajiList.filter(g => g.penerimaTipe === 'staf').length} Slip Terbit
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* FILTER & FILTER BAR */}
+          <div className="bg-[#121212] p-4 rounded-2xl border border-slate-850/80 flex flex-col md:flex-row gap-4 items-center">
+            {/* Search Input */}
+            <div className="relative w-full md:flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Cari penerima gaji, NIP, NIK, jabatan..."
+                value={gajiSearchQuery}
+                onChange={e => setGajiSearchQuery(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500/50"
+              />
+            </div>
+
+            {/* Dropdowns */}
+            <div className="flex flex-wrap gap-2 w-full md:w-auto shrink-0">
+              {/* Role Filter */}
+              <div className="flex items-center gap-1.5 bg-slate-900/60 border border-slate-800 rounded-xl px-3 py-1">
+                <Filter className="w-3.5 h-3.5 text-slate-500" />
+                <select
+                  value={gajiFilterTipe}
+                  onChange={e => setGajiFilterTipe(e.target.value as any)}
+                  className="bg-transparent text-xs text-slate-300 focus:outline-none cursor-pointer pr-1"
+                >
+                  <option value="semua" className="bg-slate-950 text-white">Semua Penerima</option>
+                  <option value="guru" className="bg-slate-950 text-white">Guru</option>
+                  <option value="staf" className="bg-slate-950 text-white">Staf</option>
+                </select>
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex items-center gap-1.5 bg-slate-900/60 border border-slate-800 rounded-xl px-3 py-1">
+                <Sliders className="w-3.5 h-3.5 text-slate-500" />
+                <select
+                  value={gajiFilterStatus}
+                  onChange={e => setGajiFilterStatus(e.target.value as any)}
+                  className="bg-transparent text-xs text-slate-300 focus:outline-none cursor-pointer pr-1"
+                >
+                  <option value="semua" className="bg-slate-950 text-white">Semua Status</option>
+                  <option value="Paid" className="bg-slate-950 text-white">Lunas (Paid)</option>
+                  <option value="Draft" className="bg-slate-950 text-white">Draft</option>
+                </select>
+              </div>
+
+              {/* Month Filter */}
+              <div className="flex items-center gap-1.5 bg-slate-900/60 border border-slate-800 rounded-xl px-3 py-1">
+                <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                <select
+                  value={gajiFilterBulan}
+                  onChange={e => setGajiFilterBulan(e.target.value)}
+                  className="bg-transparent text-xs text-slate-300 focus:outline-none cursor-pointer pr-1"
+                >
+                  <option value="semua" className="bg-slate-950 text-white">Semua Bulan</option>
+                  {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map(m => (
+                    <option key={m} value={m} className="bg-slate-950 text-white">{m}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* LIST/TABLE OF PAYROLL TRANSACTIONS */}
+          <div className="bg-[#121212] rounded-2xl border border-slate-800/80 overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-800 bg-slate-900/40 text-[10px] uppercase font-bold text-slate-400">
+                    <th className="py-4 px-4 w-12 text-center">No</th>
+                    <th className="py-4 px-4">Penerima</th>
+                    <th className="py-4 px-3">Tipe & Jabatan</th>
+                    <th className="py-4 px-3">Periode</th>
+                    <th className="py-4 px-3 text-right">Gaji Pokok</th>
+                    <th className="py-4 px-3 text-right">Tunjangan</th>
+                    <th className="py-4 px-3 text-right text-rose-400">Potongan</th>
+                    <th className="py-4 px-3 text-right text-emerald-400">Net Diterima</th>
+                    <th className="py-4 px-4 text-center">Status</th>
+                    <th className="py-4 px-4 text-center w-40">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-xs">
+                  {filteredGajiList.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="py-12 text-center text-slate-500 font-medium">
+                        Tidak ada transaksi pembayaran gaji ditemukan. <br/>
+                        <span className="text-[10px] text-slate-600 mt-1 block">Silakan tambahkan data pembayaran gaji baru.</span>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredGajiList.map((item, index) => (
+                      <tr key={item.id} className="hover:bg-slate-900/30 transition-colors">
+                        <td className="py-3.5 px-4 text-center font-mono text-slate-500">{index + 1}</td>
+                        <td className="py-3.5 px-4">
+                          <div className="font-extrabold text-white text-xs">{item.penerimaNama}</div>
+                          <div className="text-[10px] text-slate-500 font-mono mt-0.5">{(item.penerimaNipNik && item.penerimaNipNik !== '-') ? item.penerimaNipNik : (item.penerimaTipe === 'guru' ? (guruList.find(g => g.id === item.penerimaId)?.nik || guruList.find(g => g.id === item.penerimaId)?.nip || '-') : (stafList.find(s => s.id === item.penerimaId)?.nik || '-'))}</div>
+                        </td>
+                        <td className="py-3.5 px-3">
+                          <span className={`inline-block px-1.5 py-0.5 text-[9px] rounded font-bold uppercase mb-1 ${
+                            item.penerimaTipe === 'guru' 
+                              ? 'bg-purple-500/15 text-purple-400 border border-purple-500/20' 
+                              : 'bg-blue-500/15 text-blue-400 border border-blue-500/20'
+                          }`}>
+                            {item.penerimaTipe}
+                          </span>
+                          <div className="text-slate-400 text-[11px] font-medium">{item.jabatan}</div>
+                        </td>
+                        <td className="py-3.5 px-3 font-semibold text-slate-300">
+                          {item.bulan} {item.tahun}
+                        </td>
+                        <td className="py-3.5 px-3 text-right font-mono text-slate-300">
+                          Rp {item.gajiPokok.toLocaleString('id-ID')}
+                        </td>
+                        <td className="py-3.5 px-3 text-right font-mono text-slate-400">
+                          + Rp {item.tunjangan.toLocaleString('id-ID')}
+                        </td>
+                        <td className="py-3.5 px-3 text-right font-mono text-rose-400/80">
+                          - Rp {item.potongan.toLocaleString('id-ID')}
+                        </td>
+                        <td className="py-3.5 px-3 text-right font-mono font-bold text-emerald-400">
+                          Rp {item.totalDiterima.toLocaleString('id-ID')}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                            item.status === 'Paid'
+                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                              : 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${item.status === 'Paid' ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
+                            {item.status === 'Paid' ? 'Paid / Lunas' : 'Draft'}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center justify-center gap-1">
+                            {/* Slip Gaji Action */}
+                            <button
+                              onClick={() => {
+                                setSelectedGajiForSlip(item);
+                                setShowSlipGajiModal(true);
+                              }}
+                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700/60 transition-colors"
+                              title="Cetak Slip Gaji (Print PDF)"
+                            >
+                              <Printer className="w-3.5 h-3.5 text-blue-400" />
+                            </button>
+
+                            {/* WhatsApp Notification Action */}
+                            <button
+                              onClick={() => handleKirimGajiWA(item)}
+                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700/60 transition-colors"
+                              title="Kirim Slip via WhatsApp"
+                            >
+                              <Send className="w-3.5 h-3.5 text-emerald-400" />
+                            </button>
+
+                            {/* Edit Action */}
+                            <button
+                              onClick={() => handleEditGajiClick(item)}
+                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700/60 transition-colors"
+                              title="Edit Data Gaji"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                            </button>
+
+                            {/* Delete Action */}
+                            <button
+                              onClick={() => setGajiToDeleteId(item.id)}
+                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700/60 transition-colors"
+                              title="Hapus Data Gaji"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL BAYAR GAJI BARU / EDIT GAJI */}
+      {showBayarGajiModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#121212] border border-slate-800 text-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl my-8">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-6">
+              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                <Coins className="w-5 h-5 text-rose-500" />
+                {editingGaji ? 'Edit Transaksi Pembayaran Gaji' : 'Proses Transaksi Pembayaran Gaji Baru'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowBayarGajiModal(false);
+                  setEditingGaji(null);
+                }}
+                className="text-slate-400 hover:text-white text-lg font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveGaji} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* COLUMN 1: RECIPENT INFO & PERIOD */}
+                <div className="space-y-4">
+                  <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800/80 space-y-4">
+                    <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Penerima & Periode Gaji</h4>
+                    
+                    {/* Role Filter toggle inside modal */}
+                    <div>
+                      <label className="text-slate-400 font-bold block mb-1.5 text-xs">Tipe Penerima</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGajiPenerimaTipe('guru');
+                            setGajiPenerimaId('');
+                          }}
+                          className={`py-2 rounded-xl text-xs font-bold transition-all border ${
+                            gajiPenerimaTipe === 'guru'
+                              ? 'bg-purple-600/10 text-purple-400 border-purple-500/40 shadow-sm'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                          disabled={!!editingGaji}
+                        >
+                          Ibu/Bapak Guru
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGajiPenerimaTipe('staf');
+                            setGajiPenerimaId('');
+                          }}
+                          className={`py-2 rounded-xl text-xs font-bold transition-all border ${
+                            gajiPenerimaTipe === 'staf'
+                              ? 'bg-blue-600/10 text-blue-400 border-blue-500/40 shadow-sm'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                          disabled={!!editingGaji}
+                        >
+                          Staf / Karyawan
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Receiver Selector */}
+                    <div>
+                      <label className="text-slate-400 font-bold block mb-1 text-xs">Pilih Nama Penerima</label>
+                      <select
+                        value={gajiPenerimaId}
+                        onChange={e => {
+                          const id = e.target.value;
+                          setGajiPenerimaId(id);
+                          // Prefill logical salaries based on roles & status
+                          if (id && !editingGaji) {
+                            if (gajiPenerimaTipe === 'guru') {
+                              const g = guruList.find(x => x.id === id);
+                              if (g) {
+                                if (g.status === 'PNS') {
+                                  setGajiPokok(4500000);
+                                  setGajiTunjangan(1200000);
+                                } else if (g.status === 'GTY') {
+                                  setGajiPokok(3500000);
+                                  setGajiTunjangan(800000);
+                                } else {
+                                  setGajiPokok(2500000);
+                                  setGajiTunjangan(500000);
+                                }
+                              }
+                            } else {
+                              const s = stafList.find(x => x.id === id);
+                              if (s) {
+                                if (s.status === 'Tetap') {
+                                  setGajiPokok(3200000);
+                                  setGajiTunjangan(600000);
+                                } else {
+                                  setGajiPokok(2200000);
+                                  setGajiTunjangan(300000);
+                                }
+                              }
+                            }
+                          }
+                        }}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500 cursor-pointer"
+                        required
+                        disabled={!!editingGaji}
+                      >
+                        <option value="">-- Pilih Penerima --</option>
+                        {gajiPenerimaTipe === 'guru' ? (
+                          guruList.map(g => (
+                            <option key={g.id} value={g.id}>
+                              {g.nama} {g.nip ? `(NIP: ${g.nip})` : ''} - {g.jabatan}
+                            </option>
+                          ))
+                        ) : (
+                          stafList.map(s => (
+                            <option key={s.id} value={s.id}>
+                              {s.nama} {s.nik ? `(NIK: ${s.nik})` : ''} - {s.bagian}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Period selection */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-slate-400 font-bold block mb-1 text-xs">Bulan Gaji</label>
+                        <select
+                          value={gajiBulan}
+                          onChange={e => setGajiBulan(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500"
+                        >
+                          {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map(m => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-slate-400 font-bold block mb-1 text-xs">Tahun Gaji</label>
+                        <input
+                          type="number"
+                          value={gajiTahun}
+                          onChange={e => setGajiTahun(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500 font-mono"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800/80 space-y-4">
+                    <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Pembayaran & Penyetoran</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-slate-400 font-bold block mb-1 text-xs">Metode Bayar</label>
+                        <select
+                          value={gajiMetode}
+                          onChange={e => setGajiMetode(e.target.value as any)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500"
+                        >
+                          <option value="Cash">Cash</option>
+                          <option value="Transfer Bank">Transfer Bank</option>
+                          <option value="E-Wallet">E-Wallet</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-slate-400 font-bold block mb-1 text-xs">Tanggal Bayar</label>
+                        <input
+                          type="date"
+                          value={gajiTanggal}
+                          onChange={e => setGajiTanggal(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500 font-mono cursor-pointer"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-400 font-bold block mb-1 text-xs">No. Rekening / Keterangan Bank (Optional)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Bank Syariah Mandiri 7122455829"
+                        value={gajiRekening}
+                        onChange={e => setGajiRekening(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-slate-400 font-bold block mb-1.5 text-xs">Status Pembayaran</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setGajiStatus('Draft')}
+                          className={`py-2 rounded-xl text-xs font-bold transition-all border ${
+                            gajiStatus === 'Draft'
+                              ? 'bg-amber-600/10 text-amber-400 border-amber-500/40 shadow-sm'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Draft (Pending)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setGajiStatus('Paid')}
+                          className={`py-2 rounded-xl text-xs font-bold transition-all border ${
+                            gajiStatus === 'Paid'
+                              ? 'bg-emerald-600/10 text-emerald-400 border-emerald-500/40 shadow-sm'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Paid (Terbayar)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* COLUMN 2: FINANCIAL CALCULATIONS */}
+                <div className="space-y-4">
+                  <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800/80 space-y-4 h-full flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Perhitungan Nominal Gaji</h4>
+                      
+                      {/* Gaji Pokok */}
+                      <div>
+                        <label className="text-slate-400 font-bold block mb-1 text-xs">Gaji Pokok (Rp)</label>
+                        <input
+                          type="number"
+                          value={gajiPokok}
+                          onChange={e => setGajiPokok(Number(e.target.value))}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-rose-500"
+                          required
+                          min={0}
+                        />
+                      </div>
+
+                      {/* Kelompok Tunjangan */}
+                      <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl space-y-3">
+                        <div className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Rincian Tunjangan & Bonus (Rp)</div>
+                        
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <label className="text-slate-400 text-[10px] block mb-0.5">Tunjangan Jabatan & Ops</label>
+                            <input
+                              type="number"
+                              value={gajiTunjangan}
+                              onChange={e => setGajiTunjangan(Number(e.target.value))}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                              min={0}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-400 text-[10px] block mb-0.5">Tunjangan Walas</label>
+                            <input
+                              type="number"
+                              value={gajiTunjanganWalas}
+                              onChange={e => setGajiTunjanganWalas(Number(e.target.value))}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                              min={0}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-400 text-[10px] block mb-0.5">Ketepatan Waktu</label>
+                            <input
+                              type="number"
+                              value={gajiTunjanganKetepatanWaktu}
+                              onChange={e => setGajiTunjanganKetepatanWaktu(Number(e.target.value))}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                              min={0}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-400 text-[10px] block mb-0.5">Tunjangan Kehadiran</label>
+                            <input
+                              type="number"
+                              value={gajiTunjanganKehadiran}
+                              onChange={e => setGajiTunjanganKehadiran(Number(e.target.value))}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                              min={0}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-400 text-[10px] block mb-0.5">Tunjangan Piket</label>
+                            <input
+                              type="number"
+                              value={gajiTunjanganPiket}
+                              onChange={e => setGajiTunjanganPiket(Number(e.target.value))}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                              min={0}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-400 text-[10px] block mb-0.5">Excess Time</label>
+                            <input
+                              type="number"
+                              value={gajiTunjanganExcessTime}
+                              onChange={e => setGajiTunjanganExcessTime(Number(e.target.value))}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                              min={0}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Kelompok Potongan */}
+                      <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl space-y-3">
+                        <div className="text-[11px] font-bold text-rose-400 uppercase tracking-wider">Rincian Potongan & Denda (Rp)</div>
+                        
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="col-span-2">
+                            <label className="text-rose-300 text-[10px] block mb-0.5">Potongan Absensi / BPJS / Umum</label>
+                            <input
+                              type="number"
+                              value={gajiPotongan}
+                              onChange={e => setGajiPotongan(Number(e.target.value))}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-rose-500"
+                              min={0}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-rose-300 text-[10px] block mb-0.5">Denda Terlambat</label>
+                            <input
+                              type="number"
+                              value={gajiPotonganDendaTerlambat}
+                              onChange={e => setGajiPotonganDendaTerlambat(Number(e.target.value))}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-rose-500"
+                              min={0}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-rose-300 text-[10px] block mb-0.5">Denda Lupa Finger</label>
+                            <input
+                              type="number"
+                              value={gajiPotonganDendaLupaFinger}
+                              onChange={e => setGajiPotonganDendaLupaFinger(Number(e.target.value))}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-rose-500"
+                              min={0}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-rose-300 text-[10px] block mb-0.5">Potongan Koperasi</label>
+                            <input
+                              type="number"
+                              value={gajiPotonganKoperasi}
+                              onChange={e => setGajiPotonganKoperasi(Number(e.target.value))}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-rose-500"
+                              min={0}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-rose-300 text-[10px] block mb-0.5">Kas Bon</label>
+                            <input
+                              type="number"
+                              value={gajiPotonganKasBon}
+                              onChange={e => setGajiPotonganKasBon(Number(e.target.value))}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-rose-500"
+                              min={0}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Catatan */}
+                      <div>
+                        <label className="text-slate-400 font-bold block mb-1 text-xs">Catatan Transaksi</label>
+                        <textarea
+                          placeholder="e.g. Pembayaran Gaji GTT, termasuk bonus lembur UTS..."
+                          value={gajiCatatan}
+                          onChange={e => setGajiCatatan(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500 h-16 resize-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* LIVE CALCULATION REVENUE STATEMENT CARD */}
+                    <div className="p-4 bg-rose-950/15 border border-rose-500/10 rounded-xl space-y-2 mt-4">
+                      <span className="text-[10px] uppercase font-black text-rose-400/80 tracking-wider">Perkiraan Bersih (Net Income)</span>
+                      <div className="flex justify-between items-end">
+                        <div className="text-[10px] text-slate-400">
+                          (Pokok + Total Tunjangan) - Total Potongan
+                        </div>
+                        <div className="text-xl font-black text-emerald-400 font-mono">
+                          Rp {(
+                            Number(gajiPokok) +
+                            (Number(gajiTunjangan) + Number(gajiTunjanganWalas) + Number(gajiTunjanganKetepatanWaktu) + Number(gajiTunjanganKehadiran) + Number(gajiTunjanganPiket) + Number(gajiTunjanganExcessTime)) -
+                            (Number(gajiPotongan) + Number(gajiPotonganDendaTerlambat) + Number(gajiPotonganDendaLupaFinger) + Number(gajiPotonganKoperasi) + Number(gajiPotonganKasBon))
+                          ).toLocaleString('id-ID')}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBayarGajiModal(false);
+                    setEditingGaji(null);
+                  }}
+                  className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold rounded-xl text-xs transition-all shadow-md shadow-rose-600/30 flex items-center gap-1.5 active:scale-[0.98]"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  {editingGaji ? 'Simpan Perubahan Gaji' : 'Proses & Bayar Gaji'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PRINT / SLIP GAJI PREVIEW */}
+      {showSlipGajiModal && selectedGajiForSlip && (() => {
+        const item = selectedGajiForSlip;
+        const tWalas = item.tunjanganWalas || 0;
+        const tKetepatan = item.tunjanganKetepatanWaktu || 0;
+        const tHadir = item.tunjanganKehadiran || 0;
+        const tPiket = item.tunjanganPiket || 0;
+        const tExcess = item.tunjanganExcessTime || 0;
+        const tJabatan = item.tunjangan || 0;
+
+        const pTerlambat = item.potonganDendaTerlambat || 0;
+        const pFinger = item.potonganDendaLupaFinger || 0;
+        const pKoperasi = item.potonganKoperasi || 0;
+        const pKasBon = item.potonganKasBon || 0;
+        const pAbsensi = item.potongan || 0;
+
+        const totalT = tJabatan + tWalas + tKetepatan + tHadir + tPiket + tExcess;
+        const totalP = pAbsensi + pTerlambat + pFinger + pKoperasi + pKasBon;
+        const subtotalPenghasilan = item.gajiPokok + totalT;
+        const totalNet = item.totalDiterima;
+
+        // Recipient NIP / NIK
+        const recipientNipNik = (item.penerimaNipNik && item.penerimaNipNik !== '-')
+          ? item.penerimaNipNik
+          : (item.penerimaTipe === 'guru' 
+              ? (guruList.find(g => g.id === item.penerimaId)?.nip || guruList.find(g => g.id === item.penerimaId)?.nik || '-') 
+              : (stafList.find(s => s.id === item.penerimaId)?.nip || stafList.find(s => s.id === item.penerimaId)?.nik || '-'));
+
+        return (
+          <div className="fixed inset-0 bg-slate-950/90 z-[105] flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white text-slate-900 rounded-2xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl space-y-5 my-8 relative">
+              
+              {/* Action buttons at the top of printable slip (hidden in standard browser prints) */}
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3 print:hidden">
+                <div className="flex items-center gap-2">
+                  <Receipt className="w-5 h-5 text-indigo-600" />
+                  <span className="text-sm font-bold text-slate-800">Pratinjau & Cetak Slip Gaji</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleKirimGajiWA(item)}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm"
+                    title="Kirim ke WhatsApp Penerima"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    Kirim WA
+                  </button>
+                  <button
+                    onClick={() => window.print()}
+                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-md shadow-blue-600/25"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    Cetak / Simpan PDF
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSlipGajiModal(false);
+                      setSelectedGajiForSlip(null);
+                    }}
+                    className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition-all"
+                  >
+                    Tutup
+                  </button>
+                </div>
+              </div>
+
+              {/* PRINT SLIP BODY CONTENT (DESIGNED LIKE A REAL PHYSICAL SLIP) */}
+              <div id="printable-slip-gaji" className="border border-slate-300 p-6 sm:p-7 rounded-xl space-y-5 bg-white font-sans text-slate-900">
+                
+                {/* Header */}
+                <div className="flex justify-between items-start pb-3.5 border-b-2 border-slate-800">
+                  <div className="flex items-center gap-3.5">
+                    {schoolSettings?.logoUrl ? (
+                      <div className="w-14 h-14 p-1 bg-white border border-slate-200 rounded-lg flex items-center justify-center overflow-hidden shrink-0">
+                        <img src={schoolSettings.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                      </div>
+                    ) : (
+                      <div className="w-14 h-14 bg-slate-100 border border-slate-300 rounded-lg flex items-center justify-center font-bold text-slate-700 text-lg shrink-0">
+                        🏫
+                      </div>
+                    )}
+                    <div>
+                      <h2 className="text-base font-black tracking-tight text-slate-900 uppercase leading-tight">
+                        {schoolSettings?.namaSekolah || 'SMP ISLAM MODERN AL FAKHIR'}
+                      </h2>
+                      <p className="text-[10px] text-slate-600 leading-normal mt-0.5 max-w-md">
+                        {schoolSettings?.alamat || 'Alamat Sekolah'}, RT/RW {schoolSettings?.rtRw || '01/01'}, Kec. {schoolSettings?.kecamatan || 'Kecamatan'}
+                      </p>
+                      <p className="text-[9px] text-slate-500 mt-0.5 font-medium">
+                        NPSN: {schoolSettings?.npsn || '-'} • Telp: {schoolSettings?.telepon || '-'} • Email: {schoolSettings?.email || '-'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="inline-block px-2.5 py-0.5 rounded bg-emerald-100 text-emerald-900 text-[9px] font-black uppercase tracking-wider mb-1">
+                      SLIP GAJI RESMI
+                    </span>
+                    <div className="text-[11px] font-bold font-mono text-slate-700">{item.id}</div>
+                    <div className="text-[9px] text-slate-500 mt-0.5">Tgl Bayar: <span className="font-semibold text-slate-700">{item.tanggalBayar}</span></div>
+                  </div>
+                </div>
+
+                {/* Title */}
+                <div className="text-center bg-slate-100/70 py-1.5 rounded-lg border border-slate-200">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">SLIP GAJI & HONORARIUM</h3>
+                  <p className="text-[10px] font-bold text-slate-600">PERIODE: {item.bulan.toUpperCase()} {item.tahun}</p>
+                </div>
+
+                {/* Recipient details */}
+                <div className="grid grid-cols-2 gap-4 text-[10px] bg-slate-50 p-3 rounded-lg border border-slate-200">
+                  <div className="space-y-1.5">
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-medium">Nama Penerima</span>
+                      <span className="text-slate-900 font-black">: {item.penerimaNama}</span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-medium">NIP / NIK</span>
+                      <span className="text-slate-800 font-mono">: {recipientNipNik}</span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-medium">Tipe Pegawai</span>
+                      <span className="text-slate-800 font-semibold">: {item.penerimaTipe === 'guru' ? 'Tenaga Pendidik (Guru)' : 'Tenaga Kependidikan (Staf)'}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-medium">Jabatan / Bagian</span>
+                      <span className="text-slate-800 font-semibold">: {item.jabatan}</span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-medium">Metode Bayar</span>
+                      <span className="text-slate-800 font-semibold">: {item.metodePembayaran}</span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-medium">No. Rekening</span>
+                      <span className="text-slate-800 font-mono">: {item.penerimaRekening || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Financial calculations tables (2 Columns: Penerimaan & Potongan) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                  
+                  {/* 1. Penerimaan / Penghasilan */}
+                  <div className="border border-emerald-200 rounded-lg overflow-hidden bg-emerald-50/20">
+                    <div className="bg-emerald-700 text-white px-3 py-1.5 flex justify-between items-center">
+                      <span className="text-[10px] font-black uppercase tracking-wide">1. PENERIMAAN / PENGHASILAN</span>
+                      <span className="text-[9px] font-medium opacity-90">JUMLAH</span>
+                    </div>
+                    <div className="p-3 space-y-1.5 text-[10px]">
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Gaji Pokok</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {item.gajiPokok.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Tunj. Jabatan & Ops</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {tJabatan.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Tunj. Wali Kelas (Walas)</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {tWalas.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Ketepatan Waktu</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {tKetepatan.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Tunj. Kehadiran</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {tHadir.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Tunj. Piket</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {tPiket.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Excess Time (Jam Tambahan)</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {tExcess.toLocaleString('id-ID')}</span>
+                      </div>
+
+                      <div className="flex justify-between pt-2 border-t-2 border-emerald-500 font-black text-[11px] text-emerald-950">
+                        <span>Subtotal Penerimaan</span>
+                        <span className="font-mono">Rp {subtotalPenghasilan.toLocaleString('id-ID')}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Potongan & Denda */}
+                  <div className="border border-rose-200 rounded-lg overflow-hidden bg-rose-50/20">
+                    <div className="bg-rose-700 text-white px-3 py-1.5 flex justify-between items-center">
+                      <span className="text-[10px] font-black uppercase tracking-wide">2. POTONGAN & DENDA</span>
+                      <span className="text-[9px] font-medium opacity-90">JUMLAH</span>
+                    </div>
+                    <div className="p-3 space-y-1.5 text-[10px]">
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-rose-100">
+                        <span className="text-slate-600 font-medium">• Potongan Absensi / Umum</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {pAbsensi.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-rose-100">
+                        <span className="text-slate-600 font-medium">• Denda Terlambat</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {pTerlambat.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-rose-100">
+                        <span className="text-slate-600 font-medium">• Denda Lupa Finger</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {pFinger.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-rose-100">
+                        <span className="text-slate-600 font-medium">• Potongan Koperasi</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {pKoperasi.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-rose-100">
+                        <span className="text-slate-600 font-medium">• Kas Bon / Pinjaman</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {pKasBon.toLocaleString('id-ID')}</span>
+                      </div>
+
+                      {/* Spacer to align heights */}
+                      <div className="h-9 hidden sm:block"></div>
+
+                      <div className="flex justify-between pt-2 border-t-2 border-rose-500 font-black text-[11px] text-rose-950">
+                        <span>Total Potongan</span>
+                        <span className="font-mono">Rp {totalP.toLocaleString('id-ID')}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Grand Total Bersih / Net Income Card */}
+                <div className="p-4 bg-slate-900 text-white rounded-xl space-y-1.5 shadow-md">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h4 className="text-[11px] font-black uppercase tracking-wider text-emerald-400">
+                        JUMLAH BERSIH YANG DITERIMA (NET INCOME)
+                      </h4>
+                      <p className="text-[9px] text-slate-300 font-medium">
+                        {item.metodePembayaran} {item.penerimaRekening ? `• No. Rekening: ${item.penerimaRekening}` : ''}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-black font-mono text-emerald-300 tracking-tight">
+                        Rp {totalNet.toLocaleString('id-ID')}
+                      </div>
+                      <span className={`inline-block text-[8px] font-black tracking-widest uppercase px-2 py-0.5 rounded ${item.status === 'Paid' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}`}>
+                        {item.status === 'Paid' ? 'STATUS: PAID (LUNAS)' : 'STATUS: DRAFT (PENDING)'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Terbilang */}
+                  <div className="pt-2 border-t border-slate-750 text-[9.5px] text-slate-300 italic">
+                    <span className="font-semibold text-slate-400 not-italic">Terbilang: </span>
+                    "{terbilang(totalNet)}"
+                  </div>
+                </div>
+
+                {/* Notes if any */}
+                {item.catatan && (
+                  <div className="text-[9.5px] text-slate-600 italic bg-amber-50/80 p-2.5 rounded-lg border border-amber-200">
+                    <span className="font-bold text-amber-900 not-italic">Catatan Tambahan: </span>{item.catatan}
+                  </div>
+                )}
+
+                {/* Signatures */}
+                <div className="grid grid-cols-3 gap-4 pt-6 text-[10px] border-t border-slate-200">
+                  <div className="text-center space-y-10">
+                    <p className="text-slate-600 font-medium">Penerima Gaji,</p>
+                    <div className="space-y-0.5">
+                      <p className="font-bold underline text-slate-900">{item.penerimaNama}</p>
+                      <p className="text-[8.5px] text-slate-500 font-mono">NIP/NIK: {recipientNipNik}</p>
+                    </div>
+                  </div>
+                  <div className="text-center space-y-10">
+                    <p className="text-slate-600 font-medium">Bendahara Sekolah,</p>
+                    <div className="space-y-0.5">
+                      <p className="font-bold underline text-slate-900">{bendaharaNama}</p>
+                      <p className="text-[8.5px] text-slate-500">Bendahara</p>
+                    </div>
+                  </div>
+                  <div className="text-center space-y-10">
+                    <p className="text-slate-600 font-medium">Mengetahui,</p>
+                    <div className="space-y-0.5">
+                      <p className="font-bold underline text-slate-900">{schoolSettings?.kepalaSekolah || 'Kepala Sekolah'}</p>
+                      <p className="text-[8.5px] text-slate-500">Kepala Sekolah</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Slip generation footer */}
+                <div className="text-[8px] text-slate-400 text-center pt-2 border-t border-dashed border-slate-200 flex justify-between items-center">
+                  <span>Dicetak otomatis oleh Sistem Manajemen Keuangan Sekolah</span>
+                  <span>{item.id} • {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* CUSTOM DELETE CONFIRMATION DIALOG MODAL FOR GAJI */}
+      {gajiToDeleteId && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-[#121212] border border-slate-800 text-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-6">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-14 h-14 bg-rose-500/10 rounded-full flex items-center justify-center border border-rose-500/20">
+                <Trash2 className="w-7 h-7 text-rose-500" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white">Hapus Pembayaran Gaji?</h3>
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                  Apakah Anda benar-benar yakin ingin menghapus data payroll gaji ini? Rincian slip dan riwayat transaksi gaji ini akan dihapus permanen dari sistem.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setGajiToDeleteId(null)}
+                className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-colors border border-slate-700"
+              >
+                Batalkan
+              </button>
+              <button
+                onClick={handleExecuteDeleteGaji}
+                className="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl text-xs transition-colors shadow-md shadow-rose-600/30"
+              >
+                Hapus Permanen
               </button>
             </div>
           </div>

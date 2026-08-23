@@ -17,7 +17,7 @@ export type Role = 'admin' | 'guru' | 'siswa' | 'staf';
 export type SubTab = 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel' | 'ekskul';
 export type AbsensiSubTab = 'scan_barcode' | 'harian_siswa' | 'kelas_mapel' | 'absensi_guru' | 'redaksi';
 export type CbtSubTab = 'bank_soal' | 'jadwal_kartu' | 'ai_generator' | 'simulasi_ujian' | 'hasil_ujian';
-export type KeuanganSubTab = 'pembayaran' | 'pengaturan_biaya' | 'rekap' | 'redaksi';
+export type KeuanganSubTab = 'pembayaran' | 'pengaturan_biaya' | 'rekap' | 'redaksi' | 'gaji';
 export type PengaturanSubTab = 'identitas' | 'logo' | 'google_drive' | 'fonnte' | 'jadwal' | 'sistem';
 
 export interface TarifBiaya {
@@ -417,4 +417,37 @@ export interface SchoolSettings {
   bankVaNumber?: string;
   bankVaOwner?: string;
   qrisUrl?: string;
+}
+
+export interface GajiPembayaran {
+  id: string;
+  penerimaId: string;
+  penerimaNama: string;
+  penerimaTipe: 'guru' | 'staf';
+  penerimaNipNik: string;
+  jabatan: string;
+  bulan: string; // e.g. "Juli", "Agustus"
+  tahun: string; // e.g. "2026"
+  gajiPokok: number;
+  tunjangan: number;
+  // Detailed Tunjangan
+  tunjanganWalas?: number;
+  tunjanganKetepatanWaktu?: number;
+  tunjanganKehadiran?: number;
+  tunjanganPiket?: number;
+  tunjanganExcessTime?: number;
+  
+  potongan: number;
+  // Detailed Potongan
+  potonganDendaTerlambat?: number;
+  potonganDendaLupaFinger?: number;
+  potonganKoperasi?: number;
+  potonganKasBon?: number;
+
+  totalDiterima: number;
+  tanggalBayar: string; // YYYY-MM-DD
+  metodePembayaran: 'Cash' | 'Transfer Bank' | 'E-Wallet';
+  status: 'Draft' | 'Paid';
+  catatan?: string;
+  penerimaRekening?: string;
 }

@@ -25,7 +25,8 @@ import {
   MessageSquare,
   Clock,
   Building,
-  Trophy
+  Trophy,
+  Coins
 } from 'lucide-react';
 import { Role, SubTab, AbsensiSubTab, CbtSubTab, KeuanganSubTab, PengaturanSubTab } from '../types/school';
 
@@ -694,6 +695,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </div>
                         <span className="text-[9px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-1 py-0.5 rounded font-bold">
                           Baru
+                        </span>
+                      </button>
+
+                      {/* 5. Pembayaran Gaji / Payroll */}
+                      <button
+                        onClick={() => {
+                          setActiveTab('keuangan');
+                          if (setKeuanganSubTab) setKeuanganSubTab('gaji');
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
+                          keuanganSubTab === 'gaji'
+                            ? 'bg-rose-600/10 text-rose-400 border border-rose-500/20 shadow-sm'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Coins className="w-3.5 h-3.5 text-rose-400" />
+                          <span>Pembayaran Gaji (Payroll)</span>
+                        </div>
+                        <span className="text-[9px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-1 py-0.5 rounded font-bold animate-pulse">
+                          Gaji
                         </span>
                       </button>
                     </div>
