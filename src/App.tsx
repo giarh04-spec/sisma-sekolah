@@ -9,6 +9,7 @@ import { AdministrasiGuruView } from './components/AdministrasiGuruView';
 import { KeuanganView } from './components/KeuanganView';
 import { PengaturanView } from './components/PengaturanView';
 import { LoginView } from './components/LoginView';
+import { PublicSlipGajiView } from './components/PublicSlipGajiView';
 
 import { 
   Role, 
@@ -86,6 +87,16 @@ function getSavedData<T>(key: string, initial: T): T {
 }
 
 export default function App() {
+  const [publicSlipId, setPublicSlipId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('slip') || (params.get('view') === 'slip' ? params.get('id') : null);
+    } catch {
+      return null;
+    }
+  });
+
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [currentRole, setCurrentRole] = useState<Role>('admin');
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -650,6 +661,29 @@ export default function App() {
     setUserGoogleToken('');
     setIsLoggedIn(false);
   };
+
+  // If public slip link is accessed, render PublicSlipGajiView directly
+  if (publicSlipId) {
+    return (
+      <PublicSlipGajiView
+        slipId={publicSlipId}
+        schoolSettings={schoolSettings}
+        gajiList={gajiList}
+        stafList={stafList}
+        guruList={guruList}
+        onBackToApp={() => {
+          setPublicSlipId(null);
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('slip');
+            url.searchParams.delete('view');
+            url.searchParams.delete('id');
+            window.history.pushState({}, '', url.pathname);
+          } catch {}
+        }}
+      />
+    );
+  }
 
   // If not logged in, render Dashboard Login
   if (!isLoggedIn) {

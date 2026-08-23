@@ -80,7 +80,9 @@ export async function getFonnteDeviceStatus(token: string): Promise<FonnteDevice
 export async function sendFonnteMessage(
   targetPhone: string,
   message: string,
-  token: string = 'DEMO_FONNTE_TOKEN_2026'
+  token: string = 'DEMO_FONNTE_TOKEN_2026',
+  fileBlob?: Blob | null,
+  filename: string = 'slip-gaji.png'
 ): Promise<{ success: boolean; message: string }> {
   // Format phone number to Indonesian format (e.g., 081234567890 -> 6281234567890)
   let formattedPhone = targetPhone.trim().replace(/\D/g, '');
@@ -96,6 +98,10 @@ export async function sendFonnteMessage(
     formData.append('message', message);
     formData.append('countryCode', '62');
 
+    if (fileBlob) {
+      formData.append('file', fileBlob, filename);
+    }
+
     const response = await fetch('https://api.fonnte.com/send', {
       method: 'POST',
       headers: {
@@ -109,7 +115,7 @@ export async function sendFonnteMessage(
     if (data.status) {
       return {
         success: true,
-        message: `Pesan WA berhasil dikirim ke ${formattedPhone} via Fonnte Gateway`
+        message: `Slip gaji & gambar berhasil dikirim ke ${formattedPhone} via Fonnte Gateway`
       };
     } else {
       // Return simulated success if token is demo/invalid for user preview

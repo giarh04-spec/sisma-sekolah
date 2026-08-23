@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { downloadCSV, terbilang } from '../lib/exportUtils';
+import { downloadCSV, terbilang, captureElementToBlob, downloadElementAsImage, copyElementImageToClipboard } from '../lib/exportUtils';
 import { dbClearCollection } from '../lib/firebaseSync';
 import { 
   Wallet, 
@@ -39,7 +39,11 @@ import {
   Bell,
   Building2,
   QrCode,
-  Coins
+  Coins,
+  Image as ImageIcon,
+  Copy,
+  Share2,
+  Loader2
 } from 'lucide-react';
 import { TagihanKeuangan, TransaksiKeuangan, Siswa, KeuanganSubTab, TarifBiaya, TipeKeuangan, SchoolSettings, RombelKelas, EkstrakurikulerItem, GajiPembayaran, Guru, Staf } from '../types/school';
 import { sendFonnteMessage } from '../lib/fonnte';
@@ -127,6 +131,13 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   const [showSlipGajiModal, setShowSlipGajiModal] = useState<boolean>(false);
   const [selectedGajiForSlip, setSelectedGajiForSlip] = useState<GajiPembayaran | null>(null);
   const [editingGaji, setEditingGaji] = useState<GajiPembayaran | null>(null);
+  const [isProcessingSlipImage, setIsProcessingSlipImage] = useState<boolean>(false);
+  const [slipSendingStatus, setSlipSendingStatus] = useState<string>('');
+  const [offscreenSlipItem, setOffscreenSlipItem] = useState<GajiPembayaran | null>(null);
+
+  // Bulk Auto-send Gaji State
+  const [isBulkSendingGaji, setIsBulkSendingGaji] = useState<boolean>(false);
+  const [bulkGajiProgress, setBulkGajiProgress] = useState<{ current: number; total: number; name: string } | null>(null);
 
   // Form State for Gaji
   const [gajiPenerimaTipe, setGajiPenerimaTipe] = useState<'guru' | 'staf'>('guru');
@@ -324,22 +335,75 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     }
   };
 
-  // Kirim slip gaji via WhatsApp
-  const handleKirimGajiWA = async (item: GajiPembayaran) => {
-    let phone = '';
-    if (item.penerimaTipe === 'guru') {
-      const g = guruList.find(x => x.id === item.penerimaId);
-      phone = g?.telepon || '';
-    } else {
-      const s = stafList.find(x => x.id === item.penerimaId);
-      phone = s?.telepon || '';
+  // Helper untuk membuat blob gambar slip gaji (baik modal terbuka maupun di latar belakang)
+  const generateSlipImageBlob = async (item: GajiPembayaran): Promise<Blob | null> => {
+    // 1. Jika modal slip sedang terbuka untuk item ini
+    const modalEl = document.getElementById('printable-slip-gaji');
+    if (modalEl && selectedGajiForSlip?.id === item.id) {
+      return await captureElementToBlob(modalEl);
     }
 
-    if (!phone) {
-      showToast('Nomor telepon penerima tidak ditemukan atau kosong.', 'error');
+    // 2. Render ke offscreen element
+    setOffscreenSlipItem(item);
+    await new Promise(resolve => setTimeout(resolve, 150));
+    const offscreenEl = document.getElementById('printable-slip-gaji-offscreen');
+    if (offscreenEl) {
+      return await captureElementToBlob(offscreenEl);
+    }
+    return null;
+  };
+
+  // Unduh Slip Gaji sebagai Gambar PNG
+  const handleDownloadSlipImage = async (item: GajiPembayaran) => {
+    const safeName = (item.penerimaNama || 'Penerima').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `Slip_Gaji_${safeName}_${item.bulan}_${item.tahun}`;
+    showToast('Sedang membuat gambar slip gaji (PNG)...');
+    
+    let element = document.getElementById('printable-slip-gaji');
+    if (!element) {
+      setOffscreenSlipItem(item);
+      await new Promise(res => setTimeout(res, 150));
+      element = document.getElementById('printable-slip-gaji-offscreen');
+    }
+    
+    if (!element) {
+      showToast('Gagal merender elemen slip gaji.', 'error');
       return;
     }
 
+    const success = await downloadElementAsImage(element, filename);
+    if (success) {
+      showToast('✅ Gambar Slip Gaji berhasil diunduh (PNG)!');
+    } else {
+      showToast('Gagal mengunduh gambar slip.', 'error');
+    }
+  };
+
+  // Salin Gambar Slip Gaji ke Clipboard
+  const handleCopySlipImage = async (item: GajiPembayaran) => {
+    let element = document.getElementById('printable-slip-gaji');
+    if (!element) {
+      setOffscreenSlipItem(item);
+      await new Promise(res => setTimeout(res, 150));
+      element = document.getElementById('printable-slip-gaji-offscreen');
+    }
+
+    if (!element) {
+      showToast('Gagal menemukan elemen slip gaji.', 'error');
+      return;
+    }
+
+    showToast('Menyalin gambar slip ke clipboard...');
+    const success = await copyElementImageToClipboard(element);
+    if (success) {
+      showToast('📋 Gambar Slip Gaji berhasil disalin ke Clipboard! Tinggal tekan Ctrl+V di chat WhatsApp.');
+    } else {
+      showToast('Peramban tidak mendukung salin gambar otomatis. Silakan gunakan tombol Unduh Gambar.', 'error');
+    }
+  };
+
+  // Build pesan teks slip gaji
+  const buildGajiWhatsAppMessage = (item: GajiPembayaran) => {
     const tWalas = item.tunjanganWalas || 0;
     const tKetepatan = item.tunjanganKetepatanWaktu || 0;
     const tHadir = item.tunjanganKehadiran || 0;
@@ -360,7 +424,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     const formattedGajiPokok = item.gajiPokok.toLocaleString('id-ID');
     const formattedTotal = item.totalDiterima.toLocaleString('id-ID');
 
-    // Build itemized breakdown texts
     let tunjanganLines = '';
     if (tJabatan > 0) tunjanganLines += `  • Tunj. Jabatan & Ops: Rp ${tJabatan.toLocaleString('id-ID')}\n`;
     if (tWalas > 0) tunjanganLines += `  • Tunj. Wali Kelas: Rp ${tWalas.toLocaleString('id-ID')}\n`;
@@ -376,7 +439,10 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     if (pKoperasi > 0) potonganLines += `  • Potongan Koperasi: Rp ${pKoperasi.toLocaleString('id-ID')}\n`;
     if (pKasBon > 0) potonganLines += `  • Kas Bon: Rp ${pKasBon.toLocaleString('id-ID')}\n`;
 
-    const msg = `🧾 *SLIP GAJI & HONORARIUM BULANAN*\n` +
+    const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : '';
+    const slipDownloadUrl = `${baseUrl}?slip=${encodeURIComponent(item.id)}`;
+
+    return `🧾 *SLIP GAJI & HONORARIUM BULANAN*\n` +
       `*${schoolSettings?.namaSekolah || 'SMP ISLAM MODERN AL FAKHIR'}*\n` +
       `Periode: *${item.bulan} ${item.tahun}*\n` +
       `No. Slip: ${item.id}\n` +
@@ -401,15 +467,55 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       `• Tanggal: ${item.tanggalBayar}\n` +
       `${item.penerimaRekening ? `• No. Rekening: ${item.penerimaRekening}\n` : ''}` +
       `${item.catatan ? `• Catatan: ${item.catatan}\n` : ''}\n` +
+      `📥 *Link Unduh & Lihat Slip Digital:*\n` +
+      `${slipDownloadUrl}\n\n` +
+      `🖼️ *Gambar slip gaji resmi terlampir.* (Tersedia format cetak & unduh di tautan resmi di atas)\n\n` +
       `Terima kasih atas dedikasi dan kerja keras Ibu/Bapak.\n\n` +
       `Salam hangat,\n*Bendahara & Manajemen Keuangan Sekolah*`;
+  };
+
+  // Kirim slip gaji via WhatsApp secara otomatis (dengan gambar lampiran & rincian)
+  const handleKirimGajiWA = async (item: GajiPembayaran) => {
+    let phone = '';
+    if (item.penerimaTipe === 'guru') {
+      const g = guruList.find(x => x.id === item.penerimaId);
+      phone = g?.telepon || '';
+    } else {
+      const s = stafList.find(x => x.id === item.penerimaId);
+      phone = s?.telepon || '';
+    }
+
+    if (!phone) {
+      showToast('Nomor telepon penerima tidak ditemukan atau kosong.', 'error');
+      return;
+    }
+
+    setIsProcessingSlipImage(true);
+    setSlipSendingStatus('Membuat gambar slip gaji beresolusi tinggi...');
+    
+    const safeName = (item.penerimaNama || 'Penerima').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `Slip_Gaji_${safeName}_${item.bulan}_${item.tahun}.png`;
+
+    const msg = buildGajiWhatsAppMessage(item);
+
+    // Generate slip image blob
+    const slipBlob = await generateSlipImageBlob(item);
+    
+    // Copy image to clipboard & download as convenience
+    const targetEl = document.getElementById('printable-slip-gaji') || document.getElementById('printable-slip-gaji-offscreen');
+    if (targetEl) {
+      copyElementImageToClipboard(targetEl).catch(() => {});
+      downloadElementAsImage(targetEl, filename).catch(() => {});
+    }
+
+    setSlipSendingStatus('Mengirimkan slip gaji ke WhatsApp penerima...');
 
     const apiToken = schoolSettings?.fonnteToken || '';
     if (apiToken) {
       try {
-        const result = await sendFonnteMessage(phone, msg, apiToken);
+        const result = await sendFonnteMessage(phone, msg, apiToken, slipBlob, filename);
         if (result.success) {
-          showToast(`Slip gaji berhasil terkirim ke WA ${item.penerimaNama}!`);
+          showToast(`✅ Slip gaji & gambar resmi berhasil dikirim otomatis ke WA ${item.penerimaNama}!`);
         } else {
           showToast(`Gagal kirim via Gateway: ${result.message || 'Terjadi kesalahan'}.`, 'error');
         }
@@ -417,16 +523,74 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         showToast('Koneksi WhatsApp Gateway terputus.', 'error');
       }
     } else {
-      // Direct WA Link API fallback
+      // Fallback Direct WA link
       const cleanPhone = phone.replace(/[^0-9]/g, '');
       const waUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`;
       const newTab = window.open(waUrl, '_blank');
       if (newTab) {
-        showToast('Membuka WhatsApp untuk mengirim slip gaji...');
+        showToast('✅ WhatsApp dibuka! Gambar Slip Gaji telah diunduh & tersalin di clipboard (tekan Ctrl+V di chat WhatsApp).');
       } else {
         showToast('Gagal membuka popup WhatsApp, silakan izinkan popup di browser Anda.', 'error');
       }
     }
+
+    setIsProcessingSlipImage(false);
+    setSlipSendingStatus('');
+  };
+
+  // Bulk Auto-send Gaji to All Filtered Recipients
+  const handleBulkKirimGajiWA = async () => {
+    const targets = filteredGajiList.filter(item => {
+      const g = item.penerimaTipe === 'guru' ? guruList.find(x => x.id === item.penerimaId) : stafList.find(x => x.id === item.penerimaId);
+      return Boolean(g?.telepon);
+    });
+
+    if (targets.length === 0) {
+      showToast('Tidak ada data gaji dengan nomor telepon WhatsApp yang valid untuk dikirim.', 'error');
+      return;
+    }
+
+    if (!confirm(`Kirim gambar slip gaji resmi otomatis ke ${targets.length} penerima melalui WhatsApp Gateway?`)) {
+      return;
+    }
+
+    setIsBulkSendingGaji(true);
+    let successCount = 0;
+
+    for (let i = 0; i < targets.length; i++) {
+      const item = targets[i];
+      setBulkGajiProgress({ current: i + 1, total: targets.length, name: item.penerimaNama });
+      
+      try {
+        let phone = '';
+        if (item.penerimaTipe === 'guru') {
+          const g = guruList.find(x => x.id === item.penerimaId);
+          phone = g?.telepon || '';
+        } else {
+          const s = stafList.find(x => x.id === item.penerimaId);
+          phone = s?.telepon || '';
+        }
+
+        if (phone) {
+          const safeName = (item.penerimaNama || 'Penerima').replace(/[^a-zA-Z0-9_-]/g, '_');
+          const filename = `Slip_Gaji_${safeName}_${item.bulan}_${item.tahun}.png`;
+          const msg = buildGajiWhatsAppMessage(item);
+          const slipBlob = await generateSlipImageBlob(item);
+          const apiToken = schoolSettings?.fonnteToken || '';
+          
+          await sendFonnteMessage(phone, msg, apiToken, slipBlob, filename);
+          successCount++;
+        }
+        // Small throttling delay to avoid gateway flood
+        await new Promise(res => setTimeout(res, 600));
+      } catch (err) {
+        console.error('Error auto-sending gaji to:', item.penerimaNama, err);
+      }
+    }
+
+    setIsBulkSendingGaji(false);
+    setBulkGajiProgress(null);
+    showToast(`✅ Selesai! ${successCount} dari ${targets.length} slip gaji bergambar berhasil dikirim otomatis ke WhatsApp.`);
   };
 
   // Filtered Gaji List Memo
@@ -5688,6 +5852,26 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   ))}
                 </select>
               </div>
+
+              {/* Bulk Auto-Send WhatsApp Button */}
+              <button
+                onClick={handleBulkKirimGajiWA}
+                disabled={isBulkSendingGaji || filteredGajiList.length === 0}
+                className="px-3.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
+                title="Kirim gambar slip gaji otomatis ke semua guru/staf via WhatsApp"
+              >
+                {isBulkSendingGaji ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Mengirim ({bulkGajiProgress ? `${bulkGajiProgress.current}/${bulkGajiProgress.total}` : '...'})
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5 text-emerald-400" />
+                    Kirim Semua Slip WA
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
@@ -6264,38 +6448,83 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             <div className="bg-white text-slate-900 rounded-2xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl space-y-5 my-8 relative">
               
               {/* Action buttons at the top of printable slip (hidden in standard browser prints) */}
-              <div className="flex items-center justify-between border-b border-slate-200 pb-3 print:hidden">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3.5 print:hidden">
                 <div className="flex items-center gap-2">
-                  <Receipt className="w-5 h-5 text-indigo-600" />
-                  <span className="text-sm font-bold text-slate-800">Pratinjau & Cetak Slip Gaji</span>
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+                    <Receipt className="w-4 h-4 text-indigo-600" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-black text-slate-800 block">Pratinjau & Cetak Slip Gaji</span>
+                    <span className="text-[10px] text-slate-500 font-medium">Kirim gambar resmi ke WhatsApp atau simpan PDF</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <button
                     onClick={() => handleKirimGajiWA(item)}
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm"
-                    title="Kirim ke WhatsApp Penerima"
+                    disabled={isProcessingSlipImage}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-[11px] font-extrabold rounded-lg transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                    title="Kirim gambar slip gaji & rincian ke WhatsApp penerima secara otomatis"
                   >
-                    <Send className="w-3.5 h-3.5" />
-                    Kirim WA
+                    {isProcessingSlipImage ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Mengirim Otomatis...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        Kirim Slip ke WA
+                      </>
+                    )}
                   </button>
+
+                  <button
+                    onClick={() => handleDownloadSlipImage(item)}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                    title="Unduh Slip Gaji sebagai file Gambar PNG"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5 text-sky-400" />
+                    Unduh Gambar (PNG)
+                  </button>
+
+                  <button
+                    onClick={() => handleCopySlipImage(item)}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                    title="Salin gambar slip ke clipboard untuk dipaste (Ctrl+V) di WA"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-slate-600" />
+                    Salin Gambar
+                  </button>
+
                   <button
                     onClick={() => window.print()}
-                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-md shadow-blue-600/25"
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-md shadow-blue-600/25 active:scale-95 cursor-pointer"
                   >
                     <Printer className="w-3.5 h-3.5" />
-                    Cetak / Simpan PDF
+                    Cetak / PDF
                   </button>
+
                   <button
                     onClick={() => {
                       setShowSlipGajiModal(false);
                       setSelectedGajiForSlip(null);
                     }}
-                    className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition-all"
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition-all active:scale-95 cursor-pointer"
                   >
                     Tutup
                   </button>
                 </div>
               </div>
+
+              {/* Real-time sending feedback bar */}
+              {isProcessingSlipImage && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 animate-pulse print:hidden">
+                  <Loader2 className="w-4 h-4 text-emerald-600 animate-spin shrink-0" />
+                  <div className="text-xs text-emerald-900 font-semibold">
+                    {slipSendingStatus || 'Sedang memproses dan mengirimkan gambar slip gaji via WhatsApp...'}
+                  </div>
+                </div>
+              )}
 
               {/* PRINT SLIP BODY CONTENT (DESIGNED LIKE A REAL PHYSICAL SLIP) */}
               <div id="printable-slip-gaji" className="border border-slate-300 p-6 sm:p-7 rounded-xl space-y-5 bg-white font-sans text-slate-900">
@@ -6560,6 +6789,288 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* BULK SENDING WHATSAPP PROGRESS MODAL */}
+      {isBulkSendingGaji && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+          <div className="bg-[#121212] border border-slate-800 text-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 text-center">
+            <div className="w-14 h-14 mx-auto bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/20">
+              <Loader2 className="w-7 h-7 text-emerald-400 animate-spin" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-white">Mengirim Slip Gaji Otomatis</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Sedang memproses slip bergambar dan mengirimkan via WhatsApp Gateway...
+              </p>
+            </div>
+
+            {bulkGajiProgress && (
+              <div className="space-y-2 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                <div className="flex justify-between text-xs font-bold">
+                  <span className="text-slate-400">Penerima Saat Ini:</span>
+                  <span className="text-emerald-400 font-extrabold">{bulkGajiProgress.name}</span>
+                </div>
+                <div className="flex justify-between text-xs font-semibold text-slate-400">
+                  <span>Progres:</span>
+                  <span>{bulkGajiProgress.current} dari {bulkGajiProgress.total} orang</span>
+                </div>
+                {/* Progress bar */}
+                <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden mt-2">
+                  <div 
+                    className="bg-emerald-500 h-full transition-all duration-300 rounded-full"
+                    style={{ width: `${Math.round((bulkGajiProgress.current / bulkGajiProgress.total) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            <p className="text-[10px] text-slate-500 italic">
+              Mohon tidak menutup halaman ini hingga proses pengiriman selesai.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* OFFSCREEN PRINTABLE SLIP CONTAINER FOR BACKGROUND IMAGE GENERATION */}
+      {offscreenSlipItem && (
+        <div style={{ position: 'fixed', left: '-9999px', top: 0, width: '800px', zIndex: -100 }}>
+          {(() => {
+            const item = offscreenSlipItem;
+            const tWalas = item.tunjanganWalas || 0;
+            const tKetepatan = item.tunjanganKetepatanWaktu || 0;
+            const tHadir = item.tunjanganKehadiran || 0;
+            const tPiket = item.tunjanganPiket || 0;
+            const tExcess = item.tunjanganExcessTime || 0;
+            const tJabatan = item.tunjangan || 0;
+
+            const pTerlambat = item.potonganDendaTerlambat || 0;
+            const pFinger = item.potonganDendaLupaFinger || 0;
+            const pKoperasi = item.potonganKoperasi || 0;
+            const pKasBon = item.potonganKasBon || 0;
+            const pAbsensi = item.potongan || 0;
+
+            const totalT = tJabatan + tWalas + tKetepatan + tHadir + tPiket + tExcess;
+            const totalP = pAbsensi + pTerlambat + pFinger + pKoperasi + pKasBon;
+            const totalNet = item.totalDiterima;
+
+            const recipientNipNik = (item.penerimaNipNik && item.penerimaNipNik !== '-')
+              ? item.penerimaNipNik
+              : (item.penerimaTipe === 'guru' 
+                  ? (guruList.find(g => g.id === item.penerimaId)?.nip || guruList.find(g => g.id === item.penerimaId)?.nik || '-') 
+                  : (stafList.find(s => s.id === item.penerimaId)?.nip || stafList.find(s => s.id === item.penerimaId)?.nik || '-'));
+
+            return (
+              <div id="printable-slip-gaji-offscreen" className="border border-slate-300 p-6 sm:p-7 rounded-xl space-y-5 bg-white font-sans text-slate-900 w-[800px]">
+                {/* Header */}
+                <div className="flex justify-between items-start pb-3.5 border-b-2 border-slate-800">
+                  <div className="flex items-center gap-3.5">
+                    {schoolSettings?.logoUrl ? (
+                      <div className="w-14 h-14 p-1 bg-white border border-slate-200 rounded-lg flex items-center justify-center overflow-hidden shrink-0">
+                        <img src={schoolSettings.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                      </div>
+                    ) : (
+                      <div className="w-14 h-14 bg-slate-100 border border-slate-300 rounded-lg flex items-center justify-center font-bold text-slate-700 text-lg shrink-0">
+                        🏫
+                      </div>
+                    )}
+                    <div>
+                      <h2 className="text-base font-black tracking-tight text-slate-900 uppercase leading-tight">
+                        {schoolSettings?.namaSekolah || 'SMP ISLAM MODERN AL FAKHIR'}
+                      </h2>
+                      <p className="text-[10px] text-slate-600 leading-normal mt-0.5 max-w-md">
+                        {schoolSettings?.alamat || 'Alamat Sekolah'}, RT/RW {schoolSettings?.rtRw || '01/01'}, Kec. {schoolSettings?.kecamatan || 'Kecamatan'}
+                      </p>
+                      <p className="text-[9px] text-slate-500 mt-0.5 font-medium">
+                        NPSN: {schoolSettings?.npsn || '-'} • Telp: {schoolSettings?.telepon || '-'} • Email: {schoolSettings?.email || '-'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="inline-block px-2.5 py-0.5 rounded bg-emerald-100 text-emerald-900 text-[9px] font-black uppercase tracking-wider mb-1">
+                      SLIP GAJI RESMI
+                    </span>
+                    <div className="text-[11px] font-bold font-mono text-slate-700">{item.id}</div>
+                    <div className="text-[9px] text-slate-500 mt-0.5">Tgl Bayar: <span className="font-semibold text-slate-700">{item.tanggalBayar}</span></div>
+                  </div>
+                </div>
+
+                {/* Title */}
+                <div className="text-center bg-slate-100/70 py-1.5 rounded-lg border border-slate-200">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">SLIP GAJI & HONORARIUM</h3>
+                  <p className="text-[10px] font-bold text-slate-600">PERIODE: {item.bulan.toUpperCase()} {item.tahun}</p>
+                </div>
+
+                {/* Recipient details */}
+                <div className="grid grid-cols-2 gap-4 text-[10px] bg-slate-50 p-3 rounded-lg border border-slate-200">
+                  <div className="space-y-1.5">
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-medium">Nama Penerima</span>
+                      <span className="text-slate-900 font-black">: {item.penerimaNama}</span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-medium">NIP / NIK</span>
+                      <span className="text-slate-800 font-mono">: {recipientNipNik}</span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-medium">Tipe Pegawai</span>
+                      <span className="text-slate-800 font-semibold">: {item.penerimaTipe === 'guru' ? 'Tenaga Pendidik (Guru)' : 'Tenaga Kependidikan (Staf)'}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-medium">Jabatan / Posisi</span>
+                      <span className="text-slate-900 font-bold">: {item.jabatan}</span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-medium">Metode Bayar</span>
+                      <span className="text-slate-800 font-semibold">: {item.metodePembayaran}</span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-medium">No. Rekening</span>
+                      <span className="text-slate-800 font-mono">: {item.penerimaRekening || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Breakdown Sections */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Penerimaan */}
+                  <div className="border border-emerald-200 rounded-xl overflow-hidden bg-emerald-50/20">
+                    <div className="bg-emerald-600 text-white font-extrabold text-[11px] px-3.5 py-1.5 uppercase tracking-wide flex justify-between items-center">
+                      <span>I. PENERIMAAN</span>
+                      <span className="text-[9px] font-normal opacity-80">(PENGHASILAN)</span>
+                    </div>
+                    <div className="p-3 space-y-1.5 text-[10px]">
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-200/60 font-bold text-slate-900">
+                        <span>• Gaji Pokok</span>
+                        <span className="font-mono">Rp {item.gajiPokok.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Tunjangan Jabatan & Ops</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {tJabatan.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Tunjangan Wali Kelas</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {tWalas.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Ketepatan Waktu</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {tKetepatan.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Tunjangan Kehadiran</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {tHadir.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Tunjangan Piket</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {tPiket.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Excess Time</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {tExcess.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between pt-2 border-t-2 border-emerald-600 font-black text-[11px] text-emerald-950">
+                        <span>Total Penghasilan</span>
+                        <span className="font-mono">Rp {(item.gajiPokok + totalT).toLocaleString('id-ID')}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Potongan */}
+                  <div className="border border-rose-200 rounded-xl overflow-hidden bg-rose-50/20">
+                    <div className="bg-rose-600 text-white font-extrabold text-[11px] px-3.5 py-1.5 uppercase tracking-wide flex justify-between items-center">
+                      <span>II. POTONGAN</span>
+                      <span className="text-[9px] font-normal opacity-80">(DEDUKSI)</span>
+                    </div>
+                    <div className="p-3 space-y-1.5 text-[10px]">
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-rose-100">
+                        <span className="text-slate-600 font-medium">• Potongan Absensi / Umum</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {pAbsensi.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-rose-100">
+                        <span className="text-slate-600 font-medium">• Denda Terlambat</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {pTerlambat.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-rose-100">
+                        <span className="text-slate-600 font-medium">• Denda Lupa Finger</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {pFinger.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-rose-100">
+                        <span className="text-slate-600 font-medium">• Potongan Koperasi</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {pKoperasi.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-rose-100">
+                        <span className="text-slate-600 font-medium">• Kas Bon / Pinjaman</span>
+                        <span className="font-mono font-semibold text-slate-900">Rp {pKasBon.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="h-9 hidden sm:block"></div>
+                      <div className="flex justify-between pt-2 border-t-2 border-rose-500 font-black text-[11px] text-rose-950">
+                        <span>Total Potongan</span>
+                        <span className="font-mono">Rp {totalP.toLocaleString('id-ID')}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Total Bersih */}
+                <div className="p-4 bg-slate-900 text-white rounded-xl space-y-1.5 shadow-md">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h4 className="text-[11px] font-black uppercase tracking-wider text-emerald-400">
+                        JUMLAH BERSIH YANG DITERIMA (NET INCOME)
+                      </h4>
+                      <p className="text-[9px] text-slate-300 font-medium">
+                        {item.metodePembayaran} {item.penerimaRekening ? `• No. Rekening: ${item.penerimaRekening}` : ''}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-black font-mono text-emerald-300 tracking-tight">
+                        Rp {totalNet.toLocaleString('id-ID')}
+                      </div>
+                      <span className={`inline-block text-[8px] font-black tracking-widest uppercase px-2 py-0.5 rounded ${item.status === 'Paid' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}`}>
+                        {item.status === 'Paid' ? 'STATUS: PAID (LUNAS)' : 'STATUS: DRAFT (PENDING)'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-slate-750 text-[9.5px] text-slate-300 italic">
+                    <span className="font-semibold text-slate-400 not-italic">Terbilang: </span>
+                    "{terbilang(totalNet)}"
+                  </div>
+                </div>
+
+                {/* Signatures */}
+                <div className="grid grid-cols-3 gap-4 pt-6 text-[10px] border-t border-slate-200">
+                  <div className="text-center space-y-10">
+                    <p className="text-slate-600 font-medium">Penerima Gaji,</p>
+                    <div className="space-y-0.5">
+                      <p className="font-bold underline text-slate-900">{item.penerimaNama}</p>
+                      <p className="text-[8.5px] text-slate-500 font-mono">NIP/NIK: {recipientNipNik}</p>
+                    </div>
+                  </div>
+                  <div className="text-center space-y-10">
+                    <p className="text-slate-600 font-medium">Bendahara Sekolah,</p>
+                    <div className="space-y-0.5">
+                      <p className="font-bold underline text-slate-900">{bendaharaNama}</p>
+                      <p className="text-[8.5px] text-slate-500">Bendahara</p>
+                    </div>
+                  </div>
+                  <div className="text-center space-y-10">
+                    <p className="text-slate-600 font-medium">Mengetahui,</p>
+                    <div className="space-y-0.5">
+                      <p className="font-bold underline text-slate-900">{schoolSettings?.kepalaSekolah || 'Kepala Sekolah'}</p>
+                      <p className="text-[8.5px] text-slate-500">Kepala Sekolah</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[8px] text-slate-400 text-center pt-2 border-t border-dashed border-slate-200 flex justify-between items-center">
+                  <span>Dicetak otomatis oleh Sistem Manajemen Keuangan Sekolah</span>
+                  <span>{item.id} • {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
