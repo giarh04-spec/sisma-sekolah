@@ -11,6 +11,7 @@ import {
   User, 
   CreditCard, 
   ArrowLeft, 
+  X,
   CheckCheck, 
   Sparkles,
   ExternalLink,
@@ -201,13 +202,18 @@ export const PublicSlipGajiView: React.FC<PublicSlipGajiViewProps> = ({
               if (onBackToApp) {
                 onBackToApp();
               } else {
+                try {
+                  window.close();
+                } catch {
+                  // ignore
+                }
                 window.location.href = window.location.origin + window.location.pathname;
               }
             }}
-            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-300 hover:text-white transition-all flex items-center gap-2 text-xs font-bold shadow-sm"
+            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-300 hover:text-white transition-all flex items-center gap-2 text-xs font-bold shadow-sm cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Kembali ke Portal Sekolah</span>
+            <X className="w-4 h-4 text-slate-400" />
+            <span>Tutup</span>
           </button>
         </div>
 

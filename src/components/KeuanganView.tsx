@@ -6552,10 +6552,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                         <span className="w-28 text-slate-500 font-medium">NIP / NIK</span>
                         <span className="text-slate-800 font-mono">: {recipientNipNik}</span>
                       </div>
-                      <div className="flex">
-                        <span className="w-28 text-slate-500 font-medium">Tipe Pegawai</span>
-                        <span className="text-slate-800 font-semibold">: {item.penerimaTipe === 'guru' ? 'Tenaga Pendidik (Guru)' : 'Tenaga Kependidikan (Staf)'}</span>
-                      </div>
                     </div>
                     <div className="space-y-1.5">
                       <div className="flex">
@@ -6565,10 +6561,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                       <div className="flex">
                         <span className="w-28 text-slate-500 font-medium">Metode Bayar</span>
                         <span className="text-slate-800 font-semibold">: {item.metodePembayaran}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="w-28 text-slate-500 font-medium">No. Rekening</span>
-                        <span className="text-slate-800 font-mono">: {item.penerimaRekening || '-'}</span>
                       </div>
                     </div>
                   </div>
@@ -6885,10 +6877,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                       <span className="w-28 text-slate-500 font-medium">NIP / NIK</span>
                       <span className="text-slate-800 font-mono">: {recipientNipNik}</span>
                     </div>
-                    <div className="flex">
-                      <span className="w-28 text-slate-500 font-medium">Tipe Pegawai</span>
-                      <span className="text-slate-800 font-semibold">: {item.penerimaTipe === 'guru' ? 'Tenaga Pendidik (Guru)' : 'Tenaga Kependidikan (Staf)'}</span>
-                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <div className="flex">
@@ -6898,10 +6886,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     <div className="flex">
                       <span className="w-28 text-slate-500 font-medium">Metode Bayar</span>
                       <span className="text-slate-800 font-semibold">: {item.metodePembayaran}</span>
-                    </div>
-                    <div className="flex">
-                      <span className="w-28 text-slate-500 font-medium">No. Rekening</span>
-                      <span className="text-slate-800 font-mono">: {item.penerimaRekening || '-'}</span>
                     </div>
                   </div>
                 </div>
