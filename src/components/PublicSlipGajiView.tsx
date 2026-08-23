@@ -391,124 +391,96 @@ export const PublicSlipGajiView: React.FC<PublicSlipGajiViewProps> = ({
               </div>
 
               {/* RINCIAN PENGHASILAN & POTONGAN (TABEL 2 KOLOM) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-[11px]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-[10.5px] items-stretch">
                 
                 {/* KOLOM KIRI: PENERIMAAN */}
-                <div className="border border-slate-200 rounded-xl overflow-hidden flex flex-col">
-                  <div className="bg-slate-100 px-3 py-2 border-b border-slate-200 font-black text-slate-900 flex justify-between items-center">
-                    <span>I. PENERIMAAN (PENGHASILAN)</span>
-                    <span className="text-[10px] text-slate-500 font-semibold">JUMLAH (RP)</span>
+                <div className="border border-emerald-300/80 rounded-xl overflow-hidden bg-emerald-50/25 flex flex-col h-full shadow-sm">
+                  <div className="bg-emerald-700 text-white px-3.5 py-2 flex justify-between items-center">
+                    <span className="text-[10.5px] font-black uppercase tracking-wide">1. PENERIMAAN / PENGHASILAN</span>
+                    <span className="text-[9px] font-bold opacity-90">JUMLAH</span>
                   </div>
-                  <div className="p-3 space-y-2 flex-1 flex flex-col justify-between">
+                  <div className="p-3.5 flex-1 flex flex-col justify-between text-[10.5px]">
                     <div className="space-y-1.5">
-                      <div className="flex justify-between text-slate-700">
-                        <span>Gaji Pokok</span>
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Gaji Pokok</span>
                         <span className="font-mono font-bold text-slate-950">Rp {slipData.gajiPokok.toLocaleString('id-ID')}</span>
                       </div>
 
-                      {tJabatan > 0 && (
-                        <div className="flex justify-between text-slate-700">
-                          <span>Tunj. Jabatan & Operasional</span>
-                          <span className="font-mono font-bold text-slate-950">Rp {tJabatan.toLocaleString('id-ID')}</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Tunj. Jabatan & Ops</span>
+                        <span className="font-mono font-bold text-slate-950">Rp {tJabatan.toLocaleString('id-ID')}</span>
+                      </div>
 
-                      {tWalas > 0 && (
-                        <div className="flex justify-between text-slate-700">
-                          <span>Tunjangan Wali Kelas</span>
-                          <span className="font-mono font-bold text-slate-950">Rp {tWalas.toLocaleString('id-ID')}</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Tunj. Wali Kelas (Walas)</span>
+                        <span className="font-mono font-bold text-slate-950">Rp {tWalas.toLocaleString('id-ID')}</span>
+                      </div>
 
-                      {tKetepatan > 0 && (
-                        <div className="flex justify-between text-slate-700">
-                          <span>Ketepatan Waktu</span>
-                          <span className="font-mono font-bold text-slate-950">Rp {tKetepatan.toLocaleString('id-ID')}</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Ketepatan Waktu</span>
+                        <span className="font-mono font-bold text-slate-950">Rp {tKetepatan.toLocaleString('id-ID')}</span>
+                      </div>
 
-                      {tHadir > 0 && (
-                        <div className="flex justify-between text-slate-700">
-                          <span>Tunjangan Kehadiran</span>
-                          <span className="font-mono font-bold text-slate-950">Rp {tHadir.toLocaleString('id-ID')}</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Tunj. Kehadiran</span>
+                        <span className="font-mono font-bold text-slate-950">Rp {tHadir.toLocaleString('id-ID')}</span>
+                      </div>
 
-                      {tPiket > 0 && (
-                        <div className="flex justify-between text-slate-700">
-                          <span>Tunjangan Piket</span>
-                          <span className="font-mono font-bold text-slate-950">Rp {tPiket.toLocaleString('id-ID')}</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Tunj. Piket</span>
+                        <span className="font-mono font-bold text-slate-950">Rp {tPiket.toLocaleString('id-ID')}</span>
+                      </div>
 
-                      {tExcess > 0 && (
-                        <div className="flex justify-between text-slate-700">
-                          <span>Excess Time / Lembur</span>
-                          <span className="font-mono font-bold text-slate-950">Rp {tExcess.toLocaleString('id-ID')}</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-emerald-100">
+                        <span className="text-slate-600 font-medium">• Excess Time (Jam Tambahan)</span>
+                        <span className="font-mono font-bold text-slate-950">Rp {tExcess.toLocaleString('id-ID')}</span>
+                      </div>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-200 flex justify-between font-black text-slate-900 mt-2">
-                      <span>Total Penerimaan Kotor:</span>
-                      <span className="font-mono text-emerald-700">Rp {subtotalPenghasilan.toLocaleString('id-ID')}</span>
+                    <div className="flex justify-between pt-2.5 mt-3 border-t-2 border-emerald-600 font-black text-xs text-emerald-950">
+                      <span>Subtotal Penerimaan</span>
+                      <span className="font-mono">Rp {subtotalPenghasilan.toLocaleString('id-ID')}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* KOLOM KANAN: POTONGAN */}
-                <div className="border border-slate-200 rounded-xl overflow-hidden flex flex-col">
-                  <div className="bg-slate-100 px-3 py-2 border-b border-slate-200 font-black text-slate-900 flex justify-between items-center">
-                    <span>II. POTONGAN (DEDUKSI)</span>
-                    <span className="text-[10px] text-slate-500 font-semibold">JUMLAH (RP)</span>
+                <div className="border border-rose-300/80 rounded-xl overflow-hidden bg-rose-50/25 flex flex-col h-full shadow-sm">
+                  <div className="bg-rose-700 text-white px-3.5 py-2 flex justify-between items-center">
+                    <span className="text-[10.5px] font-black uppercase tracking-wide">2. POTONGAN & DENDA</span>
+                    <span className="text-[9px] font-bold opacity-90">JUMLAH</span>
                   </div>
-                  <div className="p-3 space-y-2 flex-1 flex flex-col justify-between">
+                  <div className="p-3.5 flex-1 flex flex-col justify-between text-[10.5px]">
                     <div className="space-y-1.5">
-                      {pAbsensi > 0 && (
-                        <div className="flex justify-between text-slate-700">
-                          <span>Potongan Absensi / Umum</span>
-                          <span className="font-mono font-bold text-rose-700">Rp {pAbsensi.toLocaleString('id-ID')}</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-rose-100">
+                        <span className="text-slate-600 font-medium">• Potongan Absensi / Umum</span>
+                        <span className="font-mono font-bold text-slate-950">Rp {pAbsensi.toLocaleString('id-ID')}</span>
+                      </div>
 
-                      {pTerlambat > 0 && (
-                        <div className="flex justify-between text-slate-700">
-                          <span>Denda Terlambat</span>
-                          <span className="font-mono font-bold text-rose-700">Rp {pTerlambat.toLocaleString('id-ID')}</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-rose-100">
+                        <span className="text-slate-600 font-medium">• Denda Terlambat</span>
+                        <span className="font-mono font-bold text-slate-950">Rp {pTerlambat.toLocaleString('id-ID')}</span>
+                      </div>
 
-                      {pFinger > 0 && (
-                        <div className="flex justify-between text-slate-700">
-                          <span>Denda Lupa Finger / Absen</span>
-                          <span className="font-mono font-bold text-rose-700">Rp {pFinger.toLocaleString('id-ID')}</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-rose-100">
+                        <span className="text-slate-600 font-medium">• Denda Lupa Finger</span>
+                        <span className="font-mono font-bold text-slate-950">Rp {pFinger.toLocaleString('id-ID')}</span>
+                      </div>
 
-                      {pKoperasi > 0 && (
-                        <div className="flex justify-between text-slate-700">
-                          <span>Potongan Koperasi</span>
-                          <span className="font-mono font-bold text-rose-700">Rp {pKoperasi.toLocaleString('id-ID')}</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-rose-100">
+                        <span className="text-slate-600 font-medium">• Potongan Koperasi</span>
+                        <span className="font-mono font-bold text-slate-950">Rp {pKoperasi.toLocaleString('id-ID')}</span>
+                      </div>
 
-                      {pKasBon > 0 && (
-                        <div className="flex justify-between text-slate-700">
-                          <span>Kas Bon / Angsuran Pinjaman</span>
-                          <span className="font-mono font-bold text-rose-700">Rp {pKasBon.toLocaleString('id-ID')}</span>
-                        </div>
-                      )}
-
-                      {totalPotongan === 0 && (
-                        <div className="text-center py-4 text-slate-400 italic text-[10px]">
-                          Tidak ada potongan / deduksi bulan ini.
-                        </div>
-                      )}
+                      <div className="flex justify-between py-0.5 border-b border-dashed border-rose-100">
+                        <span className="text-slate-600 font-medium">• Kas Bon / Pinjaman</span>
+                        <span className="font-mono font-bold text-slate-950">Rp {pKasBon.toLocaleString('id-ID')}</span>
+                      </div>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-200 flex justify-between font-black text-slate-900 mt-2">
-                      <span>Total Potongan:</span>
-                      <span className="font-mono text-rose-700">Rp {totalPotongan.toLocaleString('id-ID')}</span>
+                    <div className="flex justify-between pt-2.5 mt-3 border-t-2 border-rose-600 font-black text-xs text-rose-950">
+                      <span>Total Potongan</span>
+                      <span className="font-mono">Rp {totalPotongan.toLocaleString('id-ID')}</span>
                     </div>
                   </div>
                 </div>
