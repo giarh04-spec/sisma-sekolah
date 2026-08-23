@@ -519,7 +519,6 @@ export const PublicSlipGajiView: React.FC<PublicSlipGajiViewProps> = ({
                     <span className="text-[9px] text-slate-400 italic font-mono">[Tanda Tangan Digital]</span>
                   </div>
                   <p className="font-bold text-slate-950 underline">{slipData.penerimaNama}</p>
-                  <p className="text-[9px] text-slate-500">{slipData.penerimaNipNik || '-'}</p>
                 </div>
 
                 <div>
@@ -528,7 +527,6 @@ export const PublicSlipGajiView: React.FC<PublicSlipGajiViewProps> = ({
                     <span className="text-[9px] text-emerald-600 font-bold font-mono">✓ TERVERIFIKASI</span>
                   </div>
                   <p className="font-bold text-slate-950 underline">{bendaharaNama}</p>
-                  <p className="text-[9px] text-slate-500">{bendaharaNik}</p>
                 </div>
 
                 <div>
@@ -537,7 +535,6 @@ export const PublicSlipGajiView: React.FC<PublicSlipGajiViewProps> = ({
                     <span className="text-[9px] text-emerald-600 font-bold font-mono">✓ MENGETAHUI</span>
                   </div>
                   <p className="font-bold text-slate-950 underline">{kepalaSekolahNama}</p>
-                  <p className="text-[9px] text-slate-500">NIP. {kepalaSekolahNip}</p>
                 </div>
               </div>
 

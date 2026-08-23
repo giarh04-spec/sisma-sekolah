@@ -6460,27 +6460,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
-                    onClick={() => handleKirimGajiWA(item)}
-                    disabled={isProcessingSlipImage}
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-[11px] font-extrabold rounded-xl transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
-                    title="Kirim gambar slip gaji & rincian ke WhatsApp penerima secara otomatis"
-                  >
-                    {isProcessingSlipImage ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        Mengirim...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-3.5 h-3.5" />
-                        Kirim Slip ke WA
-                      </>
-                    )}
-                  </button>
-
-                  <button
                     onClick={() => handleDownloadSlipImage(item)}
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                    className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
                     title="Unduh Slip Gaji sebagai file Gambar PNG"
                   >
                     <ImageIcon className="w-3.5 h-3.5 text-sky-400" />
@@ -6488,17 +6469,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   </button>
 
                   <button
-                    onClick={() => handleCopySlipImage(item)}
-                    className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-[11px] font-bold rounded-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                    title="Salin gambar slip ke clipboard"
-                  >
-                    <Copy className="w-3.5 h-3.5 text-slate-600" />
-                    Salin
-                  </button>
-
-                  <button
                     onClick={() => window.print()}
-                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
                   >
                     <Printer className="w-3.5 h-3.5" />
                     Cetak / PDF
@@ -6509,7 +6481,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                       setShowSlipGajiModal(false);
                       setSelectedGajiForSlip(null);
                     }}
-                    className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 text-[11px] font-bold rounded-xl transition-all active:scale-95 cursor-pointer"
+                    className="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 text-[11px] font-bold rounded-xl transition-all active:scale-95 cursor-pointer"
                   >
                     Tutup
                   </button>
@@ -6729,21 +6701,18 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                       <p className="text-slate-600 font-medium">Penerima Gaji,</p>
                       <div className="space-y-0.5">
                         <p className="font-bold underline text-slate-950">{item.penerimaNama}</p>
-                        <p className="text-[9px] text-slate-500 font-mono">NIP/NIK: {recipientNipNik}</p>
                       </div>
                     </div>
                     <div className="text-center space-y-9">
                       <p className="text-slate-600 font-medium">Bendahara Sekolah,</p>
                       <div className="space-y-0.5">
                         <p className="font-bold underline text-slate-950">{bendaharaNama}</p>
-                        <p className="text-[9px] text-slate-500">Bendahara</p>
                       </div>
                     </div>
                     <div className="text-center space-y-9">
                       <p className="text-slate-600 font-medium">Mengetahui,</p>
                       <div className="space-y-0.5">
                         <p className="font-bold underline text-slate-950">{schoolSettings?.kepalaSekolah || 'Kepala Sekolah'}</p>
-                        <p className="text-[9px] text-slate-500">Kepala Sekolah</p>
                       </div>
                     </div>
                   </div>
@@ -7052,21 +7021,18 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     <p className="text-slate-600 font-medium">Penerima Gaji,</p>
                     <div className="space-y-0.5">
                       <p className="font-bold underline text-slate-900">{item.penerimaNama}</p>
-                      <p className="text-[8.5px] text-slate-500 font-mono">NIP/NIK: {recipientNipNik}</p>
                     </div>
                   </div>
                   <div className="text-center space-y-10">
                     <p className="text-slate-600 font-medium">Bendahara Sekolah,</p>
                     <div className="space-y-0.5">
                       <p className="font-bold underline text-slate-900">{bendaharaNama}</p>
-                      <p className="text-[8.5px] text-slate-500">Bendahara</p>
                     </div>
                   </div>
                   <div className="text-center space-y-10">
                     <p className="text-slate-600 font-medium">Mengetahui,</p>
                     <div className="space-y-0.5">
                       <p className="font-bold underline text-slate-900">{schoolSettings?.kepalaSekolah || 'Kepala Sekolah'}</p>
-                      <p className="text-[8.5px] text-slate-500">Kepala Sekolah</p>
                     </div>
                   </div>
                 </div>
