@@ -184,73 +184,34 @@ export const PublicSlipGajiView: React.FC<PublicSlipGajiViewProps> = ({
   const totalPotongan = pAbsensi + pTerlambat + pFinger + pKoperasi + pKasBon;
   const subtotalPenghasilan = (slipData?.gajiPokok || 0) + totalTunjangan;
 
-  // Handle Close Window / Tab
+  // Handle Close Window / Tab -> Turn into blank page or close tab
   const handleCloseWindow = () => {
-    if (onBackToApp) {
-      onBackToApp();
-      return;
-    }
-
-    // Attempt standard window.close
+    // 1. Attempt standard browser close
     try {
       window.close();
     } catch {}
 
-    // Attempt self-window reassignment and close (works in many modern browsers)
+    // 2. Attempt self-window reassignment and close
     try {
       window.open('', '_self', '');
       window.close();
     } catch {}
 
-    // Attempt about:blank reassignment & close
+    // 3. Attempt redirect to about:blank
     try {
-      const win = window.open('about:blank', '_self');
-      if (win) {
-        win.close();
-      }
-    } catch {}
+      window.location.replace('about:blank');
+    } catch {
+      try {
+        window.location.href = 'about:blank';
+      } catch {}
+    }
 
-    try {
-      if (window.opener) {
-        window.opener = null;
-        window.open('', '_self');
-        window.close();
-      }
-    } catch {}
-
-    // If browser blocks closing via script (e.g. user typed URL directly without window.open):
-    // If there is browser history, navigate back; otherwise show clean closed state
-    setTimeout(() => {
-      if (window.history.length > 1) {
-        try {
-          window.history.back();
-        } catch {}
-      }
-      setIsTabClosed(true);
-    }, 150);
+    // 4. Fallback: render completely blank page
+    setIsTabClosed(true);
   };
 
   if (isTabClosed) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center text-slate-400 mb-4 shadow-xl">
-          <X className="w-8 h-8 text-rose-400" />
-        </div>
-        <h2 className="text-xl font-bold text-white mb-2">Halaman Slip Gaji Telah Ditutup</h2>
-        <p className="text-sm text-slate-400 max-w-sm mb-6">
-          Jendela halaman ini telah ditutup. Anda dapat menutup tab peramban ini secara manual jika tidak tertutup otomatis oleh browser.
-        </p>
-        <button
-          onClick={() => {
-            try { window.close(); } catch {}
-            try { window.open('', '_self', ''); window.close(); } catch {}
-          }}
-          className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
-        >
-          Tutup Tab Ini
-        </button>
-      </div>
-    );
+    return <div className="min-h-screen w-full bg-white" />;
   }
 
   return (
