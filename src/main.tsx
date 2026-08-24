@@ -98,6 +98,40 @@ if (typeof window !== 'undefined') {
       }
     } catch (e) {}
   }, true);
+
+  // PROTEKSI SOURCE CODE & INSPECT DEVTOOLS
+  // 1. Menonaktifkan Klik Kanan (Context Menu)
+  document.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+  }, { capture: true });
+
+  // 2. Memblokir shortcut keyboard DevTools & View Source
+  document.addEventListener('keydown', (e) => {
+    // F12 -> DevTools
+    if (e.key === 'F12' || e.keyCode === 123) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+    // Ctrl + Shift + I / J / C (Windows/Linux) atau Cmd + Option + I / J / C (Mac)
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (['I', 'i', 'J', 'j', 'C', 'c'].includes(e.key) || [73, 74, 67].includes(e.keyCode))) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+    // Ctrl + U (View Source) atau Cmd + Option + U
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U' || e.keyCode === 85)) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+    // Ctrl + S (Save page)
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S' || e.keyCode === 83)) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+  }, { capture: true });
 }
 
 createRoot(document.getElementById('root')!).render(
