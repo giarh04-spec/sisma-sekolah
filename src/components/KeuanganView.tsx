@@ -171,6 +171,13 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   const [gajiFilterStatus, setGajiFilterStatus] = useState<'semua' | 'Draft' | 'Paid'>('semua');
   const [gajiFilterBulan, setGajiFilterBulan] = useState<string>('semua');
 
+  // Rekap Laporan Gaji Bulanan State
+  const [showRekapGajiModal, setShowRekapGajiModal] = useState<boolean>(false);
+  const [rekapGajiBulan, setRekapGajiBulan] = useState<string>('Juli');
+  const [rekapGajiTahun, setRekapGajiTahun] = useState<string>(new Date().getFullYear().toString());
+  const [rekapGajiTipe, setRekapGajiTipe] = useState<'semua' | 'guru' | 'staf'>('semua');
+  const [rekapGajiStatus, setRekapGajiStatus] = useState<'semua' | 'Draft' | 'Paid'>('semua');
+
   // Gaji UI alerts & confirmation states
   const [gajiToast, setGajiToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [gajiToDeleteId, setGajiToDeleteId] = useState<string | null>(null);
@@ -617,6 +624,258 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       return matchSearch && matchTipe && matchStatus && matchBulan;
     });
   }, [gajiList, gajiSearchQuery, gajiFilterTipe, gajiFilterStatus, gajiFilterBulan]);
+
+  // Filtered Rekap Gaji List for Monthly Report
+  const rekapGajiFiltered = useMemo(() => {
+    return gajiList.filter(item => {
+      const matchBulan = rekapGajiBulan === 'semua' || item.bulan.toLowerCase() === rekapGajiBulan.toLowerCase();
+      const matchTahun = !rekapGajiTahun || item.tahun.toString() === rekapGajiTahun.toString();
+      const matchTipe = rekapGajiTipe === 'semua' || item.penerimaTipe === rekapGajiTipe;
+      const matchStatus = rekapGajiStatus === 'semua' || item.status === rekapGajiStatus;
+      return matchBulan && matchTahun && matchTipe && matchStatus;
+    });
+  }, [gajiList, rekapGajiBulan, rekapGajiTahun, rekapGajiTipe, rekapGajiStatus]);
+
+  // Aggregated totals for Monthly Recap
+  const rekapGajiTotals = useMemo(() => {
+    let totalPokok = 0;
+    let totalJabatan = 0;
+    let totalWalas = 0;
+    let totalKetepatan = 0;
+    let totalKehadiran = 0;
+    let totalPiket = 0;
+    let totalExcess = 0;
+    let totalTunjangan = 0;
+    let totalGross = 0;
+
+    let totalPotAbsensi = 0;
+    let totalPotTerlambat = 0;
+    let totalPotFinger = 0;
+    let totalPotKoperasi = 0;
+    let totalPotKasBon = 0;
+    let totalPotongan = 0;
+
+    let totalNet = 0;
+    let totalPaid = 0;
+    let totalDraft = 0;
+
+    rekapGajiFiltered.forEach(item => {
+      const tJ = item.tunjangan || 0;
+      const tW = item.tunjanganWalas || 0;
+      const tK = item.tunjanganKetepatanWaktu || 0;
+      const tH = item.tunjanganKehadiran || 0;
+      const tP = item.tunjanganPiket || 0;
+      const tE = item.tunjanganExcessTime || 0;
+      const sumT = tJ + tW + tK + tH + tP + tE;
+
+      const pA = item.potongan || 0;
+      const pT = item.potonganDendaTerlambat || 0;
+      const pF = item.potonganDendaLupaFinger || 0;
+      const pK = item.potonganKoperasi || 0;
+      const pB = item.potonganKasBon || 0;
+      const sumP = pA + pT + pF + pK + pB;
+
+      totalPokok += item.gajiPokok || 0;
+      totalJabatan += tJ;
+      totalWalas += tW;
+      totalKetepatan += tK;
+      totalKehadiran += tH;
+      totalPiket += tP;
+      totalExcess += tE;
+      totalTunjangan += sumT;
+      totalGross += (item.gajiPokok || 0) + sumT;
+
+      totalPotAbsensi += pA;
+      totalPotTerlambat += pT;
+      totalPotFinger += pF;
+      totalPotKoperasi += pK;
+      totalPotKasBon += pB;
+      totalPotongan += sumP;
+
+      totalNet += item.totalDiterima || 0;
+      if (item.status === 'Paid') totalPaid++;
+      else totalDraft++;
+    });
+
+    return {
+      totalPokok,
+      totalJabatan,
+      totalWalas,
+      totalKetepatan,
+      totalKehadiran,
+      totalPiket,
+      totalExcess,
+      totalTunjangan,
+      totalGross,
+      totalPotAbsensi,
+      totalPotTerlambat,
+      totalPotFinger,
+      totalPotKoperasi,
+      totalPotKasBon,
+      totalPotongan,
+      totalNet,
+      totalPaid,
+      totalDraft,
+      count: rekapGajiFiltered.length
+    };
+  }, [rekapGajiFiltered]);
+
+  // Export CSV Rekap Gaji Bulanan
+  const handleExportRekapGajiCSV = () => {
+    if (rekapGajiFiltered.length === 0) {
+      showToast('Tidak ada data gaji pada periode yang dipilih untuk diekspor.', 'error');
+      return;
+    }
+
+    const filename = `Rekap_Laporan_Gaji_${rekapGajiBulan}_${rekapGajiTahun}`;
+    const headers = [
+      'No',
+      'ID Slip',
+      'Nama Penerima',
+      'NIP/NIK',
+      'Tipe Pegawai',
+      'Jabatan / Unit',
+      'Periode Bulan',
+      'Tahun',
+      'Gaji Pokok (Rp)',
+      'Tunj. Jabatan & Ops (Rp)',
+      'Tunj. Wali Kelas (Rp)',
+      'Ketepatan Waktu (Rp)',
+      'Tunj. Kehadiran (Rp)',
+      'Tunj. Piket (Rp)',
+      'Excess Time (Rp)',
+      'Total Tunjangan (Rp)',
+      'Penghasilan Kotor / Gross (Rp)',
+      'Pot. Absensi & Umum (Rp)',
+      'Denda Terlambat (Rp)',
+      'Denda Lupa Finger (Rp)',
+      'Pot. Koperasi (Rp)',
+      'Kas Bon (Rp)',
+      'Total Potongan (Rp)',
+      'Gaji Bersih / Net (Rp)',
+      'Status Pembayaran',
+      'Metode Pembayaran',
+      'Tanggal Bayar',
+      'No Rekening'
+    ];
+
+    const rows: (string | number)[][] = rekapGajiFiltered.map((item, idx) => {
+      const tJ = item.tunjangan || 0;
+      const tW = item.tunjanganWalas || 0;
+      const tK = item.tunjanganKetepatanWaktu || 0;
+      const tH = item.tunjanganKehadiran || 0;
+      const tP = item.tunjanganPiket || 0;
+      const tE = item.tunjanganExcessTime || 0;
+      const sumT = tJ + tW + tK + tH + tP + tE;
+
+      const pA = item.potongan || 0;
+      const pT = item.potonganDendaTerlambat || 0;
+      const pF = item.potonganDendaLupaFinger || 0;
+      const pK = item.potonganKoperasi || 0;
+      const pB = item.potonganKasBon || 0;
+      const sumP = pA + pT + pF + pK + pB;
+
+      const nipNik = (item.penerimaNipNik && item.penerimaNipNik !== '-') 
+        ? item.penerimaNipNik 
+        : (item.penerimaTipe === 'guru' ? (guruList.find(g => g.id === item.penerimaId)?.nik || guruList.find(g => g.id === item.penerimaId)?.nip || '-') : (stafList.find(s => s.id === item.penerimaId)?.nik || '-'));
+
+      return [
+        idx + 1,
+        item.id,
+        item.penerimaNama,
+        nipNik,
+        item.penerimaTipe === 'guru' ? 'Guru' : 'Staf/Karyawan',
+        item.jabatan,
+        item.bulan,
+        item.tahun,
+        item.gajiPokok,
+        tJ,
+        tW,
+        tK,
+        tH,
+        tP,
+        tE,
+        sumT,
+        item.gajiPokok + sumT,
+        pA,
+        pT,
+        pF,
+        pK,
+        pB,
+        sumP,
+        item.totalDiterima,
+        item.status === 'Paid' ? 'Paid (Lunas)' : 'Draft (Pending)',
+        item.metodePembayaran,
+        item.tanggalBayar,
+        item.penerimaRekening || '-'
+      ];
+    });
+
+    // Append Grand Total Row
+    rows.push([
+      'TOTAL',
+      '',
+      `Total ${rekapGajiTotals.count} Penerima`,
+      '',
+      '',
+      '',
+      rekapGajiBulan,
+      rekapGajiTahun,
+      rekapGajiTotals.totalPokok,
+      rekapGajiTotals.totalJabatan,
+      rekapGajiTotals.totalWalas,
+      rekapGajiTotals.totalKetepatan,
+      rekapGajiTotals.totalKehadiran,
+      rekapGajiTotals.totalPiket,
+      rekapGajiTotals.totalExcess,
+      rekapGajiTotals.totalTunjangan,
+      rekapGajiTotals.totalGross,
+      rekapGajiTotals.totalPotAbsensi,
+      rekapGajiTotals.totalPotTerlambat,
+      rekapGajiTotals.totalPotFinger,
+      rekapGajiTotals.totalPotKoperasi,
+      rekapGajiTotals.totalPotKasBon,
+      rekapGajiTotals.totalPotongan,
+      rekapGajiTotals.totalNet,
+      `${rekapGajiTotals.totalPaid} Lunas / ${rekapGajiTotals.totalDraft} Draft`,
+      '',
+      '',
+      ''
+    ]);
+
+    downloadCSV(headers, rows, filename);
+    showToast('✅ Berhasil mengekspor Rekap Laporan Gaji Bulanan (CSV)!');
+  };
+
+  // Salin Ringkasan Rekap Gaji Bulanan ke Clipboard (format WhatsApp)
+  const handleCopyRekapGajiSummary = () => {
+    const text = `📊 *REKAPITULASI LAPORAN PENGGAJIAN & HONORARIUM*\n` +
+      `*${schoolSettings?.namaSekolah || 'SMP ISLAM MODERN AL FAKHIR'}*\n` +
+      `Periode: *${rekapGajiBulan} ${rekapGajiTahun}*\n` +
+      `─────────────────────────\n` +
+      `👥 *Total Penerima:* ${rekapGajiTotals.count} Orang (${rekapGajiTotals.totalPaid} Lunas, ${rekapGajiTotals.totalDraft} Draft)\n` +
+      `💵 *Total Gaji Pokok:* Rp ${rekapGajiTotals.totalPokok.toLocaleString('id-ID')}\n` +
+      `➕ *Total Tunjangan:* Rp ${rekapGajiTotals.totalTunjangan.toLocaleString('id-ID')}\n` +
+      `   • Tunj. Jabatan & Ops: Rp ${rekapGajiTotals.totalJabatan.toLocaleString('id-ID')}\n` +
+      `   • Tunj. Wali Kelas: Rp ${rekapGajiTotals.totalWalas.toLocaleString('id-ID')}\n` +
+      `   • Kehadiran & Piket: Rp ${(rekapGajiTotals.totalKehadiran + rekapGajiTotals.totalPiket).toLocaleString('id-ID')}\n` +
+      `   • Ketepatan & Excess: Rp ${(rekapGajiTotals.totalKetepatan + rekapGajiTotals.totalExcess).toLocaleString('id-ID')}\n` +
+      `📈 *Subtotal Penghasilan Kotor (Gross):* Rp ${rekapGajiTotals.totalGross.toLocaleString('id-ID')}\n` +
+      `➖ *Total Potongan:* Rp ${rekapGajiTotals.totalPotongan.toLocaleString('id-ID')}\n` +
+      `   • Potongan Absensi: Rp ${rekapGajiTotals.totalPotAbsensi.toLocaleString('id-ID')}\n` +
+      `   • Denda Terlambat/Finger: Rp ${(rekapGajiTotals.totalPotTerlambat + rekapGajiTotals.totalPotFinger).toLocaleString('id-ID')}\n` +
+      `   • Koperasi & Kasbon: Rp ${(rekapGajiTotals.totalPotKoperasi + rekapGajiTotals.totalPotKasBon).toLocaleString('id-ID')}\n` +
+      `─────────────────────────\n` +
+      `💰 *TOTAL GAJI BERSIH (NET DISBURSED):*\n` +
+      `*Rp ${rekapGajiTotals.totalNet.toLocaleString('id-ID')}*\n` +
+      `Terbilang: _${terbilang(rekapGajiTotals.totalNet)} Rupiah_\n` +
+      `─────────────────────────\n` +
+      `Bendahara: ${bendaharaNama}\n` +
+      `Kepala Sekolah: ${schoolSettings?.namaKepalaSekolah || schoolSettings?.kepalaSekolah || 'H. Ahmad Fakhri, M.Pd'}`;
+
+    navigator.clipboard.writeText(text);
+    showToast('📋 Ringkasan Rekap Gaji Bulanan berhasil disalin ke Clipboard!');
+  };
 
   // Search Suggestions memo
   const searchSuggestions = useMemo(() => {
@@ -5710,22 +5969,43 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 Kelola transaksi gaji guru dan staf sekolah, cetak slip gaji fisik, dan kirim rincian payroll otomatis via WhatsApp.
               </p>
             </div>
-            <button
-              onClick={() => {
-                setEditingGaji(null);
-                setGajiPenerimaId('');
-                setGajiPokok(3000000);
-                setGajiTunjangan(500000);
-                setGajiPotongan(0);
-                setGajiCatatan('');
-                setGajiRekening('');
-                setShowBayarGajiModal(true);
-              }}
-              className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl text-xs transition-all shadow-md shadow-rose-600/30 flex items-center gap-2 shrink-0 active:scale-[0.98]"
-            >
-              <Plus className="w-4 h-4" />
-              Proses Gaji Baru
-            </button>
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (gajiFilterBulan !== 'semua') {
+                    setRekapGajiBulan(gajiFilterBulan);
+                  } else {
+                    const latestMonth = gajiList[0]?.bulan || 'Juli';
+                    setRekapGajiBulan(latestMonth);
+                  }
+                  setShowRekapGajiModal(true);
+                }}
+                className="px-4 py-2.5 bg-slate-850 hover:bg-slate-800 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/50 font-bold rounded-xl text-xs transition-all shadow-sm flex items-center gap-2 active:scale-[0.98] cursor-pointer"
+                title="Buka Rekapitulasi Laporan Penggajian & Honorarium Bulanan (Cetak PDF / Ekspor CSV)"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                Rekap Laporan Bulanan
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingGaji(null);
+                  setGajiPenerimaId('');
+                  setGajiPokok(3000000);
+                  setGajiTunjangan(500000);
+                  setGajiPotongan(0);
+                  setGajiCatatan('');
+                  setGajiRekening('');
+                  setShowBayarGajiModal(true);
+                }}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl text-xs transition-all shadow-md shadow-rose-600/30 flex items-center gap-2 shrink-0 active:scale-[0.98] cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                Proses Gaji Baru
+              </button>
+            </div>
           </div>
 
           {/* SUMMARY STATISTICS CARDS */}
@@ -5853,6 +6133,22 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   ))}
                 </select>
               </div>
+
+              {/* Quick Rekap Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (gajiFilterBulan !== 'semua') {
+                    setRekapGajiBulan(gajiFilterBulan);
+                  }
+                  setShowRekapGajiModal(true);
+                }}
+                className="px-3.5 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                title="Buka dan Cetak Rekap Laporan Gaji Periode Ini"
+              >
+                <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                Rekap Periode
+              </button>
 
               {/* Bulk Auto-Send WhatsApp Button */}
               <button
@@ -6728,6 +7024,438 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
           </div>
         );
       })()}
+
+      {/* MODAL REKAP LAPORAN PENGGAJIAN BULANAN */}
+      {showRekapGajiModal && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[105] flex items-start justify-center p-2 sm:p-5 overflow-y-auto">
+          <div className="bg-white text-slate-900 rounded-2xl max-w-6xl w-full shadow-2xl my-3 sm:my-6 overflow-hidden flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            
+            {/* TOP BAR / CONTROL ACTIONS (PRINT:HIDDEN) */}
+            <div className="bg-slate-900 text-white border-b border-slate-800 px-4 sm:px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+                    Rekapitulasi Laporan Penggajian & Honorarium
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      Per Bulan
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Laporan buku kas payroll guru dan staf sekolah lengkap per periode.
+                  </p>
+                </div>
+              </div>
+
+              {/* ACTION BUTTONS */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyRekapGajiSummary}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 border border-slate-700 active:scale-95 cursor-pointer"
+                  title="Salin ringkasan rekap ke format pesan WhatsApp"
+                >
+                  <Copy className="w-3.5 h-3.5 text-amber-400" />
+                  Salin Ringkasan WA
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExportRekapGajiCSV}
+                  disabled={rekapGajiFiltered.length === 0}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 border border-slate-700 active:scale-95 disabled:opacity-50 cursor-pointer"
+                  title="Unduh data tabel rekapitulasi gaji dalam format Excel CSV"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Ekspor CSV
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-emerald-600/30 active:scale-95 cursor-pointer"
+                  title="Cetak format laporan resmi (Print / Simpan PDF)"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  Cetak / PDF
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowRekapGajiModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                  title="Tutup Modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* FILTER TOOLBAR INSIDE MODAL (PRINT:HIDDEN) */}
+            <div className="bg-slate-100/90 border-b border-slate-200 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 text-xs print:hidden">
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Pilih Bulan */}
+                <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-xl px-3 py-1.5 shadow-sm">
+                  <Calendar className="w-3.5 h-3.5 text-slate-600" />
+                  <span className="font-bold text-slate-700">Bulan:</span>
+                  <select
+                    value={rekapGajiBulan}
+                    onChange={e => setRekapGajiBulan(e.target.value)}
+                    className="bg-transparent font-extrabold text-slate-900 focus:outline-none cursor-pointer pr-1"
+                  >
+                    <option value="semua">Semua Bulan</option>
+                    {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Pilih Tahun */}
+                <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-xl px-3 py-1.5 shadow-sm">
+                  <span className="font-bold text-slate-700">Tahun:</span>
+                  <select
+                    value={rekapGajiTahun}
+                    onChange={e => setRekapGajiTahun(e.target.value)}
+                    className="bg-transparent font-extrabold text-slate-900 focus:outline-none cursor-pointer pr-1"
+                  >
+                    <option value="2025">2025</option>
+                    <option value="2026">2026</option>
+                    <option value="2027">2027</option>
+                  </select>
+                </div>
+
+                {/* Filter Tipe */}
+                <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-xl px-3 py-1.5 shadow-sm">
+                  <Filter className="w-3.5 h-3.5 text-slate-600" />
+                  <span className="font-bold text-slate-700">Penerima:</span>
+                  <select
+                    value={rekapGajiTipe}
+                    onChange={e => setRekapGajiTipe(e.target.value as any)}
+                    className="bg-transparent font-semibold text-slate-900 focus:outline-none cursor-pointer pr-1"
+                  >
+                    <option value="semua">Semua (Guru & Staf)</option>
+                    <option value="guru">Guru Saja</option>
+                    <option value="staf">Staf Saja</option>
+                  </select>
+                </div>
+
+                {/* Filter Status */}
+                <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-xl px-3 py-1.5 shadow-sm">
+                  <span className="font-bold text-slate-700">Status:</span>
+                  <select
+                    value={rekapGajiStatus}
+                    onChange={e => setRekapGajiStatus(e.target.value as any)}
+                    className="bg-transparent font-semibold text-slate-900 focus:outline-none cursor-pointer pr-1"
+                  >
+                    <option value="semua">Semua Status</option>
+                    <option value="Paid">Hanya Lunas (Paid)</option>
+                    <option value="Draft">Hanya Draft</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="text-[11px] font-bold text-slate-600 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+                Menampilkan: <span className="text-emerald-700 font-extrabold">{rekapGajiFiltered.length} Data Transaksi</span>
+              </div>
+            </div>
+
+            {/* EXECUTIVE SUMMARY CARDS (PRINT:HIDDEN) */}
+            <div className="p-4 sm:p-6 bg-slate-50 border-b border-slate-200 grid grid-cols-2 md:grid-cols-4 gap-3.5 print:hidden">
+              <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+                <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider block">Total Gaji Pokok</span>
+                <div className="text-sm sm:text-base font-black text-slate-900 mt-1 font-mono">
+                  Rp {rekapGajiTotals.totalPokok.toLocaleString('id-ID')}
+                </div>
+                <span className="text-[10px] text-slate-500 mt-0.5 block">{rekapGajiTotals.count} Pegawai</span>
+              </div>
+
+              <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+                <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider block">Total Seluruh Tunjangan</span>
+                <div className="text-sm sm:text-base font-black text-indigo-700 mt-1 font-mono">
+                  + Rp {rekapGajiTotals.totalTunjangan.toLocaleString('id-ID')}
+                </div>
+                <span className="text-[10px] text-indigo-600 mt-0.5 block">Jabatan, Walas, Kehadiran, Piket</span>
+              </div>
+
+              <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+                <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider block">Total Seluruh Potongan</span>
+                <div className="text-sm sm:text-base font-black text-rose-700 mt-1 font-mono">
+                  - Rp {rekapGajiTotals.totalPotongan.toLocaleString('id-ID')}
+                </div>
+                <span className="text-[10px] text-rose-600 mt-0.5 block">Absensi, Denda, Koperasi, Kasbon</span>
+              </div>
+
+              <div className="bg-emerald-50 p-3.5 rounded-xl border border-emerald-200 shadow-sm">
+                <span className="text-[10px] font-bold uppercase text-emerald-800 tracking-wider block">Total Gaji Bersih (Net)</span>
+                <div className="text-base sm:text-lg font-black text-emerald-700 mt-1 font-mono">
+                  Rp {rekapGajiTotals.totalNet.toLocaleString('id-ID')}
+                </div>
+                <span className="text-[10px] font-bold text-emerald-800 mt-0.5 block">
+                  {rekapGajiTotals.totalPaid} Lunas • {rekapGajiTotals.totalDraft} Draft
+                </span>
+              </div>
+            </div>
+
+            {/* PRINTABLE OFFICIAL LEDGER REPORT SHEET */}
+            <div className="p-4 sm:p-8 overflow-x-auto">
+              <div id="printable-rekap-gaji" className="border border-slate-300 p-6 sm:p-8 rounded-2xl bg-white font-sans text-slate-900 shadow-sm space-y-6 min-w-[760px]">
+                
+                {/* KOP SURAT SEKOLAH RESMI */}
+                <div className="flex justify-between items-start pb-4 border-b-2 border-slate-950">
+                  <div className="flex items-center gap-4">
+                    {schoolSettings?.logoUrl ? (
+                      <div className="w-16 h-16 p-1 bg-white border border-slate-200 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+                        <img src={schoolSettings.logoUrl} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                      </div>
+                    ) : (
+                      <div className="w-16 h-16 bg-slate-100 border border-slate-300 rounded-xl flex items-center justify-center font-bold text-slate-700 text-2xl shrink-0">
+                        🏫
+                      </div>
+                    )}
+                    <div>
+                      <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-950 uppercase leading-tight">
+                        {schoolSettings?.namaSekolah || 'SMP ISLAM MODERN AL FAKHIR'}
+                      </h2>
+                      <p className="text-xs text-slate-700 leading-normal mt-0.5 max-w-xl">
+                        {schoolSettings?.alamat || 'Alamat Sekolah'}, RT/RW {schoolSettings?.rtRw || '01/01'}, Kec. {schoolSettings?.kecamatan || 'Kecamatan'}
+                      </p>
+                      <p className="text-[10px] text-slate-600 mt-0.5 font-medium">
+                        NPSN: {schoolSettings?.npsn || '70048660'} • Akreditasi: {schoolSettings?.akreditasi || 'A (Unggul)'} • Telp: {schoolSettings?.telepon || '-'} • Email: {schoolSettings?.email || '-'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="inline-block px-3 py-1 rounded bg-emerald-100 text-emerald-950 text-[10px] font-black uppercase tracking-wider mb-1">
+                      DOKUMEN PAYROLL RESMI
+                    </span>
+                    <div className="text-[11px] font-bold font-mono text-slate-800">
+                      PERIODE: {rekapGajiBulan.toUpperCase()} {rekapGajiTahun}
+                    </div>
+                    <div className="text-[9px] text-slate-500 mt-0.5">
+                      Tanggal Cetak: <span className="font-semibold text-slate-800">{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* JUDUL LAPORAN */}
+                <div className="text-center bg-slate-100 py-3 rounded-xl border border-slate-200 space-y-0.5">
+                  <h3 className="text-sm sm:text-base font-black uppercase tracking-wider text-slate-950">
+                    REKAPITULASI DAFTAR PENGGAJIAN & HONORARIUM GURU & KARYAWAN
+                  </h3>
+                  <p className="text-xs font-bold text-slate-600">
+                    PERIODE BULAN: {rekapGajiBulan.toUpperCase()} {rekapGajiTahun} • UNIT: {rekapGajiTipe === 'semua' ? 'SEMUA TENAGA PENDIDIK & KEPENDIDIKAN' : (rekapGajiTipe === 'guru' ? 'DEWAN GURU' : 'STAF & KARYAWAN')}
+                  </p>
+                </div>
+
+                {/* TABEL DETAIL REKAPITULASI GAJI */}
+                <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
+                  <table className="w-full text-left border-collapse text-[10.5px]">
+                    <thead>
+                      <tr className="bg-slate-900 text-white text-[9.5px] uppercase font-bold tracking-wider divide-x divide-slate-800">
+                        <th className="py-2.5 px-2 text-center w-8">No</th>
+                        <th className="py-2.5 px-3">Nama Pegawai & NIP/NIK</th>
+                        <th className="py-2.5 px-2 text-center w-24">Jabatan</th>
+                        <th className="py-2.5 px-2.5 text-right">Gaji Pokok</th>
+                        <th className="py-2.5 px-2 text-right">Tunj. Jabatan</th>
+                        <th className="py-2.5 px-2 text-right">Tunj. Walas</th>
+                        <th className="py-2.5 px-2 text-right">Kehadiran & Piket</th>
+                        <th className="py-2.5 px-2.5 text-right bg-slate-800 text-emerald-300">Total Bruto</th>
+                        <th className="py-2.5 px-2 text-right text-rose-300">Pot. Absensi</th>
+                        <th className="py-2.5 px-2 text-right text-rose-300">Koperasi/Kasbon</th>
+                        <th className="py-2.5 px-2 text-right text-rose-300">Total Pot.</th>
+                        <th className="py-2.5 px-3 text-right bg-emerald-900 text-emerald-200 font-extrabold">Net Diterima</th>
+                        <th className="py-2.5 px-2 text-center w-24">Status / TTD</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 text-slate-800">
+                      {rekapGajiFiltered.length === 0 ? (
+                        <tr>
+                          <td colSpan={13} className="py-10 text-center text-slate-400 font-medium italic">
+                            Tidak ada transaksi penggajian untuk periode {rekapGajiBulan} {rekapGajiTahun}.
+                          </td>
+                        </tr>
+                      ) : (
+                        rekapGajiFiltered.map((item, idx) => {
+                          const tJ = item.tunjangan || 0;
+                          const tW = item.tunjanganWalas || 0;
+                          const tK = item.tunjanganKetepatanWaktu || 0;
+                          const tH = item.tunjanganKehadiran || 0;
+                          const tP = item.tunjanganPiket || 0;
+                          const tE = item.tunjanganExcessTime || 0;
+                          const sumT = tJ + tW + tK + tH + tP + tE;
+
+                          const pA = item.potongan || 0;
+                          const pT = item.potonganDendaTerlambat || 0;
+                          const pF = item.potonganDendaLupaFinger || 0;
+                          const pK = item.potonganKoperasi || 0;
+                          const pB = item.potonganKasBon || 0;
+                          const sumP = pA + pT + pF + pK + pB;
+
+                          const nipNik = (item.penerimaNipNik && item.penerimaNipNik !== '-') 
+                            ? item.penerimaNipNik 
+                            : (item.penerimaTipe === 'guru' ? (guruList.find(g => g.id === item.penerimaId)?.nik || guruList.find(g => g.id === item.penerimaId)?.nip || '-') : (stafList.find(s => s.id === item.penerimaId)?.nik || '-'));
+
+                          return (
+                            <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
+                              <td className="py-2.5 px-2 text-center font-mono text-slate-500">{idx + 1}</td>
+                              <td className="py-2.5 px-3">
+                                <div className="font-bold text-slate-950 text-xs">{item.penerimaNama}</div>
+                                <div className="text-[9px] text-slate-500 font-mono mt-0.5">{nipNik}</div>
+                              </td>
+                              <td className="py-2.5 px-2 text-center">
+                                <span className={`inline-block px-1.5 py-0.5 text-[8.5px] rounded font-bold uppercase ${
+                                  item.penerimaTipe === 'guru' ? 'bg-purple-100 text-purple-900' : 'bg-blue-100 text-blue-900'
+                                }`}>
+                                  {item.penerimaTipe}
+                                </span>
+                                <div className="text-[9.5px] text-slate-600 font-medium truncate max-w-[90px] mx-auto mt-0.5">{item.jabatan}</div>
+                              </td>
+                              <td className="py-2.5 px-2.5 text-right font-mono text-slate-900 font-semibold">
+                                Rp {item.gajiPokok.toLocaleString('id-ID')}
+                              </td>
+                              <td className="py-2.5 px-2 text-right font-mono text-slate-700">
+                                {tJ > 0 ? `Rp ${tJ.toLocaleString('id-ID')}` : '-'}
+                              </td>
+                              <td className="py-2.5 px-2 text-right font-mono text-slate-700">
+                                {tW > 0 ? `Rp ${tW.toLocaleString('id-ID')}` : '-'}
+                              </td>
+                              <td className="py-2.5 px-2 text-right font-mono text-slate-700">
+                                {(tH + tP + tK + tE) > 0 ? `Rp ${(tH + tP + tK + tE).toLocaleString('id-ID')}` : '-'}
+                              </td>
+                              <td className="py-2.5 px-2.5 text-right font-mono font-bold text-slate-950 bg-slate-100/60">
+                                Rp {(item.gajiPokok + sumT).toLocaleString('id-ID')}
+                              </td>
+                              <td className="py-2.5 px-2 text-right font-mono text-rose-700">
+                                {(pA + pT + pF) > 0 ? `Rp ${(pA + pT + pF).toLocaleString('id-ID')}` : '-'}
+                              </td>
+                              <td className="py-2.5 px-2 text-right font-mono text-rose-700">
+                                {(pK + pB) > 0 ? `Rp ${(pK + pB).toLocaleString('id-ID')}` : '-'}
+                              </td>
+                              <td className="py-2.5 px-2 text-right font-mono font-bold text-rose-700 bg-rose-50/40">
+                                {sumP > 0 ? `Rp ${sumP.toLocaleString('id-ID')}` : '-'}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-800 bg-emerald-50 text-xs">
+                                Rp {item.totalDiterima.toLocaleString('id-ID')}
+                              </td>
+                              <td className="py-2.5 px-2 text-center text-[9px]">
+                                <span className={`inline-block px-1.5 py-0.5 rounded font-extrabold ${
+                                  item.status === 'Paid' ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'
+                                }`}>
+                                  {item.status === 'Paid' ? 'LUNAS' : 'DRAFT'}
+                                </span>
+                                {item.penerimaRekening && (
+                                  <div className="text-[8px] text-slate-500 font-mono mt-0.5 truncate max-w-[85px] mx-auto">
+                                    {item.penerimaRekening}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+
+                    {/* GRAND TOTAL ROW */}
+                    {rekapGajiFiltered.length > 0 && (
+                      <tfoot>
+                        <tr className="bg-slate-900 text-white font-extrabold text-[10px] divide-x divide-slate-800 border-t-2 border-slate-950">
+                          <td colSpan={3} className="py-3 px-3 text-center uppercase tracking-wider font-black">
+                            GRAND TOTAL AKUMULASI ({rekapGajiTotals.count} PENERIMA)
+                          </td>
+                          <td className="py-3 px-2.5 text-right font-mono">
+                            Rp {rekapGajiTotals.totalPokok.toLocaleString('id-ID')}
+                          </td>
+                          <td className="py-3 px-2 text-right font-mono text-slate-300">
+                            Rp {rekapGajiTotals.totalJabatan.toLocaleString('id-ID')}
+                          </td>
+                          <td className="py-3 px-2 text-right font-mono text-slate-300">
+                            Rp {rekapGajiTotals.totalWalas.toLocaleString('id-ID')}
+                          </td>
+                          <td className="py-3 px-2 text-right font-mono text-slate-300">
+                            Rp {(rekapGajiTotals.totalKehadiran + rekapGajiTotals.totalPiket + rekapGajiTotals.totalKetepatan + rekapGajiTotals.totalExcess).toLocaleString('id-ID')}
+                          </td>
+                          <td className="py-3 px-2.5 text-right font-mono text-emerald-300 font-black bg-slate-800">
+                            Rp {rekapGajiTotals.totalGross.toLocaleString('id-ID')}
+                          </td>
+                          <td className="py-3 px-2 text-right font-mono text-rose-300">
+                            Rp {(rekapGajiTotals.totalPotAbsensi + rekapGajiTotals.totalPotTerlambat + rekapGajiTotals.totalPotFinger).toLocaleString('id-ID')}
+                          </td>
+                          <td className="py-3 px-2 text-right font-mono text-rose-300">
+                            Rp {(rekapGajiTotals.totalPotKoperasi + rekapGajiTotals.totalPotKasBon).toLocaleString('id-ID')}
+                          </td>
+                          <td className="py-3 px-2 text-right font-mono text-rose-300 font-black">
+                            Rp {rekapGajiTotals.totalPotongan.toLocaleString('id-ID')}
+                          </td>
+                          <td className="py-3 px-3 text-right font-mono font-black text-emerald-300 bg-emerald-950 text-xs">
+                            Rp {rekapGajiTotals.totalNet.toLocaleString('id-ID')}
+                          </td>
+                          <td className="py-3 px-2 text-center text-[9px] text-slate-300">
+                            {rekapGajiTotals.totalPaid} Lunas / {rekapGajiTotals.totalDraft} Draft
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+
+                {/* TERBILANG SECTION */}
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs text-slate-800 space-y-1">
+                  <div className="font-bold text-slate-900">
+                    Total Pengeluaran Gaji Bersih (Net Payroll):{' '}
+                    <span className="text-emerald-700 font-extrabold font-mono text-sm">
+                      Rp {rekapGajiTotals.totalNet.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                  <div className="text-[11px] italic text-slate-600">
+                    <span className="font-semibold not-italic text-slate-800">Terbilang: </span>
+                    "{terbilang(rekapGajiTotals.totalNet)} Rupiah"
+                  </div>
+                </div>
+
+                {/* TANDA TANGAN & PENGESAHAN */}
+                <div className="grid grid-cols-2 gap-8 pt-6 text-xs border-t border-slate-200">
+                  <div className="text-center space-y-12">
+                    <div>
+                      <p className="text-slate-600 font-medium">Pembuat Daftar Gaji / Bendahara Sekolah,</p>
+                      <p className="text-[10px] text-slate-400">SMP Islam Modern Al Fakhir</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="font-bold underline text-slate-950 text-sm">{bendaharaNama}</p>
+                      <p className="text-[10px] text-slate-500 font-mono">NIK: {bendaharaNik}</p>
+                    </div>
+                  </div>
+
+                  <div className="text-center space-y-12">
+                    <div>
+                      <p className="text-slate-600 font-medium">
+                        {schoolSettings?.alamat ? (schoolSettings.alamat.split(',')[0] || 'Jakarta') : 'Jakarta'},{' '}
+                        {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </p>
+                      <p className="text-slate-600 font-medium">Mengetahui, Kepala Sekolah</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="font-bold underline text-slate-950 text-sm">
+                        {schoolSettings?.namaKepalaSekolah || schoolSettings?.kepalaSekolah || 'H. Ahmad Fakhri, M.Pd'}
+                      </p>
+                      <p className="text-[10px] text-slate-500 font-mono">NIP: {schoolSettings?.nipKepalaSekolah || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* FOOTER NOTIFIKASI */}
+                <div className="text-[9px] text-slate-400 text-center pt-3 border-t border-dashed border-slate-200 flex justify-between items-center">
+                  <span>Dokumen Rekapitulasi Resmi Sistem Manajemen Keuangan Sekolah</span>
+                  <span>Kode Rekap: REKAP-{rekapGajiBulan.toUpperCase()}-{rekapGajiTahun} • {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* CUSTOM DELETE CONFIRMATION DIALOG MODAL FOR GAJI */}
       {gajiToDeleteId && (
