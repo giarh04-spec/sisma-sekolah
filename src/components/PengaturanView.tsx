@@ -621,7 +621,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   </div>
                   <div className="text-[9px] text-slate-600 flex justify-between font-mono">
                     <span>Siswa: Ahmad Rizky</span>
-                    <span>Kelas: X-IPA-1</span>
+                    <span>Kelas: VIII - Al Biruni</span>
                   </div>
                 </div>
               </div>

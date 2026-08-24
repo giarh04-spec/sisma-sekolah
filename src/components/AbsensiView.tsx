@@ -675,19 +675,19 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
     rombelList.forEach(r => { if (r.namaRombel && r.namaRombel.trim()) set.add(r.namaRombel.trim()); });
     siswaList.forEach(s => { if (s.kelas && s.kelas.trim()) set.add(s.kelas.trim()); });
     if (set.size === 0) {
-      ['X-IPA-1', 'XI-IPA-2', 'XI-IPS-1', 'XII-IPA-1'].forEach(k => set.add(k));
+      ['VIII - Al Biruni', 'VIII - Al Farabi', 'VIII - Al Khawarizmi', 'VIII - Al Kindi'].forEach(k => set.add(k));
     }
     return Array.from(set);
   }, [rombelList, siswaList]);
 
   // --- Subtab 1: Absensi Siswa Harian State ---
   const todayDateStr = new Date().toISOString().split('T')[0];
-  const [selectedKelas, setSelectedKelas] = useState(() => availableKelasOptions[0] || 'X-IPA-1');
+  const [selectedKelas, setSelectedKelas] = useState(() => availableKelasOptions[0] || 'VIII - Al Biruni');
   const [selectedTanggal, setSelectedTanggal] = useState(todayDateStr);
 
   // Auto ensure selectedKelas is valid if available options change
   useEffect(() => {
-    if (availableKelasOptions.length > 0 && !availableKelasOptions.includes(selectedKelas)) {
+    if (availableKelasOptions.length > 0 && (!selectedKelas || selectedKelas === 'X-IPA-1' || !availableKelasOptions.includes(selectedKelas))) {
       setSelectedKelas(availableKelasOptions[0]);
     }
   }, [availableKelasOptions, selectedKelas]);
@@ -742,7 +742,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   };
 
   // --- Subtab 2: Absensi Kelas Per Mapel State ---
-  const [mapelKelas, setMapelKelas] = useState(() => availableKelasOptions[0] || 'X-IPA-1');
+  const [mapelKelas, setMapelKelas] = useState(() => availableKelasOptions[0] || 'VIII - Al Biruni');
   const [mapelNama, setMapelNama] = useState('Fisika & Informatika');
   const [mapelGuru, setMapelGuru] = useState('Siti Rahmawati, S.Si., M.Sc.');
   const [mapelJam, setMapelJam] = useState('1 - 2 (07:00 - 08:30)');

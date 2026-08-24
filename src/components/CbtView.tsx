@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Laptop, 
   Plus, 
@@ -27,7 +27,15 @@ import {
   QrCode,
   ShieldCheck,
   Cloud,
-  FileText
+  FileText,
+  User,
+  Edit2,
+  MapPin,
+  UserCheck,
+  Layers,
+  Sparkle,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { 
   BankSoal, 
@@ -38,9 +46,14 @@ import {
   JawabanSiswa,
   JadwalUjianItem,
   Siswa,
+  Guru,
+  RombelKelas,
+  MataPelajaranItem,
   Role,
-  CbtSubTab
+  CbtSubTab,
+  SchoolSettings
 } from '../types/school';
+import { dbFetchCollection, dbSaveCollection } from '../lib/firebaseSync';
 
 interface CbtViewProps {
   bankSoalList: BankSoal[];
@@ -50,10 +63,14 @@ interface CbtViewProps {
   hasilUjianList?: HasilUjian[];
   setHasilUjianList?: React.Dispatch<React.SetStateAction<HasilUjian[]>>;
   siswaList: Siswa[];
+  guruList?: Guru[];
+  rombelList?: RombelKelas[];
+  mapelList?: MataPelajaranItem[];
   currentRole?: Role;
   userEmail?: string;
   subTab?: CbtSubTab;
   setSubTab?: (subTab: CbtSubTab) => void;
+  schoolSettings?: SchoolSettings;
 }
 
 export const CbtView: React.FC<CbtViewProps> = ({
@@ -64,10 +81,14 @@ export const CbtView: React.FC<CbtViewProps> = ({
   hasilUjianList = [],
   setHasilUjianList,
   siswaList,
+  guruList = [],
+  rombelList = [],
+  mapelList = [],
   currentRole = 'admin',
   userEmail = '',
   subTab: externalSubTab,
-  setSubTab: externalSetSubTab
+  setSubTab: externalSetSubTab,
+  schoolSettings
 }) => {
   const [internalSubTab, setInternalSubTab] = useState<CbtSubTab>('bank_soal');
   const subTab = externalSubTab !== undefined ? externalSubTab : internalSubTab;
@@ -79,14 +100,67 @@ export const CbtView: React.FC<CbtViewProps> = ({
     }
   }, [currentRole, subTab]);
 
-  // --- Jadwal Ujian State ---
-  const [jadwalList, setJadwalList] = useState<JadwalUjianItem[]>([
+  // Compute dynamic lists of available classes, subjects, and teachers
+  // Hanya masukkan kelas/rombel yang benar-benar memiliki siswa terdaftar
+  const availableKelasList = useMemo(() => {
+    const classCountMap = new Map<string, number>();
+
+    siswaList.forEach(s => {
+      if (s.kelas && s.kelas.trim()) {
+        const k = s.kelas.trim();
+        classCountMap.set(k, (classCountMap.get(k) || 0) + 1);
+      }
+    });
+
+    // Hanya ambil kelas yang memiliki jumlah siswa > 0
+    const classesWithStudents = Array.from(classCountMap.entries())
+      .filter(([_, count]) => count > 0)
+      .map(([className]) => className);
+
+    // Fallback jika belum ada data siswa sama sekali
+    if (classesWithStudents.length === 0) {
+      rombelList.forEach(r => {
+        const name = r.namaRombel || (r as any).nama;
+        if (name && typeof name === 'string' && name.trim()) {
+          classesWithStudents.push(name.trim());
+        }
+      });
+    }
+
+    return Array.from(new Set(classesWithStudents)).sort((a, b) => 
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+    );
+  }, [siswaList, rombelList]);
+
+  const availableMapelList = useMemo(() => {
+    const set = new Set<string>();
+    mapelList.forEach(m => {
+      const name = m.namaMapel || (m as any).nama;
+      if (name && typeof name === 'string' && name.trim()) set.add(name.trim());
+    });
+    ujianList.forEach(u => {
+      if (u.mataPelajaran && u.mataPelajaran.trim()) set.add(u.mataPelajaran.trim());
+    });
+    bankSoalList.forEach(b => {
+      if (b.mataPelajaran && b.mataPelajaran.trim()) set.add(b.mataPelajaran.trim());
+    });
+    guruList.forEach(g => {
+      if (g.mataPelajaran && g.mataPelajaran.trim()) set.add(g.mataPelajaran.trim());
+    });
+    if (set.size === 0) {
+      ['Informatika / TIK', 'Matematika', 'Matematika Tingkat Lanjut', 'Bahasa Indonesia', 'Bahasa Inggris', 'IPA (Fisika/Kimia/Biologi)', 'IPS (Ekonomi/Geografi/Sejarah)', 'Pendidikan Agama Islam'].forEach(m => set.add(m));
+    }
+    return Array.from(set).sort();
+  }, [mapelList, ujianList, bankSoalList, guruList]);
+
+  // --- Jadwal Ujian State & Persistence ---
+  const DEFAULT_JADWAL: JadwalUjianItem[] = [
     {
       id: 'jdw-01',
       ujianId: 'uj-01',
-      judulUjian: 'Penilaian Tengah Semester (PTS) Matematika Kelas X',
-      mataPelajaran: 'Matematika Tingkat Lanjut',
-      kelasTarget: 'X-IPA-1',
+      judulUjian: 'Penilaian Tengah Semester (PTS) Matematika Kelas VIII',
+      mataPelajaran: 'Matematika',
+      kelasTarget: 'VIII - Al Biruni',
       tanggal: '2026-08-01',
       jamMulai: '07:30',
       jamSelesai: '09:00',
@@ -97,9 +171,9 @@ export const CbtView: React.FC<CbtViewProps> = ({
     {
       id: 'jdw-02',
       ujianId: 'uj-02',
-      judulUjian: 'PTS Bahasa Indonesia Fase E',
+      judulUjian: 'PTS Bahasa Indonesia Fase D',
       mataPelajaran: 'Bahasa Indonesia',
-      kelasTarget: 'X-IPA-1',
+      kelasTarget: 'VIII - Al Farabi',
       tanggal: '2026-08-01',
       jamMulai: '09:30',
       jamSelesai: '11:00',
@@ -107,7 +181,336 @@ export const CbtView: React.FC<CbtViewProps> = ({
       pengawas: 'Rian Hidayat, S.Pd.',
       status: 'Mendatang'
     }
-  ]);
+  ];
+
+  const [jadwalList, setJadwalList] = useState<JadwalUjianItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('edu_jadwalUjianList');
+      if (saved !== null) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item: JadwalUjianItem) => ({
+            ...item,
+            kelasTarget: item.kelasTarget === 'X-IPA-1' ? 'VIII - Al Biruni' : item.kelasTarget
+          }));
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return DEFAULT_JADWAL;
+  });
+
+  // Delete Confirmation Modal State
+  const [deleteTargetJadwal, setDeleteTargetJadwal] = useState<JadwalUjianItem | null>(null);
+
+  // Sync with Firestore
+  useEffect(() => {
+    const fetchRemoteJadwal = async () => {
+      try {
+        const remote = await dbFetchCollection<JadwalUjianItem>('edu_jadwalUjianList');
+        if (remote && Array.isArray(remote) && remote.length > 0) {
+          const sanitized = remote.map(item => ({
+            ...item,
+            kelasTarget: item.kelasTarget === 'X-IPA-1' ? 'VIII - Al Biruni' : item.kelasTarget
+          }));
+          setJadwalList(sanitized);
+          localStorage.setItem('edu_jadwalUjianList', JSON.stringify(sanitized));
+        }
+      } catch (err) {
+        console.error('Gagal mengambil jadwal ujian remote:', err);
+      }
+    };
+    fetchRemoteJadwal();
+  }, []);
+
+  const saveJadwalList = (newList: JadwalUjianItem[]) => {
+    const sanitized = newList.map(item => ({
+      ...item,
+      kelasTarget: item.kelasTarget === 'X-IPA-1' ? 'VIII - Al Biruni' : item.kelasTarget
+    }));
+    setJadwalList(sanitized);
+    try {
+      localStorage.setItem('edu_jadwalUjianList', JSON.stringify(sanitized));
+      dbSaveCollection('edu_jadwalUjianList', sanitized).catch(console.error);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // State Modal Tambah / Edit Sesi Ujian
+  const [showJadwalModal, setShowJadwalModal] = useState(false);
+  const [editingJadwalId, setEditingJadwalId] = useState<string | null>(null);
+  const [formJadwal, setFormJadwal] = useState<{
+    ujianId: string;
+    judulUjian: string;
+    mataPelajaran: string;
+    kelasTarget: string;
+    tanggal: string;
+    jamMulai: string;
+    jamSelesai: string;
+    ruang: string;
+    pengawas: string;
+    status: 'Aktif' | 'Mendatang' | 'Selesai';
+  }>({
+    ujianId: '',
+    judulUjian: '',
+    mataPelajaran: '',
+    kelasTarget: 'Semua Kelas',
+    tanggal: new Date().toISOString().split('T')[0],
+    jamMulai: '07:30',
+    jamSelesai: '09:00',
+    ruang: 'Lab Komputer 01',
+    pengawas: '',
+    status: 'Aktif'
+  });
+
+  const [formError, setFormError] = useState('');
+  const [toastNotification, setToastNotification] = useState<string | null>(null);
+  const [customKelasInput, setCustomKelasInput] = useState('');
+
+  // Helper untuk multi-select Kelas Target (membersihkan kelas usang seperti X-IPA-1 jika ada)
+  const selectedKelasArray = useMemo(() => {
+    if (!formJadwal.kelasTarget || !formJadwal.kelasTarget.trim()) return [];
+    if (formJadwal.kelasTarget === 'Semua Kelas') return availableKelasList;
+    return formJadwal.kelasTarget
+      .split(',')
+      .map(s => s.trim())
+      .filter(s => s && s !== 'X-IPA-1');
+  }, [formJadwal.kelasTarget, availableKelasList]);
+
+  // Efek untuk otomatis membersihkan jika formJadwal.kelasTarget masih memuat X-IPA-1
+  useEffect(() => {
+    if (formJadwal.kelasTarget && formJadwal.kelasTarget.includes('X-IPA-1')) {
+      const cleaned = formJadwal.kelasTarget
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s && s !== 'X-IPA-1')
+        .join(', ');
+      setFormJadwal(prev => ({
+        ...prev,
+        kelasTarget: cleaned || 'Semua Kelas'
+      }));
+    }
+  }, [formJadwal.kelasTarget]);
+
+  const isAllKelasSelected = 
+    formJadwal.kelasTarget === 'Semua Kelas' || 
+    (availableKelasList.length > 0 && availableKelasList.every(k => selectedKelasArray.includes(k)));
+
+  const handleToggleKelasCheckbox = (kelasName: string) => {
+    let current: string[];
+    if (formJadwal.kelasTarget === 'Semua Kelas') {
+      current = [...availableKelasList];
+    } else {
+      current = [...selectedKelasArray];
+    }
+
+    if (current.includes(kelasName)) {
+      current = current.filter(k => k !== kelasName);
+    } else {
+      current = [...current, kelasName];
+    }
+
+    if (current.length === 0) {
+      setFormJadwal(prev => ({ ...prev, kelasTarget: '' }));
+    } else if (current.length === availableKelasList.length && availableKelasList.length > 0) {
+      setFormJadwal(prev => ({ ...prev, kelasTarget: 'Semua Kelas' }));
+    } else {
+      setFormJadwal(prev => ({ ...prev, kelasTarget: current.join(', ') }));
+    }
+  };
+
+  const handleSelectAllKelasToggle = () => {
+    if (isAllKelasSelected) {
+      setFormJadwal(prev => ({ ...prev, kelasTarget: '' }));
+    } else {
+      setFormJadwal(prev => ({ ...prev, kelasTarget: 'Semua Kelas' }));
+    }
+  };
+
+  const handleAddCustomKelas = () => {
+    if (!customKelasInput.trim()) return;
+    const newKelas = customKelasInput.trim();
+    let current: string[] = [];
+    if (formJadwal.kelasTarget === 'Semua Kelas') {
+      current = [...availableKelasList];
+    } else {
+      current = [...selectedKelasArray];
+    }
+    if (!current.includes(newKelas)) {
+      current.push(newKelas);
+      setFormJadwal(prev => ({ ...prev, kelasTarget: current.join(', ') }));
+    }
+    setCustomKelasInput('');
+  };
+
+  const showToast = (msg: string) => {
+    setToastNotification(msg);
+    setTimeout(() => {
+      setToastNotification(null);
+    }, 3500);
+  };
+
+  const handleOpenAddJadwal = () => {
+    setEditingJadwalId(null);
+    setFormError('');
+    
+    // Temukan ujian CBT pertama (jika ada) untuk dijadikan referensi awal
+    const firstUjian = ujianList[0];
+    const defaultMapel = firstUjian?.mataPelajaran || availableMapelList[0] || 'Informatika / TIK';
+    const rawKelas = firstUjian?.kelasTarget;
+    const defaultKelas = (rawKelas && rawKelas !== 'X-IPA-1' && (availableKelasList.includes(rawKelas) || rawKelas === 'Semua Kelas'))
+      ? rawKelas
+      : (availableKelasList[0] || 'Semua Kelas');
+
+    // Cari guru pengampu mapel yang sesuai
+    const matchedGuru = guruList.find(g => 
+      g.mataPelajaran && defaultMapel && 
+      (g.mataPelajaran.toLowerCase().includes(defaultMapel.toLowerCase()) || 
+       defaultMapel.toLowerCase().includes(g.mataPelajaran.toLowerCase()))
+    );
+    const defaultGuru = matchedGuru?.nama || guruList[0]?.nama || 'Aulia Safitri, S.Pd';
+
+    setFormJadwal({
+      ujianId: firstUjian?.id || '',
+      judulUjian: firstUjian?.judulUjian || '',
+      mataPelajaran: defaultMapel,
+      kelasTarget: defaultKelas,
+      tanggal: new Date().toISOString().split('T')[0],
+      jamMulai: '07:30',
+      jamSelesai: '09:00',
+      ruang: 'Lab Komputer 01',
+      pengawas: defaultGuru,
+      status: 'Aktif'
+    });
+    setShowJadwalModal(true);
+  };
+
+  const handleOpenEditJadwal = (item: JadwalUjianItem) => {
+    setEditingJadwalId(item.id);
+    setFormError('');
+    setFormJadwal({
+      ujianId: item.ujianId || '',
+      judulUjian: item.judulUjian,
+      mataPelajaran: item.mataPelajaran,
+      kelasTarget: item.kelasTarget,
+      tanggal: item.tanggal,
+      jamMulai: item.jamMulai,
+      jamSelesai: item.jamSelesai,
+      ruang: item.ruang,
+      pengawas: item.pengawas,
+      status: item.status
+    });
+    setShowJadwalModal(true);
+  };
+
+  const handleSelectUjianPreset = (selectedId: string) => {
+    const selected = ujianList.find(u => u.id === selectedId);
+    if (selected) {
+      // Cari guru pengampu dari bank soal atau kecocokan mata pelajaran
+      const bank = bankSoalList.find(b => b.id === selected.bankSoalId);
+      const matchedGuruByBank = bank?.dibuatOleh ? guruList.find(g => g.nama.toLowerCase() === bank.dibuatOleh.toLowerCase()) : null;
+      const matchedGuruByMapel = guruList.find(g => 
+        g.mataPelajaran && selected.mataPelajaran && 
+        (g.mataPelajaran.toLowerCase().includes(selected.mataPelajaran.toLowerCase()) || 
+         selected.mataPelajaran.toLowerCase().includes(g.mataPelajaran.toLowerCase()))
+      );
+
+      const targetGuru = matchedGuruByBank?.nama || matchedGuruByMapel?.nama;
+
+      setFormJadwal(prev => ({
+        ...prev,
+        ujianId: selected.id,
+        judulUjian: selected.judulUjian,
+        mataPelajaran: selected.mataPelajaran,
+        kelasTarget: selected.kelasTarget,
+        pengawas: targetGuru || prev.pengawas || (guruList[0]?.nama || '')
+      }));
+    } else {
+      setFormJadwal(prev => ({ ...prev, ujianId: '' }));
+    }
+  };
+
+  const handleMapelChange = (newMapel: string) => {
+    const matchedGuru = guruList.find(g => 
+      g.mataPelajaran && newMapel && 
+      (g.mataPelajaran.toLowerCase().includes(newMapel.toLowerCase()) || 
+       newMapel.toLowerCase().includes(g.mataPelajaran.toLowerCase()))
+    );
+
+    setFormJadwal(prev => ({
+      ...prev,
+      mataPelajaran: newMapel,
+      pengawas: matchedGuru ? matchedGuru.nama : prev.pengawas
+    }));
+  };
+
+  const handleSaveJadwal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formJadwal.judulUjian.trim()) {
+      setFormError('Nama sesi ujian tidak boleh kosong!');
+      return;
+    }
+    if (!formJadwal.mataPelajaran.trim()) {
+      setFormError('Mata pelajaran tidak boleh kosong!');
+      return;
+    }
+    if (!formJadwal.kelasTarget || !formJadwal.kelasTarget.trim() || selectedKelasArray.length === 0) {
+      setFormError('Pilih minimal satu kelas / rombel target!');
+      return;
+    }
+    if (!formJadwal.tanggal) {
+      setFormError('Tanggal pelaksanaan ujian harus dipilih!');
+      return;
+    }
+
+    if (editingJadwalId) {
+      const updated = jadwalList.map(j => {
+        if (j.id === editingJadwalId) {
+          return {
+            ...j,
+            ...formJadwal,
+            id: editingJadwalId
+          };
+        }
+        return j;
+      });
+      saveJadwalList(updated);
+      showToast('Sesi ujian berhasil diperbarui!');
+    } else {
+      const newItem: JadwalUjianItem = {
+        id: `jdw-${Date.now().toString().slice(-6)}`,
+        ...formJadwal
+      };
+      saveJadwalList([newItem, ...jadwalList]);
+      showToast('Sesi ujian baru berhasil dijadwalkan!');
+    }
+
+    setShowJadwalModal(false);
+  };
+
+  const handleOpenDeleteJadwal = (item: JadwalUjianItem) => {
+    setDeleteTargetJadwal(item);
+  };
+
+  const handleConfirmDeleteJadwal = () => {
+    if (!deleteTargetJadwal) return;
+    const filtered = jadwalList.filter(j => j.id !== deleteTargetJadwal.id);
+    saveJadwalList(filtered);
+    showToast(`Sesi ujian "${deleteTargetJadwal.judulUjian}" berhasil dihapus!`);
+    setDeleteTargetJadwal(null);
+  };
+
+  const handleToggleStatusJadwal = (id: string, currentStatus: 'Aktif' | 'Mendatang' | 'Selesai') => {
+    const nextStatus: 'Aktif' | 'Mendatang' | 'Selesai' = 
+      currentStatus === 'Aktif' ? 'Selesai' :
+      currentStatus === 'Mendatang' ? 'Aktif' : 'Mendatang';
+    
+    const updated = jadwalList.map(j => j.id === id ? { ...j, status: nextStatus } : j);
+    saveJadwalList(updated);
+    showToast(`Status sesi diubah menjadi ${nextStatus}!`);
+  };
 
   // Modal Kartu Peserta Ujian Printable State
   const [selectedKartuSiswa, setSelectedKartuSiswa] = useState<Siswa | null>(null);
@@ -201,9 +604,9 @@ export const CbtView: React.FC<CbtViewProps> = ({
   };
 
   // --- AI Generator State ---
-  const [aiMapel, setAiMapel] = useState('Fisika');
-  const [aiKelas, setAiKelas] = useState('X-IPA-1');
-  const [aiTopik, setAiTopik] = useState('Hukum Newton & Gravitasi');
+  const [aiMapel, setAiMapel] = useState('IPA');
+  const [aiKelas, setAiKelas] = useState('VIII - Al Biruni');
+  const [aiTopik, setAiTopik] = useState('Sistem Peredaran Darah & Fotosintesis');
   const [aiJumlah, setAiJumlah] = useState(4);
   const [loadingAi, setLoadingAi] = useState(false);
 
@@ -465,21 +868,29 @@ export const CbtView: React.FC<CbtViewProps> = ({
       {subTab === 'jadwal_kartu' && (
         <div className="space-y-6">
           
+          {/* Toast Notification */}
+          {toastNotification && (
+            <div className="fixed top-5 right-5 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-bold animate-bounce">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{toastNotification}</span>
+            </div>
+          )}
+
           {/* Jadwal Ujian List */}
           <div className="bg-[#121212] rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
               <div>
                 <h3 className="font-bold text-white text-base flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-blue-400" /> Jadwal Pelaksanaan Ujian CBT 2026
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Daftar sesi ujian online, jadwal ruang lab komputer, dan pengawas
+                  Daftar sesi ujian online, jadwal ruang lab komputer, dan guru mata pelajaran
                 </p>
               </div>
 
               <button
-                onClick={() => alert('Jadwal ujian baru telah disinkronkan dengan aplikasi seluruh siswa!')}
-                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5"
+                onClick={handleOpenAddJadwal}
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-900/30 transition-all cursor-pointer"
               >
                 <Plus className="w-4 h-4" /> Tambah Sesi Ujian
               </button>
@@ -491,34 +902,107 @@ export const CbtView: React.FC<CbtViewProps> = ({
                   <tr>
                     <th className="px-4 py-3">Nama Sesi Ujian</th>
                     <th className="px-4 py-3">Mata Pelajaran</th>
-                    <th className="px-4 py-3">Kelas</th>
+                    <th className="px-4 py-3">Kelas Target</th>
                     <th className="px-4 py-3">Tanggal & Waktu</th>
-                    <th className="px-4 py-3">Ruang / Pengawas</th>
+                    <th className="px-4 py-3">Ruang / Guru Mapel</th>
                     <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
-                  {jadwalList.map(j => (
-                    <tr key={j.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="px-4 py-3 font-bold text-white">{j.judulUjian}</td>
-                      <td className="px-4 py-3 text-blue-400 font-semibold">{j.mataPelajaran}</td>
-                      <td className="px-4 py-3 font-mono font-bold">{j.kelasTarget}</td>
-                      <td className="px-4 py-3 font-mono text-slate-300">
-                        {j.tanggal} ({j.jamMulai} - {j.jamSelesai})
-                      </td>
-                      <td className="px-4 py-3 text-slate-400">
-                        <div>{j.ruang}</div>
-                        <div className="text-[10px] text-slate-500">Pengawas: {j.pengawas}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          j.status === 'Aktif' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'
-                        }`}>
-                          {j.status}
-                        </span>
+                  {jadwalList.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                        <Calendar className="w-8 h-8 mx-auto mb-2 text-slate-600 opacity-60" />
+                        <p className="font-semibold text-slate-400">Belum ada sesi ujian yang dijadwalkan</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">Klik tombol &ldquo;Tambah Sesi Ujian&rdquo; untuk membuat jadwal baru</p>
+                        <button
+                          onClick={handleOpenAddJadwal}
+                          className="mt-3 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 transition-all border border-blue-500/30"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Buat Sesi Pertama
+                        </button>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    jadwalList.map(j => (
+                      <tr key={j.id} className="hover:bg-slate-800/30 transition-colors">
+                        <td className="px-4 py-3 font-bold text-white">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
+                            <span>{j.judulUjian}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-blue-400 font-semibold">{j.mataPelajaran}</td>
+                        <td className="px-4 py-3 font-mono text-slate-200">
+                          <div className="flex flex-wrap gap-1 max-w-[220px]">
+                            {j.kelasTarget === 'Semua Kelas' ? (
+                              <span className="px-2 py-0.5 rounded-md bg-blue-950/60 border border-blue-800/80 text-blue-300 text-[11px] font-semibold">
+                                🌐 Semua Kelas
+                              </span>
+                            ) : (
+                              j.kelasTarget.split(',').map((k, idx) => (
+                                <span key={idx} className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-[11px] text-slate-200 font-bold">
+                                  {k.trim()}
+                                </span>
+                              ))
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-slate-300">
+                          <div className="font-bold text-white">{j.tanggal}</div>
+                          <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                            <Clock className="w-3 h-3 text-slate-500" />
+                            {j.jamMulai} - {j.jamSelesai} WIB
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-slate-400">
+                          <div className="font-semibold text-slate-200 flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-blue-400" /> {j.ruang}
+                          </div>
+                          <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5" title="Guru Mata Pelajaran">
+                            <UserCheck className="w-3 h-3 text-emerald-400" /> {j.pengawas || '-'}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => handleToggleStatusJadwal(j.id, j.status)}
+                            title="Klik untuk mengubah status sesi"
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all hover:scale-105 ${
+                              j.status === 'Aktif' 
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                                : j.status === 'Mendatang'
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : 'bg-slate-800 text-slate-400 border border-slate-700'
+                            }`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              j.status === 'Aktif' ? 'bg-emerald-400 animate-pulse' : j.status === 'Mendatang' ? 'bg-amber-400' : 'bg-slate-500'
+                            }`}></span>
+                            {j.status}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => handleOpenEditJadwal(j)}
+                              className="p-1.5 bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white rounded-lg transition-all cursor-pointer"
+                              title="Edit Sesi Ujian"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleOpenDeleteJadwal(j)}
+                              className="p-1.5 bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white rounded-lg transition-all cursor-pointer"
+                              title="Hapus Sesi Ujian"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -541,17 +1025,26 @@ export const CbtView: React.FC<CbtViewProps> = ({
               {siswaList.map(siswa => (
                 <div
                   key={siswa.id}
-                  className="p-4 bg-[#181818] rounded-xl border border-slate-800 flex items-center justify-between hover:border-purple-500/40 transition-all group"
+                  className="p-3.5 bg-[#181818] rounded-xl border border-slate-800 flex items-center justify-between hover:border-purple-500/40 transition-all group gap-3"
                 >
-                  <div>
-                    <div className="text-xs font-bold text-white group-hover:text-purple-300">{siswa.nama}</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">NISN: {siswa.nisn} | Kelas {siswa.kelas}</div>
-                    <div className="text-[9px] font-mono text-purple-400 mt-1">No Peserta: C2026-{siswa.nisn.slice(-4)}</div>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
+                      {siswa.fotoUrl ? (
+                        <img src={siswa.fotoUrl} alt={siswa.nama} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <User className="w-5 h-5 text-slate-400" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-white group-hover:text-purple-300 truncate">{siswa.nama}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">NISN: {siswa.nisn} | Kelas {siswa.kelas}</div>
+                      <div className="text-[9px] font-mono text-purple-400 mt-0.5">No Peserta: C2026-{siswa.nisn.slice(-4)}</div>
+                    </div>
                   </div>
 
                   <button
                     onClick={() => setSelectedKartuSiswa(siswa)}
-                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-md"
+                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-md shrink-0 cursor-pointer"
                   >
                     <Printer className="w-3.5 h-3.5" /> Kartu
                   </button>
@@ -1226,13 +1719,21 @@ export const CbtView: React.FC<CbtViewProps> = ({
               
               {/* Header Kartu Ujian */}
               <div className="flex items-center gap-3 border-b-2 border-slate-900 pb-3">
-                <div className="w-12 h-12 bg-slate-900 rounded-xl text-white font-bold flex items-center justify-center text-xl shrink-0">
-                  <Building2 className="w-7 h-7" />
+                <div className="w-12 h-12 bg-slate-900 rounded-xl text-white font-bold flex items-center justify-center text-xl shrink-0 overflow-hidden">
+                  {schoolSettings?.logoUrl ? (
+                    <img src={schoolSettings.logoUrl} alt="Logo" className="w-full h-full object-contain p-1" referrerPolicy="no-referrer" />
+                  ) : (
+                    <Building2 className="w-7 h-7" />
+                  )}
                 </div>
                 <div className="flex-1">
                   <h4 className="font-black text-sm uppercase tracking-wide leading-tight">KARTU PESERTA & JADWAL UJIAN CBT 2026</h4>
-                  <p className="text-[10px] font-bold text-slate-600">SMA PERMATA BANGSA • SEMESTER GANJIL</p>
-                  <p className="text-[9px] text-slate-500">Jl. Education No. 123 • Telp: (021) 555-0199</p>
+                  <p className="text-[10px] font-bold text-slate-600 uppercase">
+                    {schoolSettings?.namaSekolah || 'SMA PERMATA BANGSA'} • {schoolSettings?.semester ? `SEMESTER ${schoolSettings.semester.toUpperCase()}` : 'SEMESTER GANJIL'}
+                  </p>
+                  <p className="text-[9px] text-slate-500">
+                    {schoolSettings?.alamat || 'Jl. Education No. 123'} • Telp: {schoolSettings?.telepon || '(021) 555-0199'}
+                  </p>
                 </div>
                 <div className="text-right border-l-2 border-slate-900 pl-3">
                   <div className="text-[9px] font-bold text-slate-500 uppercase">NO PESERTA</div>
@@ -1240,30 +1741,53 @@ export const CbtView: React.FC<CbtViewProps> = ({
                 </div>
               </div>
 
-              {/* Identity Grid */}
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Nama Peserta:</span>
-                  <span className="font-extrabold text-slate-900 text-sm">{selectedKartuSiswa.nama}</span>
+              {/* Identity & Photo Grid */}
+              <div className="flex gap-3.5 items-start">
+                {/* Pasfoto Peserta (3x4 Aspect Ratio) */}
+                <div className="w-[84px] h-[112px] shrink-0 border-2 border-slate-900 rounded-lg overflow-hidden bg-slate-100 flex flex-col items-center justify-center relative shadow-sm">
+                  {selectedKartuSiswa.fotoUrl ? (
+                    <img 
+                      src={selectedKartuSiswa.fotoUrl} 
+                      alt={selectedKartuSiswa.nama} 
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-slate-400 p-1 text-center">
+                      <User className="w-8 h-8 text-slate-400 mb-1" />
+                      <span className="text-[8px] font-extrabold uppercase tracking-wider text-slate-500">FOTO 3x4</span>
+                    </div>
+                  )}
+                  <div className="absolute bottom-0 inset-x-0 bg-slate-900/85 text-white text-[7px] text-center font-bold py-0.5 uppercase tracking-wider">
+                    Peserta
+                  </div>
                 </div>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">NISN / NIS:</span>
-                  <span className="font-mono font-bold">{selectedKartuSiswa.nisn} / {selectedKartuSiswa.nis}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Kelas / Ruang Lab:</span>
-                  <span className="font-bold">{selectedKartuSiswa.kelas} (Ruang Lab 01)</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Password Login CBT:</span>
-                  <span className="font-mono font-extrabold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-                    CBT#{selectedKartuSiswa.nisn.slice(-4)}
-                  </span>
+
+                {/* Identity Grid */}
+                <div className="flex-1 grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Nama Peserta:</span>
+                    <span className="font-extrabold text-slate-900 text-sm leading-tight block">{selectedKartuSiswa.nama}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">NISN / NIS:</span>
+                    <span className="font-mono font-bold text-slate-800">{selectedKartuSiswa.nisn} / {selectedKartuSiswa.nis}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Kelas / Ruang Lab:</span>
+                    <span className="font-bold text-slate-800">{selectedKartuSiswa.kelas} (Ruang Lab 01)</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Password Login CBT:</span>
+                    <span className="font-mono font-extrabold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 inline-block">
+                      CBT#{selectedKartuSiswa.nisn.slice(-4)}
+                    </span>
+                  </div>
                 </div>
               </div>
 
               {/* Jadwal Ringkas Table */}
-              <div className="pt-2">
+              <div className="pt-1">
                 <span className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wider block mb-1">
                   Jadwal Sesi Ujian Terjadwal:
                 </span>
@@ -1291,8 +1815,8 @@ export const CbtView: React.FC<CbtViewProps> = ({
               <div className="flex items-center justify-between pt-2 border-t-2 border-slate-900 text-[9px] text-slate-500">
                 <div>
                   <p>Tanda Tangan Kepala Sekolah,</p>
-                  <div className="h-8"></div>
-                  <p className="font-bold text-slate-900">Dr. H. Ahmad Dahlan, M.Pd.</p>
+                  <div className="h-7"></div>
+                  <p className="font-bold text-slate-900">{schoolSettings?.kepalaSekolah || 'Dr. H. Ahmad Dahlan, M.Pd.'}</p>
                 </div>
                 <div className="text-center font-mono">
                   <div className="bg-slate-900 text-white font-mono font-extrabold px-3 py-1 tracking-widest text-xs rounded">
@@ -1316,6 +1840,452 @@ export const CbtView: React.FC<CbtViewProps> = ({
                 className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-lg"
               >
                 <Printer className="w-4 h-4" /> Cetak Kartu Peserta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL TAMBAH & EDIT SESI UJIAN CBT */}
+      {showJadwalModal && (
+        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#121212] border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-5 shadow-2xl my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">
+                    {editingJadwalId ? 'Edit Sesi Ujian CBT' : 'Tambah Sesi Ujian CBT'}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Atur jadwal pelaksanaan ujian online, ruang lab, dan guru mata pelajaran
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowJadwalModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {formError && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveJadwal} className="space-y-4 text-xs">
+              
+              {/* Preset dari Ujian CBT */}
+              {ujianList.length > 0 && !editingJadwalId && (
+                <div className="p-3.5 bg-[#181818] rounded-xl border border-blue-500/30 space-y-1.5 shadow-sm">
+                  <label className="text-[11px] font-bold text-blue-400 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-400" /> Pilih dari Ujian CBT yang Sudah Dibuat (Opsional):
+                  </label>
+                  <select
+                    value={formJadwal.ujianId}
+                    onChange={(e) => handleSelectUjianPreset(e.target.value)}
+                    className="w-full bg-[#121212] border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:border-blue-500 outline-none font-medium"
+                  >
+                    <option value="">-- Buat Sesi Kustom / Mandiri --</option>
+                    {ujianList.map(u => (
+                      <option key={u.id} value={u.id}>
+                        📝 {u.judulUjian} ({u.mataPelajaran} • Kelas {u.kelasTarget})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400">
+                    Memilih ujian CBT akan otomatis mengisi nama sesi, mata pelajaran, kelas target, dan guru mapel terkait.
+                  </p>
+                </div>
+              )}
+
+              {/* Nama Sesi Ujian */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">
+                  Nama Sesi Ujian <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="cth: Penilaian Tengah Semester (PTS) Matematika Kelas X"
+                  value={formJadwal.judulUjian}
+                  onChange={(e) => setFormJadwal({ ...formJadwal, judulUjian: e.target.value })}
+                  className="w-full bg-[#181818] border border-slate-800 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 text-xs focus:border-blue-500 outline-none"
+                />
+              </div>
+
+              {/* Grid 2: Mapel & Guru Mapel */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">
+                    Mata Pelajaran <span className="text-rose-400">*</span>
+                  </label>
+                  <div className="space-y-1.5">
+                    <select
+                      value={availableMapelList.includes(formJadwal.mataPelajaran) ? formJadwal.mataPelajaran : 'custom'}
+                      onChange={(e) => {
+                        if (e.target.value !== 'custom') {
+                          handleMapelChange(e.target.value);
+                        }
+                      }}
+                      className="w-full bg-[#181818] border border-slate-800 rounded-xl px-3.5 py-2.5 text-white text-xs focus:border-blue-500 outline-none"
+                    >
+                      <option value="">-- Pilih Mata Pelajaran --</option>
+                      {availableMapelList.map(m => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                      <option value="custom">✏️ Tulis Mata Pelajaran Kustom / Lainnya...</option>
+                    </select>
+
+                    {/* Jika memilih kustom atau input manual */}
+                    {(!availableMapelList.includes(formJadwal.mataPelajaran) || !formJadwal.mataPelajaran) && (
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ketik nama mata pelajaran..."
+                        value={formJadwal.mataPelajaran}
+                        onChange={(e) => handleMapelChange(e.target.value)}
+                        className="w-full bg-[#1c1c1c] border border-blue-500/50 rounded-xl px-3.5 py-2 text-white placeholder-slate-500 text-xs focus:border-blue-500 outline-none"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">
+                    Guru Mata Pelajaran (Guru Mapel)
+                  </label>
+                  <div className="space-y-1.5">
+                    <select
+                      value={
+                        guruList.some(g => g.nama === formJadwal.pengawas)
+                          ? formJadwal.pengawas
+                          : formJadwal.pengawas
+                          ? 'custom'
+                          : ''
+                      }
+                      onChange={(e) => {
+                        if (e.target.value !== 'custom') {
+                          setFormJadwal({ ...formJadwal, pengawas: e.target.value });
+                        }
+                      }}
+                      className="w-full bg-[#181818] border border-slate-800 rounded-xl px-3.5 py-2.5 text-white text-xs focus:border-blue-500 outline-none font-medium"
+                    >
+                      <option value="">-- Pilih Guru Mata Pelajaran --</option>
+                      {guruList.map(g => (
+                        <option key={g.id} value={g.nama}>
+                          {g.nama} {g.mataPelajaran ? `(Guru ${g.mataPelajaran})` : ''}
+                        </option>
+                      ))}
+                      <option value="custom">✏️ Tulis Guru Mapel Lainnya...</option>
+                    </select>
+
+                    {(formJadwal.pengawas && !guruList.some(g => g.nama === formJadwal.pengawas)) && (
+                      <input
+                        type="text"
+                        placeholder="Ketik nama guru mata pelajaran..."
+                        value={formJadwal.pengawas}
+                        onChange={(e) => setFormJadwal({ ...formJadwal, pengawas: e.target.value })}
+                        className="w-full bg-[#1c1c1c] border border-blue-500/50 rounded-xl px-3.5 py-2 text-white placeholder-slate-500 text-xs focus:border-blue-500 outline-none"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Kelas / Rombel Target (Multi-Pilihan Ceklis) */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-slate-300 font-bold text-xs">
+                    Kelas / Rombel Target (Bisa Pilih Lebih dari Satu) <span className="text-rose-400">*</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
+                      formJadwal.kelasTarget === 'Semua Kelas' || isAllKelasSelected
+                        ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+                        : selectedKelasArray.length > 0
+                        ? 'text-blue-400 bg-blue-500/10 border-blue-500/30'
+                        : 'text-rose-400 bg-rose-500/10 border-rose-500/30'
+                    }`}>
+                      {formJadwal.kelasTarget === 'Semua Kelas' || isAllKelasSelected
+                        ? '🌐 Semua Kelas Terpilih'
+                        : selectedKelasArray.length > 0
+                        ? `✓ ${selectedKelasArray.length} Kelas Dipilih`
+                        : '⚠️ Belum Ada Kelas Dipilih'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleSelectAllKelasToggle}
+                      className="text-[11px] text-slate-400 hover:text-blue-400 underline transition-colors cursor-pointer"
+                    >
+                      {isAllKelasSelected ? 'Batal Pilih Semua' : 'Pilih Semua'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-[#181818] border border-slate-800 rounded-xl p-3 space-y-2.5">
+                  {/* Master Toggle: Semua Kelas */}
+                  <label className="flex items-center justify-between p-2.5 rounded-lg bg-[#141414] hover:bg-slate-800/60 border border-slate-800 cursor-pointer transition-all">
+                    <div className="flex items-center gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={isAllKelasSelected}
+                        onChange={handleSelectAllKelasToggle}
+                        className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-0 cursor-pointer accent-blue-600"
+                      />
+                      <div>
+                        <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <span>🌐</span> Semua Kelas (Semua Rombel Terdaftar)
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          Berlaku otomatis untuk seluruh siswa di semua tingkatan kelas
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                      {availableKelasList.length} Rombel
+                    </span>
+                  </label>
+
+                  {/* Grid Checkbox Rombel */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1 custom-scrollbar">
+                    {availableKelasList.map(k => {
+                      const isChecked = selectedKelasArray.includes(k) || formJadwal.kelasTarget === 'Semua Kelas';
+                      const count = siswaList.filter(s => s.kelas && s.kelas.trim().toLowerCase() === k.toLowerCase()).length;
+                      return (
+                        <label
+                          key={k}
+                          className={`flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer ${
+                            isChecked
+                              ? 'bg-blue-950/40 border-blue-500/50 text-white shadow-sm'
+                              : 'bg-[#141414] border-slate-800/80 hover:bg-slate-800/40 text-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => handleToggleKelasCheckbox(k)}
+                              className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-0 cursor-pointer accent-blue-600 shrink-0"
+                            />
+                            <span className="text-xs font-medium truncate" title={k}>{k}</span>
+                          </div>
+                          {count > 0 && (
+                            <span className="text-[10px] font-mono text-slate-400 bg-slate-800/90 px-1.5 py-0.5 rounded shrink-0 ml-1.5">
+                              {count} Siswa
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  {/* Tambah Kelas / Rombel Kustom */}
+                  <div className="pt-2 border-t border-slate-800 flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="+ Tulis nama kelas / rombel kustom..."
+                      value={customKelasInput}
+                      onChange={(e) => setCustomKelasInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCustomKelas();
+                        }
+                      }}
+                      className="flex-1 bg-[#121212] border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomKelas}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-blue-600 text-slate-200 hover:text-white rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0"
+                    >
+                      + Tambah
+                    </button>
+                  </div>
+
+                  {/* Chips Preview Rombel yang Dipilih */}
+                  {selectedKelasArray.length > 0 && formJadwal.kelasTarget !== 'Semua Kelas' && (
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="text-[10px] text-slate-400">Rombel Terpilih:</span>
+                      {selectedKelasArray.map(k => (
+                        <span
+                          key={k}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[11px]"
+                        >
+                          {k}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleKelasCheckbox(k)}
+                            className="hover:text-rose-400 cursor-pointer ml-0.5"
+                            title={`Hapus ${k}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Grid 3: Tanggal & Waktu */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">
+                    Tanggal Pelaksanaan <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formJadwal.tanggal}
+                    onChange={(e) => setFormJadwal({ ...formJadwal, tanggal: e.target.value })}
+                    className="w-full bg-[#181818] border border-slate-800 rounded-xl px-3 py-2.5 text-white text-xs focus:border-blue-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">
+                    Jam Mulai <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={formJadwal.jamMulai}
+                    onChange={(e) => setFormJadwal({ ...formJadwal, jamMulai: e.target.value })}
+                    className="w-full bg-[#181818] border border-slate-800 rounded-xl px-3 py-2.5 text-white text-xs focus:border-blue-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">
+                    Jam Selesai <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={formJadwal.jamSelesai}
+                    onChange={(e) => setFormJadwal({ ...formJadwal, jamSelesai: e.target.value })}
+                    className="w-full bg-[#181818] border border-slate-800 rounded-xl px-3 py-2.5 text-white text-xs focus:border-blue-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Grid 2: Ruang & Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">
+                    Ruang / Laboratorium CBT
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="cth: Lab Komputer 01"
+                    value={formJadwal.ruang}
+                    onChange={(e) => setFormJadwal({ ...formJadwal, ruang: e.target.value })}
+                    className="w-full bg-[#181818] border border-slate-800 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 text-xs focus:border-blue-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">
+                    Status Sesi Ujian
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['Aktif', 'Mendatang', 'Selesai'] as const).map(st => (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => setFormJadwal({ ...formJadwal, status: st })}
+                        className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                          formJadwal.status === st
+                            ? st === 'Aktif'
+                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-sm'
+                              : st === 'Mendatang'
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
+                              : 'bg-slate-700 text-slate-200 border-slate-600 shadow-sm'
+                            : 'bg-[#181818] text-slate-400 border-slate-800 hover:text-white'
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${
+                          st === 'Aktif' ? 'bg-emerald-400' : st === 'Mendatang' ? 'bg-amber-400' : 'bg-slate-500'
+                        }`}></span>
+                        {st}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowJadwalModal(false)}
+                  className="px-4 py-2.5 bg-[#181818] hover:bg-slate-800 text-slate-300 rounded-xl font-bold transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-lg shadow-blue-900/30 transition-all cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  {editingJadwalId ? 'Perbarui Sesi Ujian' : 'Simpan Sesi Ujian'}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal for Sesi Ujian */}
+      {deleteTargetJadwal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+          <div className="bg-[#121212] border border-rose-500/40 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-rose-950/30 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-2xl shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="space-y-2 flex-1">
+                <h3 className="text-base font-bold text-white">Hapus Sesi Ujian CBT?</h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Apakah Anda yakin ingin menghapus sesi ujian ini dari jadwal pelaksanaan CBT?
+                </p>
+                <div className="p-3 bg-[#181818] rounded-xl border border-slate-800 space-y-1">
+                  <div className="text-xs font-bold text-rose-300">{deleteTargetJadwal.judulUjian}</div>
+                  <div className="text-[11px] text-slate-400">
+                    {deleteTargetJadwal.mataPelajaran} • Kelas {deleteTargetJadwal.kelasTarget}
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    {deleteTargetJadwal.tanggal} ({deleteTargetJadwal.jamMulai} - {deleteTargetJadwal.jamSelesai}) • {deleteTargetJadwal.ruang}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setDeleteTargetJadwal(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteJadwal}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-rose-900/40 transition-all cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Ya, Hapus Sesi
               </button>
             </div>
           </div>

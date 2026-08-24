@@ -821,6 +821,10 @@ export default function App() {
               userEmail={userEmail}
               subTab={cbtSubTab}
               setSubTab={setCbtSubTab}
+              schoolSettings={schoolSettings}
+              guruList={guruList}
+              rombelList={rombelList}
+              mapelList={mapelList}
             />
           )}
 

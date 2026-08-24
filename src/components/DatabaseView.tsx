@@ -189,7 +189,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     kurikulum: 'Kurikulum Merdeka',
     catatan: '',
     jadwalMengajar: [
-      { id: 'js-new-1', hari: 'Senin', jamMulai: '07:30', jamSelesai: '09:00', kelasTarget: 'X-IPA-1', ruangan: 'Ruang R.101 (Gedung A)' }
+      { id: 'js-new-1', hari: 'Senin', jamMulai: '07:30', jamSelesai: '09:00', kelasTarget: 'VIII - Al Biruni', ruangan: 'Ruang R.101 (Gedung A)' }
     ]
   });
 
@@ -308,7 +308,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     nis: '',
     nik: '',
     nama: '',
-    kelas: 'X-IPA-1',
+    kelas: 'VIII - Al Biruni',
     jenisKelamin: 'L',
     tempatLahir: 'Jakarta',
     tanggalLahir: '2008-01-01',
@@ -469,8 +469,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
     if (type === 'siswa') {
       headers = 'NISN;NIS;NIK;Nama;Rombel;JenisKelamin;TempatLahir;TanggalLahir;Agama;Alamat;NamaOrang tua/Wali;TeleponWali;AsalSekolah;Anak Ke-;JumlahSaudara;BeratBadan;TinggiBadan\n';
-      sampleRows = '81234567;1001;3171010101080001;Budi Santoso;X-IPA-1;L;Jakarta;12/05/2008;Islam;Jl. Merdeka No 10;Ahmad Santoso;81234567890;;;;;\n' +
-                   '81234568;1002;3171010202080002;Siti Rahma;X-IPA-1;P;Bandung;18/06/2008;Islam;Jl. Mawar No 5;Bambang;81298765432;;;;;\n';
+      sampleRows = '81234567;1001;3171010101080001;Budi Santoso;VIII - Al Biruni;L;Jakarta;12/05/2008;Islam;Jl. Merdeka No 10;Ahmad Santoso;81234567890;;;;;\n' +
+                   '81234568;1002;3171010202080002;Siti Rahma;VIII - Al Biruni;P;Bandung;18/06/2008;Islam;Jl. Mawar No 5;Bambang;81298765432;;;;;\n';
       filename = 'Template_Import_Data_Siswa_2026.csv';
     } else if (type === 'guru') {
       headers = 'NIP,NIK,Nama,GelarDepan,GelarBelakang,MataPelajaran,Jabatan,Email,Telepon,JenisKelamin,TempatLahir,TanggalLahir,Agama,Pendidikan,Status\n';
@@ -542,7 +542,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                 nis: cols[1] || `${1000 + idx}`,
                 nik: cols[2] || `317100000000000${idx}`,
                 nama: cols[3] || `Siswa Impor ${idx + 1}`,
-                kelas: cols[4] || 'X-IPA-1',
+                kelas: cols[4] || 'VIII - Al Biruni',
                 jenisKelamin: (cols[5] === 'P' || cols[5] === 'p' ? 'P' : 'L') as 'L' | 'P',
                 tempatLahir: cols[6] || 'Jakarta',
                 tanggalLahir: cols[7] || '2008-01-01',
@@ -738,7 +738,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         nis: '',
         nik: '',
         nama: '',
-        kelas: defaultRombel?.namaRombel || 'X-IPA-1',
+        kelas: defaultRombel?.namaRombel || 'VIII - Al Biruni',
         tingkatKelas: defaultRombel?.tingkatKelas || 'Kelas 7',
         rombel: defaultRombel?.namaRombel || '',
         jenisKelamin: 'L',
@@ -841,7 +841,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         kurikulum: 'Kurikulum Merdeka',
         catatan: '',
         jadwalMengajar: [
-          { id: `js-${Date.now()}`, hari: 'Senin', jamMulai: '07:30', jamSelesai: '09:00', kelasTarget: 'X-IPA-1', ruangan: 'Ruang R.101 (Gedung A)' }
+          { id: `js-${Date.now()}`, hari: 'Senin', jamMulai: '07:30', jamSelesai: '09:00', kelasTarget: 'VIII - Al Biruni', ruangan: 'Ruang R.101 (Gedung A)' }
         ]
       });
     } else if (subTab === 'ekskul') {
@@ -1110,7 +1110,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   className="bg-[#181818] border border-slate-800 text-slate-200 rounded-lg px-3 py-2 text-xs font-medium focus:ring-1 focus:ring-blue-500 focus:outline-none"
                 >
                   <option value="Semua">Semua Kelas / Rombel</option>
-                  {Array.from(new Set([...activeRombelList.map(r => r.namaRombel), 'X-IPA-1', 'XI-IPA-2', 'XI-IPS-1', 'XII-IPA-1'])).map(k => (
+                  {Array.from(new Set(activeRombelList.map(r => r.namaRombel))).map(k => (
                     <option key={k} value={k}>{k}</option>
                   ))}
                 </select>
@@ -3065,7 +3065,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   'Kepala Laboratorium IPA',
                   'Kepala Perpustakaan',
                   'Pembina OSIS',
-                  'Wali Kelas X-IPA-1'
+                  'Wali Kelas VIII - Al Biruni'
                 ];
 
                 const mapelOptionsToRender = Array.from(new Set([
@@ -3334,7 +3334,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       <input 
                         type="text" 
                         required 
-                        placeholder="contoh: X-IPA-1, 7-A"
+                        placeholder="contoh: VIII - Al Biruni, 7-A"
                         value={formRombel.namaRombel} 
                         onChange={e => setFormRombel({ ...formRombel, namaRombel: e.target.value })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 

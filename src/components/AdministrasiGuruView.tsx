@@ -514,7 +514,7 @@ export const AdministrasiGuruView: React.FC<AdministrasiGuruViewProps> = ({
       tipe: 'modul_ajar',
       guruNama: teacherName,
       mataPelajaran: mapelName,
-      kelas: 'X-IPA-1',
+      kelas: 'VIII - Al Biruni',
       tahunAjaran: '2026/2027',
       semester: 'Ganjil',
       judul: `Dokumen Upload: ${file.name}`,
