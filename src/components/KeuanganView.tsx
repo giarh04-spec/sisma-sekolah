@@ -43,7 +43,8 @@ import {
   Image as ImageIcon,
   Copy,
   Share2,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
 import { TagihanKeuangan, TransaksiKeuangan, Siswa, KeuanganSubTab, TarifBiaya, TipeKeuangan, SchoolSettings, RombelKelas, EkstrakurikulerItem, GajiPembayaran, Guru, Staf } from '../types/school';
 import { sendFonnteMessage } from '../lib/fonnte';
@@ -5998,226 +5999,230 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
       {/* MODAL BAYAR GAJI BARU / EDIT GAJI */}
       {showBayarGajiModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#121212] border border-slate-800 text-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl my-8">
-            <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-6">
-              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <Coins className="w-5 h-5 text-rose-500" />
-                {editingGaji ? 'Edit Transaksi Pembayaran Gaji' : 'Proses Transaksi Pembayaran Gaji Baru'}
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4 md:p-6">
+          <div className="bg-[#121212] border border-slate-800 text-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center px-5 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 shrink-0 bg-[#141414]">
+              <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+                <Coins className="w-5 h-5 text-rose-500 shrink-0" />
+                <span>{editingGaji ? 'Edit Transaksi Pembayaran Gaji' : 'Proses Transaksi Pembayaran Gaji Baru'}</span>
               </h3>
               <button
+                type="button"
                 onClick={() => {
                   setShowBayarGajiModal(false);
                   setEditingGaji(null);
                 }}
-                className="text-slate-400 hover:text-white text-lg font-bold"
+                className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:text-white text-slate-400 flex items-center justify-center transition-colors cursor-pointer"
+                title="Tutup"
               >
-                ×
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveGaji} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* COLUMN 1: RECIPENT INFO & PERIOD */}
-                <div className="space-y-4">
-                  <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800/80 space-y-4">
-                    <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Penerima & Periode Gaji</h4>
-                    
-                    {/* Role Filter toggle inside modal */}
-                    <div>
-                      <label className="text-slate-400 font-bold block mb-1.5 text-xs">Tipe Penerima</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setGajiPenerimaTipe('guru');
-                            setGajiPenerimaId('');
-                          }}
-                          className={`py-2 rounded-xl text-xs font-bold transition-all border ${
-                            gajiPenerimaTipe === 'guru'
-                              ? 'bg-purple-600/10 text-purple-400 border-purple-500/40 shadow-sm'
-                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                          }`}
-                          disabled={!!editingGaji}
-                        >
-                          Ibu/Bapak Guru
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setGajiPenerimaTipe('staf');
-                            setGajiPenerimaId('');
-                          }}
-                          className={`py-2 rounded-xl text-xs font-bold transition-all border ${
-                            gajiPenerimaTipe === 'staf'
-                              ? 'bg-blue-600/10 text-blue-400 border-blue-500/40 shadow-sm'
-                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                          }`}
-                          disabled={!!editingGaji}
-                        >
-                          Staf / Karyawan
-                        </button>
+            {/* Modal Form */}
+            <form onSubmit={handleSaveGaji} className="flex flex-col flex-1 min-h-0">
+              <div className="overflow-y-auto p-4 sm:p-6 space-y-6 flex-1 custom-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+                  {/* COLUMN 1: RECIPENT INFO & PERIOD */}
+                  <div className="space-y-4">
+                    <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800/80 space-y-4">
+                      <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Penerima & Periode Gaji</h4>
+                      
+                      {/* Role Filter toggle inside modal */}
+                      <div>
+                        <label className="text-slate-400 font-bold block mb-1.5 text-xs">Tipe Penerima</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGajiPenerimaTipe('guru');
+                              setGajiPenerimaId('');
+                            }}
+                            className={`py-2 rounded-xl text-xs font-bold transition-all border ${
+                              gajiPenerimaTipe === 'guru'
+                                ? 'bg-purple-600/10 text-purple-400 border-purple-500/40 shadow-sm'
+                                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                            disabled={!!editingGaji}
+                          >
+                            Ibu/Bapak Guru
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGajiPenerimaTipe('staf');
+                              setGajiPenerimaId('');
+                            }}
+                            className={`py-2 rounded-xl text-xs font-bold transition-all border ${
+                              gajiPenerimaTipe === 'staf'
+                                ? 'bg-blue-600/10 text-blue-400 border-blue-500/40 shadow-sm'
+                                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                            disabled={!!editingGaji}
+                          >
+                            Staf / Karyawan
+                          </button>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Receiver Selector */}
-                    <div>
-                      <label className="text-slate-400 font-bold block mb-1 text-xs">Pilih Nama Penerima</label>
-                      <select
-                        value={gajiPenerimaId}
-                        onChange={e => {
-                          const id = e.target.value;
-                          setGajiPenerimaId(id);
-                          // Prefill logical salaries based on roles & status
-                          if (id && !editingGaji) {
-                            if (gajiPenerimaTipe === 'guru') {
-                              const g = guruList.find(x => x.id === id);
-                              if (g) {
-                                if (g.status === 'PNS') {
-                                  setGajiPokok(4500000);
-                                  setGajiTunjangan(1200000);
-                                } else if (g.status === 'GTY') {
-                                  setGajiPokok(3500000);
-                                  setGajiTunjangan(800000);
-                                } else {
-                                  setGajiPokok(2500000);
-                                  setGajiTunjangan(500000);
+                      {/* Receiver Selector */}
+                      <div>
+                        <label className="text-slate-400 font-bold block mb-1 text-xs">Pilih Nama Penerima</label>
+                        <select
+                          value={gajiPenerimaId}
+                          onChange={e => {
+                            const id = e.target.value;
+                            setGajiPenerimaId(id);
+                            // Prefill logical salaries based on roles & status
+                            if (id && !editingGaji) {
+                              if (gajiPenerimaTipe === 'guru') {
+                                const g = guruList.find(x => x.id === id);
+                                if (g) {
+                                  if (g.status === 'PNS') {
+                                    setGajiPokok(4500000);
+                                    setGajiTunjangan(1200000);
+                                  } else if (g.status === 'GTY') {
+                                    setGajiPokok(3500000);
+                                    setGajiTunjangan(800000);
+                                  } else {
+                                    setGajiPokok(2500000);
+                                    setGajiTunjangan(500000);
+                                  }
                                 }
-                              }
-                            } else {
-                              const s = stafList.find(x => x.id === id);
-                              if (s) {
-                                if (s.status === 'Tetap') {
-                                  setGajiPokok(3200000);
-                                  setGajiTunjangan(600000);
-                                } else {
-                                  setGajiPokok(2200000);
-                                  setGajiTunjangan(300000);
+                              } else {
+                                const s = stafList.find(x => x.id === id);
+                                if (s) {
+                                  if (s.status === 'Tetap') {
+                                    setGajiPokok(3200000);
+                                    setGajiTunjangan(600000);
+                                  } else {
+                                    setGajiPokok(2200000);
+                                    setGajiTunjangan(300000);
+                                  }
                                 }
                               }
                             }
-                          }
-                        }}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500 cursor-pointer"
-                        required
-                        disabled={!!editingGaji}
-                      >
-                        <option value="">-- Pilih Penerima --</option>
-                        {gajiPenerimaTipe === 'guru' ? (
-                          guruList.map(g => (
-                            <option key={g.id} value={g.id}>
-                              {g.nama} {g.nip ? `(NIP: ${g.nip})` : ''} - {g.jabatan}
-                            </option>
-                          ))
-                        ) : (
-                          stafList.map(s => (
-                            <option key={s.id} value={s.id}>
-                              {s.nama} {s.nik ? `(NIK: ${s.nik})` : ''} - {s.bagian}
-                            </option>
-                          ))
-                        )}
-                      </select>
-                    </div>
-
-                    {/* Period selection */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-slate-400 font-bold block mb-1 text-xs">Bulan Gaji</label>
-                        <select
-                          value={gajiBulan}
-                          onChange={e => setGajiBulan(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500"
+                          }}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500 cursor-pointer"
+                          required
+                          disabled={!!editingGaji}
                         >
-                          {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map(m => (
-                            <option key={m} value={m}>{m}</option>
-                          ))}
+                          <option value="">-- Pilih Penerima --</option>
+                          {gajiPenerimaTipe === 'guru' ? (
+                            guruList.map(g => (
+                              <option key={g.id} value={g.id}>
+                                {g.nama} {g.nip ? `(NIP: ${g.nip})` : ''} - {g.jabatan}
+                              </option>
+                            ))
+                          ) : (
+                            stafList.map(s => (
+                              <option key={s.id} value={s.id}>
+                                {s.nama} {s.nik ? `(NIK: ${s.nik})` : ''} - {s.bagian}
+                              </option>
+                            ))
+                          )}
                         </select>
                       </div>
+
+                      {/* Period selection */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-slate-400 font-bold block mb-1 text-xs">Bulan Gaji</label>
+                          <select
+                            value={gajiBulan}
+                            onChange={e => setGajiBulan(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500"
+                          >
+                            {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map(m => (
+                              <option key={m} value={m}>{m}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-slate-400 font-bold block mb-1 text-xs">Tahun Gaji</label>
+                          <input
+                            type="number"
+                            value={gajiTahun}
+                            onChange={e => setGajiTahun(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500 font-mono"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800/80 space-y-4">
+                      <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Pembayaran & Penyetoran</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-slate-400 font-bold block mb-1 text-xs">Metode Bayar</label>
+                          <select
+                            value={gajiMetode}
+                            onChange={e => setGajiMetode(e.target.value as any)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500"
+                          >
+                            <option value="Cash">Cash</option>
+                            <option value="Transfer Bank">Transfer Bank</option>
+                            <option value="E-Wallet">E-Wallet</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-slate-400 font-bold block mb-1 text-xs">Tanggal Bayar</label>
+                          <input
+                            type="date"
+                            value={gajiTanggal}
+                            onChange={e => setGajiTanggal(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500 font-mono cursor-pointer"
+                            required
+                          />
+                        </div>
+                      </div>
+
                       <div>
-                        <label className="text-slate-400 font-bold block mb-1 text-xs">Tahun Gaji</label>
+                        <label className="text-slate-400 font-bold block mb-1 text-xs">No. Rekening / Keterangan Bank (Optional)</label>
                         <input
-                          type="number"
-                          value={gajiTahun}
-                          onChange={e => setGajiTahun(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500 font-mono"
-                          required
+                          type="text"
+                          placeholder="e.g. Bank Syariah Mandiri 7122455829"
+                          value={gajiRekening}
+                          onChange={e => setGajiRekening(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500"
                         />
+                      </div>
+
+                      <div>
+                        <label className="text-slate-400 font-bold block mb-1.5 text-xs">Status Pembayaran</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setGajiStatus('Draft')}
+                            className={`py-2 rounded-xl text-xs font-bold transition-all border ${
+                              gajiStatus === 'Draft'
+                                ? 'bg-amber-600/10 text-amber-400 border-amber-500/40 shadow-sm'
+                                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            Draft (Pending)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGajiStatus('Paid')}
+                            className={`py-2 rounded-xl text-xs font-bold transition-all border ${
+                              gajiStatus === 'Paid'
+                                ? 'bg-emerald-600/10 text-emerald-400 border-emerald-500/40 shadow-sm'
+                                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            Paid (Terbayar)
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800/80 space-y-4">
-                    <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Pembayaran & Penyetoran</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-slate-400 font-bold block mb-1 text-xs">Metode Bayar</label>
-                        <select
-                          value={gajiMetode}
-                          onChange={e => setGajiMetode(e.target.value as any)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500"
-                        >
-                          <option value="Cash">Cash</option>
-                          <option value="Transfer Bank">Transfer Bank</option>
-                          <option value="E-Wallet">E-Wallet</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-slate-400 font-bold block mb-1 text-xs">Tanggal Bayar</label>
-                        <input
-                          type="date"
-                          value={gajiTanggal}
-                          onChange={e => setGajiTanggal(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500 font-mono cursor-pointer"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-slate-400 font-bold block mb-1 text-xs">No. Rekening / Keterangan Bank (Optional)</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Bank Syariah Mandiri 7122455829"
-                        value={gajiRekening}
-                        onChange={e => setGajiRekening(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-slate-400 font-bold block mb-1.5 text-xs">Status Pembayaran</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setGajiStatus('Draft')}
-                          className={`py-2 rounded-xl text-xs font-bold transition-all border ${
-                            gajiStatus === 'Draft'
-                              ? 'bg-amber-600/10 text-amber-400 border-amber-500/40 shadow-sm'
-                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                          }`}
-                        >
-                          Draft (Pending)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setGajiStatus('Paid')}
-                          className={`py-2 rounded-xl text-xs font-bold transition-all border ${
-                            gajiStatus === 'Paid'
-                              ? 'bg-emerald-600/10 text-emerald-400 border-emerald-500/40 shadow-sm'
-                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                          }`}
-                        >
-                          Paid (Terbayar)
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* COLUMN 2: FINANCIAL CALCULATIONS */}
-                <div className="space-y-4">
-                  <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800/80 space-y-4 h-full flex flex-col justify-between">
-                    <div className="space-y-4">
+                  {/* COLUMN 2: FINANCIAL CALCULATIONS */}
+                  <div className="space-y-4">
+                    <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800/80 space-y-4">
                       <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Perhitungan Nominal Gaji</h4>
                       
                       {/* Gaji Pokok */}
@@ -6369,21 +6374,21 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                           className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500 h-16 resize-none"
                         />
                       </div>
-                    </div>
 
-                    {/* LIVE CALCULATION REVENUE STATEMENT CARD */}
-                    <div className="p-4 bg-rose-950/15 border border-rose-500/10 rounded-xl space-y-2 mt-4">
-                      <span className="text-[10px] uppercase font-black text-rose-400/80 tracking-wider">Perkiraan Bersih (Net Income)</span>
-                      <div className="flex justify-between items-end">
-                        <div className="text-[10px] text-slate-400">
-                          (Pokok + Total Tunjangan) - Total Potongan
-                        </div>
-                        <div className="text-xl font-black text-emerald-400 font-mono">
-                          Rp {(
-                            Number(gajiPokok) +
-                            (Number(gajiTunjangan) + Number(gajiTunjanganWalas) + Number(gajiTunjanganKetepatanWaktu) + Number(gajiTunjanganKehadiran) + Number(gajiTunjanganPiket) + Number(gajiTunjanganExcessTime)) -
-                            (Number(gajiPotongan) + Number(gajiPotonganDendaTerlambat) + Number(gajiPotonganDendaLupaFinger) + Number(gajiPotonganKoperasi) + Number(gajiPotonganKasBon))
-                          ).toLocaleString('id-ID')}
+                      {/* LIVE CALCULATION REVENUE STATEMENT CARD */}
+                      <div className="p-4 bg-rose-950/15 border border-rose-500/20 rounded-xl space-y-2">
+                        <span className="text-[10px] uppercase font-black text-rose-400/90 tracking-wider">Perkiraan Bersih (Net Income)</span>
+                        <div className="flex flex-wrap justify-between items-end gap-2">
+                          <div className="text-[10px] text-slate-400">
+                            (Pokok + Total Tunjangan) - Total Potongan
+                          </div>
+                          <div className="text-xl font-black text-emerald-400 font-mono">
+                            Rp {(
+                              Number(gajiPokok) +
+                              (Number(gajiTunjangan) + Number(gajiTunjanganWalas) + Number(gajiTunjanganKetepatanWaktu) + Number(gajiTunjanganKehadiran) + Number(gajiTunjanganPiket) + Number(gajiTunjanganExcessTime)) -
+                              (Number(gajiPotongan) + Number(gajiPotonganDendaTerlambat) + Number(gajiPotonganDendaLupaFinger) + Number(gajiPotonganKoperasi) + Number(gajiPotonganKasBon))
+                            ).toLocaleString('id-ID')}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -6391,20 +6396,21 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-800">
+              {/* Modal Footer */}
+              <div className="flex justify-end gap-2.5 px-5 sm:px-6 py-3.5 sm:py-4 border-t border-slate-800 bg-[#141414] shrink-0">
                 <button
                   type="button"
                   onClick={() => {
                     setShowBayarGajiModal(false);
                     setEditingGaji(null);
                   }}
-                  className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-colors"
+                  className="px-4 sm:px-5 py-2 sm:py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold rounded-xl text-xs transition-all shadow-md shadow-rose-600/30 flex items-center gap-1.5 active:scale-[0.98]"
+                  className="px-5 sm:px-6 py-2 sm:py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold rounded-xl text-xs transition-all shadow-md shadow-rose-600/30 flex items-center gap-1.5 active:scale-[0.98] cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   {editingGaji ? 'Simpan Perubahan Gaji' : 'Proses & Bayar Gaji'}
