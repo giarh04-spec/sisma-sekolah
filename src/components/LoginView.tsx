@@ -14,8 +14,7 @@ import {
   Globe,
   ArrowRight,
   Sparkles,
-  FileSpreadsheet,
-  Receipt
+  FileSpreadsheet
 } from 'lucide-react';
 import { Role, SchoolSettings, Guru, Staf, Siswa } from '../types/school';
 import { googleSignIn } from '../lib/firebase';
@@ -274,34 +273,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
             {!loading && <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />}
           </button>
         </form>
-
-        {/* Akses Cepat Slip Gaji Publik (Tanpa Login) */}
-        <div className="pt-2">
-          <div className="relative flex py-2 items-center">
-            <div className="flex-grow border-t border-zinc-800"></div>
-            <span className="flex-shrink mx-3 text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Akses Publik Tanpa Login</span>
-            <div className="flex-grow border-t border-zinc-800"></div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (onOpenPublicSlip) {
-                onOpenPublicSlip('portal');
-              } else {
-                try {
-                  const url = new URL(window.location.href);
-                  url.searchParams.set('slip', 'portal');
-                  window.location.href = url.toString();
-                } catch {}
-              }
-            }}
-            className="w-full py-2.5 px-4 bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/30 hover:border-emerald-500/50 text-emerald-300 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 active:scale-[0.99] cursor-pointer shadow-sm group"
-          >
-            <Receipt className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
-            <span>Lihat / Unduh Slip Gaji Guru & Staf</span>
-          </button>
-        </div>
 
         {/* Footer */}
         <div className="pt-3 border-t border-zinc-800/80 flex items-center justify-between text-[10px] text-zinc-500">

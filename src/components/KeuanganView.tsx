@@ -44,7 +44,8 @@ import {
   Copy,
   Share2,
   Loader2,
-  X
+  X,
+  Upload
 } from 'lucide-react';
 import { TagihanKeuangan, TransaksiKeuangan, Siswa, KeuanganSubTab, TarifBiaya, TipeKeuangan, SchoolSettings, RombelKelas, EkstrakurikulerItem, GajiPembayaran, Guru, Staf } from '../types/school';
 import { sendFonnteMessage } from '../lib/fonnte';
@@ -153,6 +154,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
   const [gajiPotongan, setGajiPotongan] = useState<number>(0);
   const [gajiPotonganDendaTerlambat, setGajiPotonganDendaTerlambat] = useState<number>(0);
+  const [gajiPotonganDendaTerlambatLebih, setGajiPotonganDendaTerlambatLebih] = useState<number>(0);
   const [gajiPotonganDendaLupaFinger, setGajiPotonganDendaLupaFinger] = useState<number>(0);
   const [gajiPotonganKoperasi, setGajiPotonganKoperasi] = useState<number>(0);
   const [gajiPotonganKasBon, setGajiPotonganKasBon] = useState<number>(0);
@@ -177,6 +179,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   const [rekapGajiTahun, setRekapGajiTahun] = useState<string>(new Date().getFullYear().toString());
   const [rekapGajiTipe, setRekapGajiTipe] = useState<'semua' | 'guru' | 'staf'>('semua');
   const [rekapGajiStatus, setRekapGajiStatus] = useState<'semua' | 'Draft' | 'Paid'>('semua');
+  const [rekapTemplateMode, setRekapTemplateMode] = useState<'excel' | 'modern'>('excel');
 
   // Gaji UI alerts & confirmation states
   const [gajiToast, setGajiToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -239,6 +242,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
     const totalPotonganCalc = Number(gajiPotongan) +
       Number(gajiPotonganDendaTerlambat) +
+      Number(gajiPotonganDendaTerlambatLebih) +
       Number(gajiPotonganDendaLupaFinger) +
       Number(gajiPotonganKoperasi) +
       Number(gajiPotonganKasBon);
@@ -263,6 +267,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       tunjanganExcessTime: Number(gajiTunjanganExcessTime),
       potongan: Number(gajiPotongan),
       potonganDendaTerlambat: Number(gajiPotonganDendaTerlambat),
+      potonganDendaTerlambatLebih: Number(gajiPotonganDendaTerlambatLebih),
       potonganDendaLupaFinger: Number(gajiPotonganDendaLupaFinger),
       potonganKoperasi: Number(gajiPotonganKoperasi),
       potonganKasBon: Number(gajiPotonganKasBon),
@@ -300,6 +305,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     setGajiTunjanganExcessTime(0);
     setGajiPotongan(0);
     setGajiPotonganDendaTerlambat(0);
+    setGajiPotonganDendaTerlambatLebih(0);
     setGajiPotonganDendaLupaFinger(0);
     setGajiPotonganKoperasi(0);
     setGajiPotonganKasBon(0);
@@ -320,6 +326,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     setGajiTunjanganExcessTime(item.tunjanganExcessTime || 0);
     setGajiPotongan(item.potongan);
     setGajiPotonganDendaTerlambat(item.potonganDendaTerlambat || 0);
+    setGajiPotonganDendaTerlambatLebih(item.potonganDendaTerlambatLebih || 0);
     setGajiPotonganDendaLupaFinger(item.potonganDendaLupaFinger || 0);
     setGajiPotonganKoperasi(item.potonganKoperasi || 0);
     setGajiPotonganKasBon(item.potonganKasBon || 0);
@@ -638,20 +645,21 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   // Aggregated totals for Monthly Recap
   const rekapGajiTotals = useMemo(() => {
     let totalPokok = 0;
-    let totalJabatan = 0;
-    let totalWalas = 0;
-    let totalKetepatan = 0;
-    let totalKehadiran = 0;
-    let totalPiket = 0;
-    let totalExcess = 0;
+    let totalJabatan = 0; // Tunjangan Fungsional
+    let totalWalas = 0; // TJ Walas
+    let totalKetepatan = 0; // Ketetapan Waktu
+    let totalKehadiran = 0; // TJ Kehadiran
+    let totalPiket = 0; // Piket
+    let totalExcess = 0; // Exces Time
     let totalTunjangan = 0;
     let totalGross = 0;
 
     let totalPotAbsensi = 0;
-    let totalPotTerlambat = 0;
-    let totalPotFinger = 0;
-    let totalPotKoperasi = 0;
-    let totalPotKasBon = 0;
+    let totalPotTerlambat = 0; // Denda Terlambat < 30 Min
+    let totalPotTerlambatLebih = 0; // Denda Terlambat > 30 Min
+    let totalPotFinger = 0; // Denda Lupa Finger
+    let totalPotKoperasi = 0; // Pot. Koperasi
+    let totalPotKasBon = 0; // Gaji Diambil Dimuka
     let totalPotongan = 0;
 
     let totalNet = 0;
@@ -669,10 +677,11 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
       const pA = item.potongan || 0;
       const pT = item.potonganDendaTerlambat || 0;
+      const pTL = item.potonganDendaTerlambatLebih || 0;
       const pF = item.potonganDendaLupaFinger || 0;
       const pK = item.potonganKoperasi || 0;
       const pB = item.potonganKasBon || 0;
-      const sumP = pA + pT + pF + pK + pB;
+      const sumP = pA + pT + pTL + pF + pK + pB;
 
       totalPokok += item.gajiPokok || 0;
       totalJabatan += tJ;
@@ -686,12 +695,13 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
       totalPotAbsensi += pA;
       totalPotTerlambat += pT;
+      totalPotTerlambatLebih += pTL;
       totalPotFinger += pF;
       totalPotKoperasi += pK;
       totalPotKasBon += pB;
       totalPotongan += sumP;
 
-      totalNet += item.totalDiterima || 0;
+      totalNet += item.totalDiterima || ((item.gajiPokok || 0) + sumT - sumP);
       if (item.status === 'Paid') totalPaid++;
       else totalDraft++;
     });
@@ -708,6 +718,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       totalGross,
       totalPotAbsensi,
       totalPotTerlambat,
+      totalPotTerlambatLebih,
       totalPotFinger,
       totalPotKoperasi,
       totalPotKasBon,
@@ -719,46 +730,41 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     };
   }, [rekapGajiFiltered]);
 
-  // Export CSV Rekap Gaji Bulanan
+  // Export CSV Rekap Gaji Bulanan (Format Template Master 18 Kolom)
   const handleExportRekapGajiCSV = () => {
     if (rekapGajiFiltered.length === 0) {
       showToast('Tidak ada data gaji pada periode yang dipilih untuk diekspor.', 'error');
       return;
     }
 
-    const filename = `Rekap_Laporan_Gaji_${rekapGajiBulan}_${rekapGajiTahun}`;
+    const filename = `Rekap_Gaji_Karyawan_${rekapGajiBulan}_${rekapGajiTahun}`;
     const headers = [
       'No',
-      'ID Slip',
-      'Nama Penerima',
-      'NIP/NIK',
-      'Tipe Pegawai',
-      'Jabatan / Unit',
-      'Periode Bulan',
-      'Tahun',
-      'Gaji Pokok (Rp)',
-      'Tunj. Jabatan & Ops (Rp)',
-      'Tunj. Wali Kelas (Rp)',
-      'Ketepatan Waktu (Rp)',
-      'Tunj. Kehadiran (Rp)',
-      'Tunj. Piket (Rp)',
-      'Excess Time (Rp)',
-      'Total Tunjangan (Rp)',
-      'Penghasilan Kotor / Gross (Rp)',
-      'Pot. Absensi & Umum (Rp)',
-      'Denda Terlambat (Rp)',
-      'Denda Lupa Finger (Rp)',
-      'Pot. Koperasi (Rp)',
-      'Kas Bon (Rp)',
-      'Total Potongan (Rp)',
-      'Gaji Bersih / Net (Rp)',
-      'Status Pembayaran',
-      'Metode Pembayaran',
-      'Tanggal Bayar',
-      'No Rekening'
+      'NAMA',
+      'JABATAN',
+      'GAJI POKOK',
+      'TJ WALAS',
+      'TUNJANGAN FUNGSIONAL',
+      'KETETAPAN WAKTU',
+      'TJ KEHADIRAN',
+      'PIKET',
+      'EXCES TIME',
+      'JML PENDAPATAN',
+      'DENDA TERLAMBAT < 30 MIN',
+      'DENDA TERLAMBAT > 30 MIN',
+      'DENDA LUPA FINGER',
+      'POT. KOPERASI',
+      'GAJI DIAMBIL DIMUKA',
+      'TOTAL POTONGAN',
+      'GAJI BERSIH'
     ];
 
-    const rows: (string | number)[][] = rekapGajiFiltered.map((item, idx) => {
+    const rows: (string | number)[][] = [];
+
+    // Header index row 1..18
+    rows.push(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18']);
+
+    rekapGajiFiltered.forEach((item, idx) => {
       const tJ = item.tunjangan || 0;
       const tW = item.tunjanganWalas || 0;
       const tK = item.tunjanganKetepatanWaktu || 0;
@@ -766,84 +772,63 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       const tP = item.tunjanganPiket || 0;
       const tE = item.tunjanganExcessTime || 0;
       const sumT = tJ + tW + tK + tH + tP + tE;
+      const jmlPendapatan = (item.gajiPokok || 0) + sumT;
 
       const pA = item.potongan || 0;
       const pT = item.potonganDendaTerlambat || 0;
+      const pTL = item.potonganDendaTerlambatLebih || 0;
       const pF = item.potonganDendaLupaFinger || 0;
       const pK = item.potonganKoperasi || 0;
       const pB = item.potonganKasBon || 0;
-      const sumP = pA + pT + pF + pK + pB;
+      const sumP = pA + pT + pTL + pF + pK + pB;
+      const gajiBersih = item.totalDiterima || (jmlPendapatan - sumP);
 
-      const nipNik = (item.penerimaNipNik && item.penerimaNipNik !== '-') 
-        ? item.penerimaNipNik 
-        : (item.penerimaTipe === 'guru' ? (guruList.find(g => g.id === item.penerimaId)?.nik || guruList.find(g => g.id === item.penerimaId)?.nip || '-') : (stafList.find(s => s.id === item.penerimaId)?.nik || '-'));
-
-      return [
+      rows.push([
         idx + 1,
-        item.id,
-        item.penerimaNama,
-        nipNik,
-        item.penerimaTipe === 'guru' ? 'Guru' : 'Staf/Karyawan',
-        item.jabatan,
-        item.bulan,
-        item.tahun,
-        item.gajiPokok,
-        tJ,
-        tW,
-        tK,
-        tH,
-        tP,
-        tE,
-        sumT,
-        item.gajiPokok + sumT,
-        pA,
-        pT,
-        pF,
-        pK,
-        pB,
+        item.penerimaNama.toUpperCase(),
+        (item.jabatan || '').toUpperCase(),
+        item.gajiPokok || 0,
+        tW || 0,
+        tJ || 0,
+        tK || 0,
+        tH || 0,
+        tP || 0,
+        tE || 0,
+        jmlPendapatan,
+        pT || 0,
+        pTL || 0,
+        pF || 0,
+        pK || 0,
+        pB || 0,
         sumP,
-        item.totalDiterima,
-        item.status === 'Paid' ? 'Paid (Lunas)' : 'Draft (Pending)',
-        item.metodePembayaran,
-        item.tanggalBayar,
-        item.penerimaRekening || '-'
-      ];
+        gajiBersih
+      ]);
     });
 
-    // Append Grand Total Row
+    // Grand Total row
     rows.push([
       'TOTAL',
+      `TOTAL ${rekapGajiTotals.count} PEGAWAI`,
       '',
-      `Total ${rekapGajiTotals.count} Penerima`,
-      '',
-      '',
-      '',
-      rekapGajiBulan,
-      rekapGajiTahun,
       rekapGajiTotals.totalPokok,
-      rekapGajiTotals.totalJabatan,
       rekapGajiTotals.totalWalas,
+      rekapGajiTotals.totalJabatan,
       rekapGajiTotals.totalKetepatan,
       rekapGajiTotals.totalKehadiran,
       rekapGajiTotals.totalPiket,
       rekapGajiTotals.totalExcess,
-      rekapGajiTotals.totalTunjangan,
       rekapGajiTotals.totalGross,
-      rekapGajiTotals.totalPotAbsensi,
       rekapGajiTotals.totalPotTerlambat,
+      rekapGajiTotals.totalPotTerlambatLebih,
       rekapGajiTotals.totalPotFinger,
       rekapGajiTotals.totalPotKoperasi,
       rekapGajiTotals.totalPotKasBon,
       rekapGajiTotals.totalPotongan,
-      rekapGajiTotals.totalNet,
-      `${rekapGajiTotals.totalPaid} Lunas / ${rekapGajiTotals.totalDraft} Draft`,
-      '',
-      '',
-      ''
+      rekapGajiTotals.totalNet
     ]);
 
     downloadCSV(headers, rows, filename);
-    showToast('✅ Berhasil mengekspor Rekap Laporan Gaji Bulanan (CSV)!');
+    showToast('✅ Berhasil mengekspor Rekap Gaji Karyawan (18 Kolom Format Master Sheet)!');
   };
 
   // Salin Ringkasan Rekap Gaji Bulanan ke Clipboard (format WhatsApp)
@@ -5990,6 +5975,225 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               <button
                 type="button"
                 onClick={() => {
+                  // Download Excel-compatible HTML Template matching the 18-column official master sheet layout with borders
+                  const htmlContent = `
+                  <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+                  <head>
+                    <meta charset="utf-8">
+                    <style>
+                      table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 10px; }
+                      th, td { border: 1px solid black; padding: 4px 6px; text-align: center; vertical-align: middle; }
+                      th { background-color: #f1f5f9; font-weight: bold; }
+                      .text-left { text-align: left; }
+                      .text-right { text-align: right; }
+                      .bg-gray { background-color: #e2e8f0; }
+                    </style>
+                  </head>
+                  <body>
+                    <table>
+                      <tr>
+                        <th rowspan="2">No</th>
+                        <th rowspan="2">NAMA</th>
+                        <th rowspan="2">JABATAN</th>
+                        <th colspan="8" class="bg-gray">PENDAPATAN</th>
+                        <th colspan="6" class="bg-gray">POTONGAN</th>
+                        <th rowspan="2" class="bg-gray">GAJI BERSIH</th>
+                      </tr>
+                      <tr>
+                        <th>GAJI POKOK</th>
+                        <th>TJ WALAS</th>
+                        <th>TUNJANGAN FUNGSIONAL</th>
+                        <th>KETETAPAN WAKTU</th>
+                        <th>TJ KEHADIRAN</th>
+                        <th>PIKET</th>
+                        <th>EXCES TIME</th>
+                        <th class="bg-gray">JML PENDAPATAN</th>
+                        <th>DENDA TERLAMBAT < 30 MIN</th>
+                        <th>DENDA TERLAMBAT > 30 MIN</th>
+                        <th>DENDA LUPA FINGER</th>
+                        <th>POT. KOPERASI</th>
+                        <th>GAJI DIAMBIL DIMUKA</th>
+                        <th class="bg-gray">TOTAL POTONGAN</th>
+                      </tr>
+                      <tr>
+                        <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th>
+                      </tr>
+                      <tr>
+                        <td>1</td>
+                        <td class="text-left">ALYA NABIYLA</td>
+                        <td class="text-left">ADMINISTRATION</td>
+                        <td class="text-right">2000000</td>
+                        <td class="text-right">70000</td>
+                        <td class="text-right">50000</td>
+                        <td class="text-right">50000</td>
+                        <td class="text-right">50000</td>
+                        <td class="text-right">0</td>
+                        <td class="text-right">1000</td>
+                        <td class="bg-gray text-right">2221000</td>
+                        <td class="text-right">10000</td>
+                        <td class="text-right">1000</td>
+                        <td class="text-right">1000</td>
+                        <td class="text-right">26000</td>
+                        <td class="text-right">20000</td>
+                        <td class="bg-gray text-right">58000</td>
+                        <td class="bg-gray text-right">2163000</td>
+                      </tr>
+                      <tr>
+                        <td>2</td>
+                        <td class="text-left">NOUFAL ZAINUDIN ZIDANE</td>
+                        <td class="text-left">IT ENGINEERING</td>
+                        <td class="text-right">4500000</td>
+                        <td class="text-right">0</td>
+                        <td class="text-right">1000000</td>
+                        <td class="text-right">1170000</td>
+                        <td class="text-right">910000</td>
+                        <td class="text-right">100000</td>
+                        <td class="text-right">0</td>
+                        <td class="bg-gray text-right">7680000</td>
+                        <td class="text-right">0</td>
+                        <td class="text-right">0</td>
+                        <td class="text-right">0</td>
+                        <td class="text-right">0</td>
+                        <td class="text-right">5233000</td>
+                        <td class="bg-gray text-right">5233000</td>
+                        <td class="bg-gray text-right">2447000</td>
+                      </tr>
+                      <tr>
+                        <td>3</td>
+                        <td class="text-left">MUHAMMAD LUTHFI HAKIM</td>
+                        <td class="text-left">OPERATOR</td>
+                        <td class="text-right">2000000</td>
+                        <td class="text-right">50000</td>
+                        <td class="text-right">50000</td>
+                        <td class="text-right">50000</td>
+                        <td class="text-right">50000</td>
+                        <td class="text-right">0</td>
+                        <td class="text-right">0</td>
+                        <td class="bg-gray text-right">2200000</td>
+                        <td class="text-right">10000</td>
+                        <td class="text-right">0</td>
+                        <td class="text-right">0</td>
+                        <td class="text-right">26000</td>
+                        <td class="text-right">20000</td>
+                        <td class="bg-gray text-right">56000</td>
+                        <td class="bg-gray text-right">2144000</td>
+                      </tr>
+                    </table>
+                  </body>
+                  </html>`;
+                  const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `Template_Master_Gaji_Sekolah.xls`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="px-3.5 py-2.5 bg-slate-850 hover:bg-slate-800 text-blue-400 border border-blue-500/30 hover:border-blue-500/50 font-bold rounded-xl text-xs transition-all shadow-sm flex items-center gap-1.5 active:scale-[0.98] cursor-pointer"
+                title="Download Template Format CSV/Excel untuk Import Gaji"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-blue-400" />
+                Template
+              </button>
+
+              <label
+                className="px-3.5 py-2.5 bg-slate-850 hover:bg-slate-800 text-indigo-400 border border-indigo-500/30 hover:border-indigo-500/50 font-bold rounded-xl text-xs transition-all shadow-sm flex items-center gap-1.5 active:scale-[0.98] cursor-pointer"
+                title="Upload & Import Data Gaji dari File CSV/Excel"
+              >
+                <Upload className="w-4 h-4 text-indigo-400" />
+                Upload
+                <input
+                  type="file"
+                  accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      try {
+                        const text = event.target?.result as string;
+                        if (!text) return;
+                        const lines = text.split('\n');
+                        let importedCount = 0;
+                        for (let i = 1; i < lines.length; i++) {
+                          const line = lines[i].trim();
+                          if (!line) continue;
+                          const cols = line.split(',');
+                          if (cols.length >= 6) {
+                            const tipe = (cols[1]?.trim() === 'staf' ? 'staf' : 'guru') as 'guru' | 'staf';
+                            const namaRaw = cols[2]?.trim() || 'Pegawai Import';
+                            const nama = namaRaw.split('(')[0].trim();
+                            const bulan = cols[3]?.trim() || 'Juli';
+                            const tahun = String(cols[4]?.trim() || '2026');
+                            const gajiPokok = Number(cols[5]?.trim()) || 3000000;
+                            const tunjangan = Number(cols[6]?.trim()) || 500000;
+                            const tunjanganWalas = Number(cols[7]?.trim()) || 0;
+                            const tunjanganKetepatanWaktu = Number(cols[8]?.trim()) || 0;
+                            const tunjanganKehadiran = Number(cols[9]?.trim()) || 0;
+                            const tunjanganPiket = Number(cols[10]?.trim()) || 0;
+                            const tunjanganExcessTime = Number(cols[11]?.trim()) || 0;
+                            const potongan = Number(cols[12]?.trim()) || 0;
+                            const potonganDendaTerlambat = Number(cols[13]?.trim()) || 0;
+                            const potonganDendaTerlambatLebih = Number(cols[14]?.trim()) || 0;
+                            const potonganDendaLupaFinger = Number(cols[15]?.trim()) || 0;
+                            const potonganKoperasi = Number(cols[16]?.trim()) || 0;
+                            const potonganKasBon = Number(cols[17]?.trim()) || 0;
+
+                            const sumT = tunjangan + tunjanganWalas + tunjanganKetepatanWaktu + tunjanganKehadiran + tunjanganPiket + tunjanganExcessTime;
+                            const sumP = potongan + potonganDendaTerlambat + potonganDendaTerlambatLebih + potonganDendaLupaFinger + potonganKoperasi + potonganKasBon;
+                            const totalDiterima = (gajiPokok + sumT) - sumP;
+
+                            const newGajiItem: GajiPembayaran = {
+                              id: `gaji-imp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                              penerimaId: `imp-${Math.random().toString(36).substr(2, 4)}`,
+                              penerimaTipe: tipe,
+                              penerimaNama: nama,
+                              penerimaNipNik: '-',
+                              jabatan: tipe === 'guru' ? 'Guru Mata Pelajaran' : 'Staf Kependidikan',
+                              bulan,
+                              tahun,
+                              gajiPokok,
+                              tunjangan,
+                              tunjanganWalas,
+                              tunjanganKetepatanWaktu,
+                              tunjanganKehadiran,
+                              tunjanganPiket,
+                              tunjanganExcessTime,
+                              potongan,
+                              potonganDendaTerlambat,
+                              potonganDendaTerlambatLebih,
+                              potonganDendaLupaFinger,
+                              potonganKoperasi,
+                              potonganKasBon,
+                              totalDiterima,
+                              tanggalBayar: new Date().toISOString().split('T')[0],
+                              metodePembayaran: 'Transfer Bank',
+                              status: 'Paid',
+                              catatan: 'Imported via Template CSV'
+                            };
+
+                            if (setGajiList) {
+                              setGajiList(prev => [newGajiItem, ...prev]);
+                            }
+                            importedCount++;
+                          }
+                        }
+                        alert(`Berhasil mengimpor ${importedCount} data gaji pegawai!`);
+                      } catch (err) {
+                        console.error(err);
+                        alert('Gagal membaca file template. Pastikan format CSV sesuai.');
+                      }
+                    };
+                    reader.readAsText(file);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={() => {
                   setEditingGaji(null);
                   setGajiPenerimaId('');
                   setGajiPokok(3000000);
@@ -6617,11 +6821,21 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                             />
                           </div>
                           <div>
-                            <label className="text-rose-300 text-[10px] block mb-0.5">Denda Terlambat</label>
+                            <label className="text-rose-300 text-[10px] block mb-0.5">Denda Terlambat &lt; 30 Min</label>
                             <input
                               type="number"
                               value={gajiPotonganDendaTerlambat}
                               onChange={e => setGajiPotonganDendaTerlambat(Number(e.target.value))}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-rose-500"
+                              min={0}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-rose-300 text-[10px] block mb-0.5">Denda Terlambat &gt; 30 Min</label>
+                            <input
+                              type="number"
+                              value={gajiPotonganDendaTerlambatLebih}
+                              onChange={e => setGajiPotonganDendaTerlambatLebih(Number(e.target.value))}
                               className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-rose-500"
                               min={0}
                             />
@@ -6647,7 +6861,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                             />
                           </div>
                           <div>
-                            <label className="text-rose-300 text-[10px] block mb-0.5">Kas Bon</label>
+                            <label className="text-rose-300 text-[10px] block mb-0.5">Gaji Diambil Dimuka / Kasbon</label>
                             <input
                               type="number"
                               value={gajiPotonganKasBon}
@@ -6681,7 +6895,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                             Rp {(
                               Number(gajiPokok) +
                               (Number(gajiTunjangan) + Number(gajiTunjanganWalas) + Number(gajiTunjanganKetepatanWaktu) + Number(gajiTunjanganKehadiran) + Number(gajiTunjanganPiket) + Number(gajiTunjanganExcessTime)) -
-                              (Number(gajiPotongan) + Number(gajiPotonganDendaTerlambat) + Number(gajiPotonganDendaLupaFinger) + Number(gajiPotonganKoperasi) + Number(gajiPotonganKasBon))
+                              (Number(gajiPotongan) + Number(gajiPotonganDendaTerlambat) + Number(gajiPotonganDendaTerlambatLebih) + Number(gajiPotonganDendaLupaFinger) + Number(gajiPotonganKoperasi) + Number(gajiPotonganKasBon))
                             ).toLocaleString('id-ID')}
                           </div>
                         </div>
@@ -6989,7 +7203,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   )}
 
                   {/* Signatures */}
-                  <div className="grid grid-cols-3 gap-3 pt-6 text-[10px] border-t border-slate-200">
+                  <div className="grid grid-cols-2 gap-6 pt-6 text-[10px] border-t border-slate-200">
                     <div className="text-center space-y-9">
                       <p className="text-slate-600 font-medium">Penerima Gaji,</p>
                       <div className="space-y-0.5">
@@ -7000,12 +7214,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                       <p className="text-slate-600 font-medium">Bendahara Sekolah,</p>
                       <div className="space-y-0.5">
                         <p className="font-bold underline text-slate-950">{bendaharaNama}</p>
-                      </div>
-                    </div>
-                    <div className="text-center space-y-9">
-                      <p className="text-slate-600 font-medium">Mengetahui,</p>
-                      <div className="space-y-0.5">
-                        <p className="font-bold underline text-slate-950">{schoolSettings?.kepalaSekolah || 'Kepala Sekolah'}</p>
                       </div>
                     </div>
                   </div>
@@ -7084,10 +7292,11 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowRekapGajiModal(false)}
-                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
-                  title="Tutup Modal"
+                  className="px-3.5 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white text-xs font-black rounded-xl transition-all flex items-center gap-1.5 border border-rose-500/30 active:scale-95 cursor-pointer"
+                  title="Tutup Modal Rekap"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-3.5 h-3.5" />
+                  Tutup
                 </button>
               </div>
             </div>
@@ -7095,6 +7304,32 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             {/* FILTER TOOLBAR INSIDE MODAL (PRINT:HIDDEN) */}
             <div className="bg-slate-100/90 border-b border-slate-200 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 text-xs print:hidden">
               <div className="flex flex-wrap items-center gap-3">
+                {/* Mode Tampilan Template */}
+                <div className="flex items-center bg-white border border-slate-300 rounded-xl p-0.5 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setRekapTemplateMode('excel')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      rekapTemplateMode === 'excel'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    📊 Format Master Sheet (18 Kolom Sesuai Gambar)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRekapTemplateMode('modern')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      rekapTemplateMode === 'modern'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    📄 Format Ringkas & TTD
+                  </button>
+                </div>
+
                 {/* Pilih Bulan */}
                 <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-xl px-3 py-1.5 shadow-sm">
                   <Calendar className="w-3.5 h-3.5 text-slate-600" />
@@ -7175,7 +7410,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 <div className="text-sm sm:text-base font-black text-indigo-700 mt-1 font-mono">
                   + Rp {rekapGajiTotals.totalTunjangan.toLocaleString('id-ID')}
                 </div>
-                <span className="text-[10px] text-indigo-600 mt-0.5 block">Jabatan, Walas, Kehadiran, Piket</span>
+                <span className="text-[10px] text-indigo-600 mt-0.5 block">Walas, Fungsional, Piket, Excess Time</span>
               </div>
 
               <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
@@ -7183,7 +7418,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 <div className="text-sm sm:text-base font-black text-rose-700 mt-1 font-mono">
                   - Rp {rekapGajiTotals.totalPotongan.toLocaleString('id-ID')}
                 </div>
-                <span className="text-[10px] text-rose-600 mt-0.5 block">Absensi, Denda, Koperasi, Kasbon</span>
+                <span className="text-[10px] text-rose-600 mt-0.5 block">Denda Terlambat, Finger, Koperasi, Kasbon</span>
               </div>
 
               <div className="bg-emerald-50 p-3.5 rounded-xl border border-emerald-200 shadow-sm">
@@ -7197,251 +7432,613 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               </div>
             </div>
 
-            {/* PRINTABLE OFFICIAL LEDGER REPORT SHEET */}
-            <div className="p-4 sm:p-8 overflow-x-auto">
-              <div id="printable-rekap-gaji" className="border border-slate-300 p-6 sm:p-8 rounded-2xl bg-white font-sans text-slate-900 shadow-sm space-y-6 min-w-[760px]">
+            {/* PRINTABLE OFFICIAL REPORT SHEET CONTAINER */}
+            <div className="p-4 sm:p-6 overflow-x-auto">
+              <div id="printable-rekap-gaji" className="border border-slate-300 p-4 sm:p-6 rounded-xl bg-white font-sans text-slate-900 shadow-sm space-y-4 min-w-[1100px]">
                 
-                {/* KOP SURAT SEKOLAH RESMI */}
-                <div className="flex justify-between items-start pb-4 border-b-2 border-slate-950">
-                  <div className="flex items-center gap-4">
-                    {schoolSettings?.logoUrl ? (
-                      <div className="w-16 h-16 p-1 bg-white border border-slate-200 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
-                        <img src={schoolSettings.logoUrl} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                {/* TEMPLATE MODE 1: EXCEL MASTER 18 KOLOM (EXACT MATCH DENGAN GAMBAR) */}
+                {rekapTemplateMode === 'excel' ? (
+                  <div className="space-y-4">
+                    {/* Header Sesuai Gambar */}
+                    <div className="text-center space-y-1 pb-2">
+                      <div className="flex items-center justify-center gap-3">
+                        {schoolSettings?.logoUrl && (
+                          <img src={schoolSettings.logoUrl} alt="Logo" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
+                        )}
+                        <h2 className="text-base sm:text-lg font-black tracking-wide text-black uppercase">
+                          REKAP GAJI KARYAWAN {schoolSettings?.namaSekolah ? `- ${schoolSettings.namaSekolah.toUpperCase()}` : ''}
+                        </h2>
                       </div>
-                    ) : (
-                      <div className="w-16 h-16 bg-slate-100 border border-slate-300 rounded-xl flex items-center justify-center font-bold text-slate-700 text-2xl shrink-0">
-                        🏫
-                      </div>
-                    )}
-                    <div>
-                      <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-950 uppercase leading-tight">
-                        {schoolSettings?.namaSekolah || 'SMP ISLAM MODERN AL FAKHIR'}
-                      </h2>
-                      <p className="text-xs text-slate-700 leading-normal mt-0.5 max-w-xl">
-                        {schoolSettings?.alamat || 'Alamat Sekolah'}, RT/RW {schoolSettings?.rtRw || '01/01'}, Kec. {schoolSettings?.kecamatan || 'Kecamatan'}
-                      </p>
-                      <p className="text-[10px] text-slate-600 mt-0.5 font-medium">
-                        NPSN: {schoolSettings?.npsn || '70048660'} • Akreditasi: {schoolSettings?.akreditasi || 'A (Unggul)'} • Telp: {schoolSettings?.telepon || '-'} • Email: {schoolSettings?.email || '-'}
+                      <p className="text-xs sm:text-sm font-extrabold text-black uppercase tracking-wider">
+                        BULAN : {rekapGajiBulan === 'semua' ? 'SEMUA BULAN' : rekapGajiBulan.toUpperCase()} {rekapGajiTahun}
                       </p>
                     </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className="inline-block px-3 py-1 rounded bg-emerald-100 text-emerald-950 text-[10px] font-black uppercase tracking-wider mb-1">
-                      DOKUMEN PAYROLL RESMI
-                    </span>
-                    <div className="text-[11px] font-bold font-mono text-slate-800">
-                      PERIODE: {rekapGajiBulan.toUpperCase()} {rekapGajiTahun}
-                    </div>
-                    <div className="text-[9px] text-slate-500 mt-0.5">
-                      Tanggal Cetak: <span className="font-semibold text-slate-800">{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                    </div>
-                  </div>
-                </div>
 
-                {/* JUDUL LAPORAN */}
-                <div className="text-center bg-slate-100 py-3 rounded-xl border border-slate-200 space-y-0.5">
-                  <h3 className="text-sm sm:text-base font-black uppercase tracking-wider text-slate-950">
-                    REKAPITULASI DAFTAR PENGGAJIAN & HONORARIUM GURU & KARYAWAN
-                  </h3>
-                  <p className="text-xs font-bold text-slate-600">
-                    PERIODE BULAN: {rekapGajiBulan.toUpperCase()} {rekapGajiTahun} • UNIT: {rekapGajiTipe === 'semua' ? 'SEMUA TENAGA PENDIDIK & KEPENDIDIKAN' : (rekapGajiTipe === 'guru' ? 'DEWAN GURU' : 'STAF & KARYAWAN')}
-                  </p>
-                </div>
+                    {/* Spreadsheet Table 18 Kolom */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse border border-black text-[9px] leading-tight">
+                        <thead>
+                          {/* Row 1: Group Headers */}
+                          <tr className="bg-slate-100 text-black font-extrabold uppercase text-center border-b border-black divide-x divide-black">
+                            <th rowSpan={2} className="py-2 px-1 w-7 text-center align-middle">No</th>
+                            <th rowSpan={2} className="py-2 px-2 min-w-[140px] text-center align-middle">NAMA</th>
+                            <th rowSpan={2} className="py-2 px-2 min-w-[100px] text-center align-middle">JABATAN</th>
+                            <th colSpan={8} className="py-1 px-2 text-center bg-slate-200 border-b border-black">PENDAPATAN</th>
+                            <th colSpan={6} className="py-1 px-2 text-center bg-slate-200 border-b border-black">POTONGAN</th>
+                            <th rowSpan={2} className="py-2 px-2 min-w-[105px] text-center align-middle bg-slate-100">GAJI BERSIH</th>
+                          </tr>
 
-                {/* TABEL DETAIL REKAPITULASI GAJI */}
-                <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
-                  <table className="w-full text-left border-collapse text-[10.5px]">
-                    <thead>
-                      <tr className="bg-slate-900 text-white text-[9.5px] uppercase font-bold tracking-wider divide-x divide-slate-800">
-                        <th className="py-2.5 px-2 text-center w-8">No</th>
-                        <th className="py-2.5 px-3">Nama Pegawai & NIP/NIK</th>
-                        <th className="py-2.5 px-2 text-center w-24">Jabatan</th>
-                        <th className="py-2.5 px-2.5 text-right">Gaji Pokok</th>
-                        <th className="py-2.5 px-2 text-right">Tunj. Jabatan</th>
-                        <th className="py-2.5 px-2 text-right">Tunj. Walas</th>
-                        <th className="py-2.5 px-2 text-right">Kehadiran & Piket</th>
-                        <th className="py-2.5 px-2.5 text-right bg-slate-800 text-emerald-300">Total Bruto</th>
-                        <th className="py-2.5 px-2 text-right text-rose-300">Pot. Absensi</th>
-                        <th className="py-2.5 px-2 text-right text-rose-300">Koperasi/Kasbon</th>
-                        <th className="py-2.5 px-2 text-right text-rose-300">Total Pot.</th>
-                        <th className="py-2.5 px-3 text-right bg-emerald-900 text-emerald-200 font-extrabold">Net Diterima</th>
-                        <th className="py-2.5 px-2 text-center w-24">Status / TTD</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 text-slate-800">
-                      {rekapGajiFiltered.length === 0 ? (
-                        <tr>
-                          <td colSpan={13} className="py-10 text-center text-slate-400 font-medium italic">
-                            Tidak ada transaksi penggajian untuk periode {rekapGajiBulan} {rekapGajiTahun}.
-                          </td>
-                        </tr>
-                      ) : (
-                        rekapGajiFiltered.map((item, idx) => {
-                          const tJ = item.tunjangan || 0;
-                          const tW = item.tunjanganWalas || 0;
-                          const tK = item.tunjanganKetepatanWaktu || 0;
-                          const tH = item.tunjanganKehadiran || 0;
-                          const tP = item.tunjanganPiket || 0;
-                          const tE = item.tunjanganExcessTime || 0;
-                          const sumT = tJ + tW + tK + tH + tP + tE;
+                          {/* Row 2: Detailed Subheaders */}
+                          <tr className="bg-slate-50 text-black font-bold uppercase text-[8.5px] text-center border-b border-black divide-x divide-black">
+                            {/* PENDAPATAN Columns */}
+                            <th className="py-2 px-1 min-w-[85px]">GAJI POKOK</th>
+                            <th className="py-2 px-1 min-w-[70px]">TJ WALAS</th>
+                            <th className="py-2 px-1 min-w-[85px]">TUNJANGAN FUNGSIONAL</th>
+                            <th className="py-2 px-1 min-w-[80px]">KETETAPAN WAKTU</th>
+                            <th className="py-2 px-1 min-w-[75px]">TJ KEHADIRAN</th>
+                            <th className="py-2 px-1 min-w-[60px]">PIKET</th>
+                            <th className="py-2 px-1 min-w-[70px]">EXCES TIME</th>
+                            <th className="py-2 px-1 min-w-[90px] font-black bg-slate-200">JML PENDAPATAN</th>
 
-                          const pA = item.potongan || 0;
-                          const pT = item.potonganDendaTerlambat || 0;
-                          const pF = item.potonganDendaLupaFinger || 0;
-                          const pK = item.potonganKoperasi || 0;
-                          const pB = item.potonganKasBon || 0;
-                          const sumP = pA + pT + pF + pK + pB;
+                            {/* POTONGAN Columns */}
+                            <th className="py-2 px-1 min-w-[85px]">DENDA TERLAMBAT &lt; 30 MIN</th>
+                            <th className="py-2 px-1 min-w-[85px]">DENDA TERLAMBAT &gt; 30 MIN</th>
+                            <th className="py-2 px-1 min-w-[75px]">DENDA LUPA FINGER</th>
+                            <th className="py-2 px-1 min-w-[75px]">POT. KOPERASI</th>
+                            <th className="py-2 px-1 min-w-[85px]">GAJI DIAMBIL DIMUKA</th>
+                            <th className="py-2 px-1 min-w-[85px] font-black bg-slate-200">TOTAL POTONGAN</th>
+                          </tr>
 
-                          const nipNik = (item.penerimaNipNik && item.penerimaNipNik !== '-') 
-                            ? item.penerimaNipNik 
-                            : (item.penerimaTipe === 'guru' ? (guruList.find(g => g.id === item.penerimaId)?.nik || guruList.find(g => g.id === item.penerimaId)?.nip || '-') : (stafList.find(s => s.id === item.penerimaId)?.nik || '-'));
+                          {/* Row 3: Column Numbers 1..18 */}
+                          <tr className="bg-slate-200/80 text-black font-bold text-[8px] text-center border-b border-black divide-x divide-black">
+                            {Array.from({ length: 18 }, (_, idx) => (
+                              <th key={idx + 1} className="py-0.5 px-0.5">
+                                {idx + 1}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
 
-                          return (
-                            <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
-                              <td className="py-2.5 px-2 text-center font-mono text-slate-500">{idx + 1}</td>
-                              <td className="py-2.5 px-3">
-                                <div className="font-bold text-slate-950 text-xs">{item.penerimaNama}</div>
-                                <div className="text-[9px] text-slate-500 font-mono mt-0.5">{nipNik}</div>
-                              </td>
-                              <td className="py-2.5 px-2 text-center">
-                                <span className={`inline-block px-1.5 py-0.5 text-[8.5px] rounded font-bold uppercase ${
-                                  item.penerimaTipe === 'guru' ? 'bg-purple-100 text-purple-900' : 'bg-blue-100 text-blue-900'
-                                }`}>
-                                  {item.penerimaTipe}
-                                </span>
-                                <div className="text-[9.5px] text-slate-600 font-medium truncate max-w-[90px] mx-auto mt-0.5">{item.jabatan}</div>
-                              </td>
-                              <td className="py-2.5 px-2.5 text-right font-mono text-slate-900 font-semibold">
-                                Rp {item.gajiPokok.toLocaleString('id-ID')}
-                              </td>
-                              <td className="py-2.5 px-2 text-right font-mono text-slate-700">
-                                {tJ > 0 ? `Rp ${tJ.toLocaleString('id-ID')}` : '-'}
-                              </td>
-                              <td className="py-2.5 px-2 text-right font-mono text-slate-700">
-                                {tW > 0 ? `Rp ${tW.toLocaleString('id-ID')}` : '-'}
-                              </td>
-                              <td className="py-2.5 px-2 text-right font-mono text-slate-700">
-                                {(tH + tP + tK + tE) > 0 ? `Rp ${(tH + tP + tK + tE).toLocaleString('id-ID')}` : '-'}
-                              </td>
-                              <td className="py-2.5 px-2.5 text-right font-mono font-bold text-slate-950 bg-slate-100/60">
-                                Rp {(item.gajiPokok + sumT).toLocaleString('id-ID')}
-                              </td>
-                              <td className="py-2.5 px-2 text-right font-mono text-rose-700">
-                                {(pA + pT + pF) > 0 ? `Rp ${(pA + pT + pF).toLocaleString('id-ID')}` : '-'}
-                              </td>
-                              <td className="py-2.5 px-2 text-right font-mono text-rose-700">
-                                {(pK + pB) > 0 ? `Rp ${(pK + pB).toLocaleString('id-ID')}` : '-'}
-                              </td>
-                              <td className="py-2.5 px-2 text-right font-mono font-bold text-rose-700 bg-rose-50/40">
-                                {sumP > 0 ? `Rp ${sumP.toLocaleString('id-ID')}` : '-'}
-                              </td>
-                              <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-800 bg-emerald-50 text-xs">
-                                Rp {item.totalDiterima.toLocaleString('id-ID')}
-                              </td>
-                              <td className="py-2.5 px-2 text-center text-[9px]">
-                                <span className={`inline-block px-1.5 py-0.5 rounded font-extrabold ${
-                                  item.status === 'Paid' ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'
-                                }`}>
-                                  {item.status === 'Paid' ? 'LUNAS' : 'DRAFT'}
-                                </span>
-                                {item.penerimaRekening && (
-                                  <div className="text-[8px] text-slate-500 font-mono mt-0.5 truncate max-w-[85px] mx-auto">
-                                    {item.penerimaRekening}
-                                  </div>
-                                )}
+                        <tbody className="divide-y divide-black text-black">
+                          {rekapGajiFiltered.length === 0 ? (
+                            <tr>
+                              <td colSpan={18} className="py-12 text-center text-slate-500 font-medium italic">
+                                Belum ada data transaksi pembayaran gaji untuk periode {rekapGajiBulan} {rekapGajiTahun}.
                               </td>
                             </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
+                          ) : (
+                            rekapGajiFiltered.map((item, idx) => {
+                              const tJ = item.tunjangan || 0;
+                              const tW = item.tunjanganWalas || 0;
+                              const tK = item.tunjanganKetepatanWaktu || 0;
+                              const tH = item.tunjanganKehadiran || 0;
+                              const tP = item.tunjanganPiket || 0;
+                              const tE = item.tunjanganExcessTime || 0;
+                              const sumT = tJ + tW + tK + tH + tP + tE;
+                              const jmlPendapatan = (item.gajiPokok || 0) + sumT;
 
-                    {/* GRAND TOTAL ROW */}
-                    {rekapGajiFiltered.length > 0 && (
-                      <tfoot>
-                        <tr className="bg-slate-900 text-white font-extrabold text-[10px] divide-x divide-slate-800 border-t-2 border-slate-950">
-                          <td colSpan={3} className="py-3 px-3 text-center uppercase tracking-wider font-black">
-                            GRAND TOTAL AKUMULASI ({rekapGajiTotals.count} PENERIMA)
-                          </td>
-                          <td className="py-3 px-2.5 text-right font-mono">
-                            Rp {rekapGajiTotals.totalPokok.toLocaleString('id-ID')}
-                          </td>
-                          <td className="py-3 px-2 text-right font-mono text-slate-300">
-                            Rp {rekapGajiTotals.totalJabatan.toLocaleString('id-ID')}
-                          </td>
-                          <td className="py-3 px-2 text-right font-mono text-slate-300">
-                            Rp {rekapGajiTotals.totalWalas.toLocaleString('id-ID')}
-                          </td>
-                          <td className="py-3 px-2 text-right font-mono text-slate-300">
-                            Rp {(rekapGajiTotals.totalKehadiran + rekapGajiTotals.totalPiket + rekapGajiTotals.totalKetepatan + rekapGajiTotals.totalExcess).toLocaleString('id-ID')}
-                          </td>
-                          <td className="py-3 px-2.5 text-right font-mono text-emerald-300 font-black bg-slate-800">
-                            Rp {rekapGajiTotals.totalGross.toLocaleString('id-ID')}
-                          </td>
-                          <td className="py-3 px-2 text-right font-mono text-rose-300">
-                            Rp {(rekapGajiTotals.totalPotAbsensi + rekapGajiTotals.totalPotTerlambat + rekapGajiTotals.totalPotFinger).toLocaleString('id-ID')}
-                          </td>
-                          <td className="py-3 px-2 text-right font-mono text-rose-300">
-                            Rp {(rekapGajiTotals.totalPotKoperasi + rekapGajiTotals.totalPotKasBon).toLocaleString('id-ID')}
-                          </td>
-                          <td className="py-3 px-2 text-right font-mono text-rose-300 font-black">
-                            Rp {rekapGajiTotals.totalPotongan.toLocaleString('id-ID')}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono font-black text-emerald-300 bg-emerald-950 text-xs">
-                            Rp {rekapGajiTotals.totalNet.toLocaleString('id-ID')}
-                          </td>
-                          <td className="py-3 px-2 text-center text-[9px] text-slate-300">
-                            {rekapGajiTotals.totalPaid} Lunas / {rekapGajiTotals.totalDraft} Draft
-                          </td>
-                        </tr>
-                      </tfoot>
-                    )}
-                  </table>
-                </div>
+                              const pA = item.potongan || 0;
+                              const pT = item.potonganDendaTerlambat || 0;
+                              const pTL = item.potonganDendaTerlambatLebih || 0;
+                              const pF = item.potonganDendaLupaFinger || 0;
+                              const pK = item.potonganKoperasi || 0;
+                              const pB = item.potonganKasBon || 0;
+                              const sumP = pA + pT + pTL + pF + pK + pB;
+                              const gajiBersih = item.totalDiterima || (jmlPendapatan - sumP);
 
-                {/* TERBILANG SECTION */}
-                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs text-slate-800 space-y-1">
-                  <div className="font-bold text-slate-900">
-                    Total Pengeluaran Gaji Bersih (Net Payroll):{' '}
-                    <span className="text-emerald-700 font-extrabold font-mono text-sm">
-                      Rp {rekapGajiTotals.totalNet.toLocaleString('id-ID')}
-                    </span>
-                  </div>
-                  <div className="text-[11px] italic text-slate-600">
-                    <span className="font-semibold not-italic text-slate-800">Terbilang: </span>
-                    "{terbilang(rekapGajiTotals.totalNet)} Rupiah"
-                  </div>
-                </div>
+                              const formatCurrency = (val: number, isZeroDash = true) => {
+                                if (isZeroDash && (val === 0 || !val)) {
+                                  return (
+                                    <div className="flex justify-between w-full font-mono text-[8.5px] px-0.5">
+                                      <span>Rp</span>
+                                      <span>-</span>
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <div className="flex justify-between w-full font-mono text-[8.5px] px-0.5">
+                                    <span>Rp</span>
+                                    <span>{val.toLocaleString('id-ID')},00</span>
+                                  </div>
+                                );
+                              };
 
-                {/* TANDA TANGAN & PENGESAHAN */}
-                <div className="grid grid-cols-2 gap-8 pt-6 text-xs border-t border-slate-200">
-                  <div className="text-center space-y-12">
-                    <div>
-                      <p className="text-slate-600 font-medium">Pembuat Daftar Gaji / Bendahara Sekolah,</p>
-                      <p className="text-[10px] text-slate-400">SMP Islam Modern Al Fakhir</p>
+                              return (
+                                <tr key={item.id} className={`divide-x divide-black ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                                  {/* 1. No */}
+                                  <td className="py-1 px-1 text-center font-mono font-medium">{idx + 1}</td>
+                                  
+                                  {/* 2. NAMA */}
+                                  <td className="py-1 px-1.5 font-bold uppercase text-[8.5px] whitespace-nowrap">
+                                    {item.penerimaNama}
+                                  </td>
+
+                                  {/* 3. JABATAN */}
+                                  <td className="py-1 px-1.5 uppercase text-[8px] font-medium whitespace-nowrap">
+                                    {item.jabatan || (item.penerimaTipe === 'guru' ? 'GURU' : 'STAF')}
+                                  </td>
+
+                                  {/* 4. GAJI POKOK */}
+                                  <td className="py-1 px-1">{formatCurrency(item.gajiPokok || 0)}</td>
+
+                                  {/* 5. TJ WALAS */}
+                                  <td className="py-1 px-1">{formatCurrency(tW)}</td>
+
+                                  {/* 6. TUNJANGAN FUNGSIONAL */}
+                                  <td className="py-1 px-1">{formatCurrency(tJ)}</td>
+
+                                  {/* 7. KETETAPAN WAKTU */}
+                                  <td className="py-1 px-1">{formatCurrency(tK)}</td>
+
+                                  {/* 8. TJ KEHADIRAN */}
+                                  <td className="py-1 px-1">{formatCurrency(tH)}</td>
+
+                                  {/* 9. PIKET */}
+                                  <td className="py-1 px-1">{formatCurrency(tP)}</td>
+
+                                  {/* 10. EXCES TIME */}
+                                  <td className="py-1 px-1">{formatCurrency(tE)}</td>
+
+                                  {/* 11. JML PENDAPATAN */}
+                                  <td className="py-1 px-1 font-bold bg-slate-100/70">
+                                    {formatCurrency(jmlPendapatan)}
+                                  </td>
+
+                                  {/* 12. DENDA TERLAMBAT < 30 MIN */}
+                                  <td className="py-1 px-1">{formatCurrency(pT)}</td>
+
+                                  {/* 13. DENDA TERLAMBAT > 30 MIN */}
+                                  <td className="py-1 px-1">{formatCurrency(pTL)}</td>
+
+                                  {/* 14. DENDA LUPA FINGER */}
+                                  <td className="py-1 px-1">{formatCurrency(pF)}</td>
+
+                                  {/* 15. POT. KOPERASI */}
+                                  <td className="py-1 px-1">{formatCurrency(pK)}</td>
+
+                                  {/* 16. GAJI DIAMBIL DIMUKA */}
+                                  <td className="py-1 px-1">{formatCurrency(pB)}</td>
+
+                                  {/* 17. TOTAL POTONGAN */}
+                                  <td className="py-1 px-1 font-bold bg-slate-100/70">
+                                    {formatCurrency(sumP)}
+                                  </td>
+
+                                  {/* 18. GAJI BERSIH */}
+                                  <td className="py-1 px-1 font-bold bg-slate-200/50">
+                                    {formatCurrency(gajiBersih)}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+
+                          {/* Extra blank rows to give standard Excel spreadsheet ledger layout */}
+                          {rekapGajiFiltered.length > 0 && Array.from({ length: Math.max(0, 10 - rekapGajiFiltered.length) }, (_, i) => (
+                            <tr key={`blank-${i}`} className="divide-x divide-black bg-white h-6">
+                              <td className="py-1 px-1 text-center font-mono text-slate-400">{rekapGajiFiltered.length + i + 1}</td>
+                              <td className="py-1 px-1.5">&nbsp;</td>
+                              <td className="py-1 px-1.5">&nbsp;</td>
+                              <td className="py-1 px-1">&nbsp;</td>
+                              <td className="py-1 px-1">&nbsp;</td>
+                              <td className="py-1 px-1">&nbsp;</td>
+                              <td className="py-1 px-1">&nbsp;</td>
+                              <td className="py-1 px-1">&nbsp;</td>
+                              <td className="py-1 px-1">&nbsp;</td>
+                              <td className="py-1 px-1">&nbsp;</td>
+                              <td className="py-1 px-1 bg-slate-100/40">
+                                <div className="flex justify-between w-full font-mono text-[8.5px] px-0.5 text-slate-400">
+                                  <span>Rp</span>
+                                  <span>-</span>
+                                </div>
+                              </td>
+                              <td className="py-1 px-1">&nbsp;</td>
+                              <td className="py-1 px-1">&nbsp;</td>
+                              <td className="py-1 px-1">&nbsp;</td>
+                              <td className="py-1 px-1">&nbsp;</td>
+                              <td className="py-1 px-1">&nbsp;</td>
+                              <td className="py-1 px-1 bg-slate-100/40">
+                                <div className="flex justify-between w-full font-mono text-[8.5px] px-0.5 text-slate-400">
+                                  <span>Rp</span>
+                                  <span>-</span>
+                                </div>
+                              </td>
+                              <td className="py-1 px-1 bg-slate-200/30">
+                                <div className="flex justify-between w-full font-mono text-[8.5px] px-0.5 text-slate-400">
+                                  <span>Rp</span>
+                                  <span>-</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+
+                        {/* TOTAL ROW */}
+                        {rekapGajiFiltered.length > 0 && (
+                          <tfoot>
+                            <tr className="bg-slate-200 text-black font-black text-[8.5px] divide-x divide-black border-t-2 border-black">
+                              <td colSpan={3} className="py-2 px-2 text-center uppercase tracking-wider">
+                                TOTAL
+                              </td>
+                              
+                              {/* 4. Total Gaji Pokok */}
+                              <td className="py-2 px-1">
+                                <div className="flex justify-between w-full font-mono font-black px-0.5">
+                                  <span>Rp</span>
+                                  <span>{rekapGajiTotals.totalPokok.toLocaleString('id-ID')},00</span>
+                                </div>
+                              </td>
+
+                              {/* 5. Total Tj Walas */}
+                              <td className="py-2 px-1">
+                                <div className="flex justify-between w-full font-mono font-black px-0.5">
+                                  <span>Rp</span>
+                                  <span>{rekapGajiTotals.totalWalas > 0 ? `${rekapGajiTotals.totalWalas.toLocaleString('id-ID')},00` : '-'}</span>
+                                </div>
+                              </td>
+
+                              {/* 6. Total Tunjangan Fungsional */}
+                              <td className="py-2 px-1">
+                                <div className="flex justify-between w-full font-mono font-black px-0.5">
+                                  <span>Rp</span>
+                                  <span>{rekapGajiTotals.totalJabatan > 0 ? `${rekapGajiTotals.totalJabatan.toLocaleString('id-ID')},00` : '-'}</span>
+                                </div>
+                              </td>
+
+                              {/* 7. Total Ketetapan Waktu */}
+                              <td className="py-2 px-1">
+                                <div className="flex justify-between w-full font-mono font-black px-0.5">
+                                  <span>Rp</span>
+                                  <span>{rekapGajiTotals.totalKetepatan > 0 ? `${rekapGajiTotals.totalKetepatan.toLocaleString('id-ID')},00` : '-'}</span>
+                                </div>
+                              </td>
+
+                              {/* 8. Total Tj Kehadiran */}
+                              <td className="py-2 px-1">
+                                <div className="flex justify-between w-full font-mono font-black px-0.5">
+                                  <span>Rp</span>
+                                  <span>{rekapGajiTotals.totalKehadiran > 0 ? `${rekapGajiTotals.totalKehadiran.toLocaleString('id-ID')},00` : '-'}</span>
+                                </div>
+                              </td>
+
+                              {/* 9. Total Piket */}
+                              <td className="py-2 px-1">
+                                <div className="flex justify-between w-full font-mono font-black px-0.5">
+                                  <span>Rp</span>
+                                  <span>{rekapGajiTotals.totalPiket > 0 ? `${rekapGajiTotals.totalPiket.toLocaleString('id-ID')},00` : '-'}</span>
+                                </div>
+                              </td>
+
+                              {/* 10. Total Exces Time */}
+                              <td className="py-2 px-1">
+                                <div className="flex justify-between w-full font-mono font-black px-0.5">
+                                  <span>Rp</span>
+                                  <span>{rekapGajiTotals.totalExcess > 0 ? `${rekapGajiTotals.totalExcess.toLocaleString('id-ID')},00` : '-'}</span>
+                                </div>
+                              </td>
+
+                              {/* 11. Total Jml Pendapatan */}
+                              <td className="py-2 px-1 bg-slate-300">
+                                <div className="flex justify-between w-full font-mono font-black px-0.5">
+                                  <span>Rp</span>
+                                  <span>{rekapGajiTotals.totalGross.toLocaleString('id-ID')},00</span>
+                                </div>
+                              </td>
+
+                              {/* 12. Total Denda Terlambat < 30 Min */}
+                              <td className="py-2 px-1">
+                                <div className="flex justify-between w-full font-mono font-black px-0.5">
+                                  <span>Rp</span>
+                                  <span>{rekapGajiTotals.totalPotTerlambat > 0 ? `${rekapGajiTotals.totalPotTerlambat.toLocaleString('id-ID')},00` : '-'}</span>
+                                </div>
+                              </td>
+
+                              {/* 13. Total Denda Terlambat > 30 Min */}
+                              <td className="py-2 px-1">
+                                <div className="flex justify-between w-full font-mono font-black px-0.5">
+                                  <span>Rp</span>
+                                  <span>{rekapGajiTotals.totalPotTerlambatLebih > 0 ? `${rekapGajiTotals.totalPotTerlambatLebih.toLocaleString('id-ID')},00` : '-'}</span>
+                                </div>
+                              </td>
+
+                              {/* 14. Total Denda Lupa Finger */}
+                              <td className="py-2 px-1">
+                                <div className="flex justify-between w-full font-mono font-black px-0.5">
+                                  <span>Rp</span>
+                                  <span>{rekapGajiTotals.totalPotFinger > 0 ? `${rekapGajiTotals.totalPotFinger.toLocaleString('id-ID')},00` : '-'}</span>
+                                </div>
+                              </td>
+
+                              {/* 15. Total Pot. Koperasi */}
+                              <td className="py-2 px-1">
+                                <div className="flex justify-between w-full font-mono font-black px-0.5">
+                                  <span>Rp</span>
+                                  <span>{rekapGajiTotals.totalPotKoperasi > 0 ? `${rekapGajiTotals.totalPotKoperasi.toLocaleString('id-ID')},00` : '-'}</span>
+                                </div>
+                              </td>
+
+                              {/* 16. Total Gaji Diambil Dimuka */}
+                              <td className="py-2 px-1">
+                                <div className="flex justify-between w-full font-mono font-black px-0.5">
+                                  <span>Rp</span>
+                                  <span>{rekapGajiTotals.totalPotKasBon > 0 ? `${rekapGajiTotals.totalPotKasBon.toLocaleString('id-ID')},00` : '-'}</span>
+                                </div>
+                              </td>
+
+                              {/* 17. Total Potongan */}
+                              <td className="py-2 px-1 bg-slate-300">
+                                <div className="flex justify-between w-full font-mono font-black px-0.5">
+                                  <span>Rp</span>
+                                  <span>{rekapGajiTotals.totalPotongan.toLocaleString('id-ID')},00</span>
+                                </div>
+                              </td>
+
+                              {/* 18. Total Gaji Bersih */}
+                              <td className="py-2 px-1 bg-slate-300">
+                                <div className="flex justify-between w-full font-mono font-black px-0.5">
+                                  <span>Rp</span>
+                                  <span>{rekapGajiTotals.totalNet.toLocaleString('id-ID')},00</span>
+                                </div>
+                              </td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
                     </div>
-                    <div className="space-y-0.5">
-                      <p className="font-bold underline text-slate-950 text-sm">{bendaharaNama}</p>
-                      <p className="text-[10px] text-slate-500 font-mono">NIK: {bendaharaNik}</p>
+
+                    {/* Tanda Tangan & Pengesahan Master Sheet */}
+                    <div className="flex justify-end pt-6 text-xs text-black">
+                      <div className="text-center space-y-16 w-72">
+                        <div>
+                          <p className="text-black font-semibold">
+                            {schoolSettings?.alamat ? (schoolSettings.alamat.split(',')[0] || 'Jakarta') : 'Jakarta'},{' '}
+                            {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </p>
+                          <p className="font-semibold text-black">Pembuat Daftar Gaji / Bendahara Sekolah,</p>
+                          <p className="text-[10.5px] text-slate-600">{schoolSettings?.namaSekolah || 'SMP Islam Modern Al Fakhir'}</p>
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="font-bold underline text-black text-sm">{bendaharaNama}</p>
+                          <p className="text-[10px] text-slate-600 font-mono">NIK: {bendaharaNik}</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                ) : (
+                  /* TEMPLATE MODE 2: MODERN OFFICIAL KOP & DETAIL */
+                  <div className="space-y-6">
+                    {/* KOP SURAT SEKOLAH RESMI */}
+                    <div className="flex justify-between items-start pb-4 border-b-2 border-slate-950">
+                      <div className="flex items-center gap-4">
+                        {schoolSettings?.logoUrl ? (
+                          <div className="w-16 h-16 p-1 bg-white border border-slate-200 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+                            <img src={schoolSettings.logoUrl} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                          </div>
+                        ) : (
+                          <div className="w-16 h-16 bg-slate-100 border border-slate-300 rounded-xl flex items-center justify-center font-bold text-slate-700 text-2xl shrink-0">
+                            🏫
+                          </div>
+                        )}
+                        <div>
+                          <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-950 uppercase leading-tight">
+                            {schoolSettings?.namaSekolah || 'SMP ISLAM MODERN AL FAKHIR'}
+                          </h2>
+                          <p className="text-xs text-slate-700 leading-normal mt-0.5 max-w-xl">
+                            {schoolSettings?.alamat || 'Alamat Sekolah'}, RT/RW {schoolSettings?.rtRw || '01/01'}, Kec. {schoolSettings?.kecamatan || 'Kecamatan'}
+                          </p>
+                          <p className="text-[10px] text-slate-600 mt-0.5 font-medium">
+                            NPSN: {schoolSettings?.npsn || '70048660'} • Akreditasi: {schoolSettings?.akreditasi || 'A (Unggul)'} • Telp: {schoolSettings?.telepon || '-'} • Email: {schoolSettings?.email || '-'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="inline-block px-3 py-1 rounded bg-emerald-100 text-emerald-950 text-[10px] font-black uppercase tracking-wider mb-1">
+                          DOKUMEN PAYROLL RESMI
+                        </span>
+                        <div className="text-[11px] font-bold font-mono text-slate-800">
+                          PERIODE: {rekapGajiBulan.toUpperCase()} {rekapGajiTahun}
+                        </div>
+                        <div className="text-[9px] text-slate-500 mt-0.5">
+                          Tanggal Cetak: <span className="font-semibold text-slate-800">{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                        </div>
+                      </div>
+                    </div>
 
-                  <div className="text-center space-y-12">
-                    <div>
-                      <p className="text-slate-600 font-medium">
-                        {schoolSettings?.alamat ? (schoolSettings.alamat.split(',')[0] || 'Jakarta') : 'Jakarta'},{' '}
-                        {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    {/* JUDUL LAPORAN */}
+                    <div className="text-center bg-slate-100 py-3 rounded-xl border border-slate-200 space-y-0.5">
+                      <h3 className="text-sm sm:text-base font-black uppercase tracking-wider text-slate-950">
+                        REKAPITULASI DAFTAR PENGGAJIAN & HONORARIUM GURU & KARYAWAN
+                      </h3>
+                      <p className="text-xs font-bold text-slate-600">
+                        PERIODE BULAN: {rekapGajiBulan.toUpperCase()} {rekapGajiTahun} • UNIT: {rekapGajiTipe === 'semua' ? 'SEMUA TENAGA PENDIDIK & KEPENDIDIKAN' : (rekapGajiTipe === 'guru' ? 'DEWAN GURU' : 'STAF & KARYAWAN')}
                       </p>
-                      <p className="text-slate-600 font-medium">Mengetahui, Kepala Sekolah</p>
                     </div>
-                    <div className="space-y-0.5">
-                      <p className="font-bold underline text-slate-950 text-sm">
-                        {schoolSettings?.namaKepalaSekolah || schoolSettings?.kepalaSekolah || 'H. Ahmad Fakhri, M.Pd'}
-                      </p>
-                      <p className="text-[10px] text-slate-500 font-mono">NIP: {schoolSettings?.nipKepalaSekolah || '-'}</p>
+
+                    {/* TABEL DETAIL REKAPITULASI GAJI */}
+                    <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
+                      <table className="w-full text-left border-collapse text-[10.5px]">
+                        <thead>
+                          <tr className="bg-slate-900 text-white text-[9.5px] uppercase font-bold tracking-wider divide-x divide-slate-800">
+                            <th className="py-2.5 px-2 text-center w-8">No</th>
+                            <th className="py-2.5 px-3">Nama Pegawai & NIP/NIK</th>
+                            <th className="py-2.5 px-2 text-center w-24">Jabatan</th>
+                            <th className="py-2.5 px-2.5 text-right">Gaji Pokok</th>
+                            <th className="py-2.5 px-2 text-right">Tunj. Jabatan</th>
+                            <th className="py-2.5 px-2 text-right">Tunj. Walas</th>
+                            <th className="py-2.5 px-2 text-right">Kehadiran & Piket</th>
+                            <th className="py-2.5 px-2.5 text-right bg-slate-800 text-emerald-300">Total Bruto</th>
+                            <th className="py-2.5 px-2 text-right text-rose-300">Pot. Absensi</th>
+                            <th className="py-2.5 px-2 text-right text-rose-300">Koperasi/Kasbon</th>
+                            <th className="py-2.5 px-2 text-right text-rose-300">Total Pot.</th>
+                            <th className="py-2.5 px-3 text-right bg-emerald-900 text-emerald-200 font-extrabold">Net Diterima</th>
+                            <th className="py-2.5 px-2 text-center w-24">Status / TTD</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 text-slate-800">
+                          {rekapGajiFiltered.length === 0 ? (
+                            <tr>
+                              <td colSpan={13} className="py-10 text-center text-slate-400 font-medium italic">
+                                Tidak ada transaksi penggajian untuk periode {rekapGajiBulan} {rekapGajiTahun}.
+                              </td>
+                            </tr>
+                          ) : (
+                            rekapGajiFiltered.map((item, idx) => {
+                              const tJ = item.tunjangan || 0;
+                              const tW = item.tunjanganWalas || 0;
+                              const tK = item.tunjanganKetepatanWaktu || 0;
+                              const tH = item.tunjanganKehadiran || 0;
+                              const tP = item.tunjanganPiket || 0;
+                              const tE = item.tunjanganExcessTime || 0;
+                              const sumT = tJ + tW + tK + tH + tP + tE;
+
+                              const pA = item.potongan || 0;
+                              const pT = item.potonganDendaTerlambat || 0;
+                              const pTL = item.potonganDendaTerlambatLebih || 0;
+                              const pF = item.potonganDendaLupaFinger || 0;
+                              const pK = item.potonganKoperasi || 0;
+                              const pB = item.potonganKasBon || 0;
+                              const sumP = pA + pT + pTL + pF + pK + pB;
+
+                              const nipNik = (item.penerimaNipNik && item.penerimaNipNik !== '-') 
+                                ? item.penerimaNipNik 
+                                : (item.penerimaTipe === 'guru' ? (guruList.find(g => g.id === item.penerimaId)?.nik || guruList.find(g => g.id === item.penerimaId)?.nip || '-') : (stafList.find(s => s.id === item.penerimaId)?.nik || '-'));
+
+                              return (
+                                <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
+                                  <td className="py-2.5 px-2 text-center font-mono text-slate-500">{idx + 1}</td>
+                                  <td className="py-2.5 px-3">
+                                    <div className="font-bold text-slate-950 text-xs">{item.penerimaNama}</div>
+                                    <div className="text-[9px] text-slate-500 font-mono mt-0.5">{nipNik}</div>
+                                  </td>
+                                  <td className="py-2.5 px-2 text-center">
+                                    <span className={`inline-block px-1.5 py-0.5 text-[8.5px] rounded font-bold uppercase ${
+                                      item.penerimaTipe === 'guru' ? 'bg-purple-100 text-purple-900' : 'bg-blue-100 text-blue-900'
+                                    }`}>
+                                      {item.penerimaTipe}
+                                    </span>
+                                    <div className="text-[9.5px] text-slate-600 font-medium truncate max-w-[90px] mx-auto mt-0.5">{item.jabatan}</div>
+                                  </td>
+                                  <td className="py-2.5 px-2.5 text-right font-mono text-slate-900 font-semibold">
+                                    Rp {item.gajiPokok.toLocaleString('id-ID')}
+                                  </td>
+                                  <td className="py-2.5 px-2 text-right font-mono text-slate-700">
+                                    {tJ > 0 ? `Rp ${tJ.toLocaleString('id-ID')}` : '-'}
+                                  </td>
+                                  <td className="py-2.5 px-2 text-right font-mono text-slate-700">
+                                    {tW > 0 ? `Rp ${tW.toLocaleString('id-ID')}` : '-'}
+                                  </td>
+                                  <td className="py-2.5 px-2 text-right font-mono text-slate-700">
+                                    {(tH + tP + tK + tE) > 0 ? `Rp ${(tH + tP + tK + tE).toLocaleString('id-ID')}` : '-'}
+                                  </td>
+                                  <td className="py-2.5 px-2.5 text-right font-mono font-bold text-slate-950 bg-slate-100/60">
+                                    Rp {(item.gajiPokok + sumT).toLocaleString('id-ID')}
+                                  </td>
+                                  <td className="py-2.5 px-2 text-right font-mono text-rose-700">
+                                    {(pA + pT + pTL + pF) > 0 ? `Rp ${(pA + pT + pTL + pF).toLocaleString('id-ID')}` : '-'}
+                                  </td>
+                                  <td className="py-2.5 px-2 text-right font-mono text-rose-700">
+                                    {(pK + pB) > 0 ? `Rp ${(pK + pB).toLocaleString('id-ID')}` : '-'}
+                                  </td>
+                                  <td className="py-2.5 px-2 text-right font-mono font-bold text-rose-700 bg-rose-50/40">
+                                    {sumP > 0 ? `Rp ${sumP.toLocaleString('id-ID')}` : '-'}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-800 bg-emerald-50 text-xs">
+                                    Rp {item.totalDiterima.toLocaleString('id-ID')}
+                                  </td>
+                                  <td className="py-2.5 px-2 text-center text-[9px]">
+                                    <span className={`inline-block px-1.5 py-0.5 rounded font-extrabold ${
+                                      item.status === 'Paid' ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'
+                                    }`}>
+                                      {item.status === 'Paid' ? 'LUNAS' : 'DRAFT'}
+                                    </span>
+                                    {item.penerimaRekening && (
+                                      <div className="text-[8px] text-slate-500 font-mono mt-0.5 truncate max-w-[85px] mx-auto">
+                                        {item.penerimaRekening}
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+
+                        {/* GRAND TOTAL ROW */}
+                        {rekapGajiFiltered.length > 0 && (
+                          <tfoot>
+                            <tr className="bg-slate-900 text-white font-extrabold text-[10px] divide-x divide-slate-800 border-t-2 border-slate-950">
+                              <td colSpan={3} className="py-3 px-3 text-center uppercase tracking-wider font-black">
+                                GRAND TOTAL AKUMULASI ({rekapGajiTotals.count} PENERIMA)
+                              </td>
+                              <td className="py-3 px-2.5 text-right font-mono">
+                                Rp {rekapGajiTotals.totalPokok.toLocaleString('id-ID')}
+                              </td>
+                              <td className="py-3 px-2 text-right font-mono text-slate-300">
+                                Rp {rekapGajiTotals.totalJabatan.toLocaleString('id-ID')}
+                              </td>
+                              <td className="py-3 px-2 text-right font-mono text-slate-300">
+                                Rp {rekapGajiTotals.totalWalas.toLocaleString('id-ID')}
+                              </td>
+                              <td className="py-3 px-2 text-right font-mono text-slate-300">
+                                Rp {(rekapGajiTotals.totalKehadiran + rekapGajiTotals.totalPiket + rekapGajiTotals.totalKetepatan + rekapGajiTotals.totalExcess).toLocaleString('id-ID')}
+                              </td>
+                              <td className="py-3 px-2.5 text-right font-mono text-emerald-300 font-black bg-slate-800">
+                                Rp {rekapGajiTotals.totalGross.toLocaleString('id-ID')}
+                              </td>
+                              <td className="py-3 px-2 text-right font-mono text-rose-300">
+                                Rp {(rekapGajiTotals.totalPotAbsensi + rekapGajiTotals.totalPotTerlambat + rekapGajiTotals.totalPotTerlambatLebih + rekapGajiTotals.totalPotFinger).toLocaleString('id-ID')}
+                              </td>
+                              <td className="py-3 px-2 text-right font-mono text-rose-300">
+                                Rp {(rekapGajiTotals.totalPotKoperasi + rekapGajiTotals.totalPotKasBon).toLocaleString('id-ID')}
+                              </td>
+                              <td className="py-3 px-2 text-right font-mono text-rose-300 font-black">
+                                Rp {rekapGajiTotals.totalPotongan.toLocaleString('id-ID')}
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono font-black text-emerald-300 bg-emerald-950 text-xs">
+                                Rp {rekapGajiTotals.totalNet.toLocaleString('id-ID')}
+                              </td>
+                              <td className="py-3 px-2 text-center text-[9px] text-slate-300">
+                                {rekapGajiTotals.totalPaid} Lunas / {rekapGajiTotals.totalDraft} Draft
+                              </td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+
+                    {/* TERBILANG SECTION */}
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs text-slate-800 space-y-1">
+                      <div className="font-bold text-slate-900">
+                        Total Pengeluaran Gaji Bersih (Net Payroll):{' '}
+                        <span className="text-emerald-700 font-extrabold font-mono text-sm">
+                          Rp {rekapGajiTotals.totalNet.toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                      <div className="text-[11px] italic text-slate-600">
+                        <span className="font-semibold not-italic text-slate-800">Terbilang: </span>
+                        "{terbilang(rekapGajiTotals.totalNet)} Rupiah"
+                      </div>
+                    </div>
+
+                    {/* TANDA TANGAN & PENGESAHAN */}
+                    <div className="flex justify-end pt-6 text-xs border-t border-slate-200">
+                      <div className="text-center space-y-12 w-72">
+                        <div>
+                          <p className="text-slate-600 font-medium">
+                            {schoolSettings?.alamat ? (schoolSettings.alamat.split(',')[0] || 'Jakarta') : 'Jakarta'},{' '}
+                            {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </p>
+                          <p className="text-slate-600 font-medium">Pembuat Daftar Gaji / Bendahara Sekolah,</p>
+                          <p className="text-[10px] text-slate-400">SMP Islam Modern Al Fakhir</p>
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="font-bold underline text-slate-950 text-sm">{bendaharaNama}</p>
+                          <p className="text-[10px] text-slate-500 font-mono">NIK: {bendaharaNik}</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* FOOTER NOTIFIKASI */}
                 <div className="text-[9px] text-slate-400 text-center pt-3 border-t border-dashed border-slate-200 flex justify-between items-center">
@@ -7733,7 +8330,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 </div>
 
                 {/* Signatures */}
-                <div className="grid grid-cols-3 gap-4 pt-6 text-[10px] border-t border-slate-200">
+                <div className="grid grid-cols-2 gap-6 pt-6 text-[10px] border-t border-slate-200">
                   <div className="text-center space-y-10">
                     <p className="text-slate-600 font-medium">Penerima Gaji,</p>
                     <div className="space-y-0.5">
@@ -7744,12 +8341,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     <p className="text-slate-600 font-medium">Bendahara Sekolah,</p>
                     <div className="space-y-0.5">
                       <p className="font-bold underline text-slate-900">{bendaharaNama}</p>
-                    </div>
-                  </div>
-                  <div className="text-center space-y-10">
-                    <p className="text-slate-600 font-medium">Mengetahui,</p>
-                    <div className="space-y-0.5">
-                      <p className="font-bold underline text-slate-900">{schoolSettings?.kepalaSekolah || 'Kepala Sekolah'}</p>
                     </div>
                   </div>
                 </div>

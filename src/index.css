@@ -8,7 +8,9 @@
   #printable-receipt,
   #printable-receipt *,
   #printable-slip-gaji,
-  #printable-slip-gaji * {
+  #printable-slip-gaji *,
+  #printable-rekap-gaji,
+  #printable-rekap-gaji * {
     visibility: visible !important;
   }
 
@@ -26,14 +28,15 @@
   }
 
   #printable-receipt,
-  #printable-slip-gaji {
+  #printable-slip-gaji,
+  #printable-rekap-gaji {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
-    padding: 20px !important;
+    padding: 15px !important;
     background: #ffffff !important;
     color: #000000 !important;
     box-shadow: none !important;

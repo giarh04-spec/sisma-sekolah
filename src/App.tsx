@@ -54,7 +54,8 @@ import {
   INITIAL_TRANSAKSI,
   INITIAL_SCHOOL_SETTINGS,
   INITIAL_TARIF_BIAYA,
-  INITIAL_EKSKUL
+  INITIAL_EKSKUL,
+  INITIAL_GAJI
 } from './data/mockData';
 
 import { initAuth, googleSignOut, db } from './lib/firebase';
@@ -158,7 +159,11 @@ export default function App() {
   const [tagihanList, setTagihanList] = useState<TagihanKeuangan[]>(() => getSavedData('edu_tagihanList', []));
   const [transaksiList, setTransaksiList] = useState<TransaksiKeuangan[]>(() => getSavedData('edu_transaksiList', []));
   const [tarifBiayaList, setTarifBiayaList] = useState<TarifBiaya[]>(() => getSavedData('edu_tarifBiayaList', INITIAL_TARIF_BIAYA));
-  const [gajiList, setGajiList] = useState<GajiPembayaran[]>(() => getSavedData('edu_gajiList', []));
+  const [gajiList, setGajiList] = useState<GajiPembayaran[]>(() => {
+    const saved = getSavedData('edu_gajiList', null);
+    if (saved && Array.isArray(saved) && saved.length > 0) return saved;
+    return INITIAL_GAJI;
+  });
 
   // School Identity & Settings State
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings>(() => {

@@ -439,10 +439,11 @@ export interface GajiPembayaran {
   
   potongan: number;
   // Detailed Potongan
-  potonganDendaTerlambat?: number;
-  potonganDendaLupaFinger?: number;
-  potonganKoperasi?: number;
-  potonganKasBon?: number;
+  potonganDendaTerlambat?: number; // Denda Terlambat < 30 Min
+  potonganDendaTerlambatLebih?: number; // Denda Terlambat > 30 Min
+  potonganDendaLupaFinger?: number; // Denda Lupa Finger
+  potonganKoperasi?: number; // Pot. Koperasi
+  potonganKasBon?: number; // Gaji Diambil Dimuka (Kasbon / Pinjaman)
 
   totalDiterima: number;
   tanggalBayar: string; // YYYY-MM-DD

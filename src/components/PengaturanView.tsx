@@ -171,9 +171,54 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
     const reader = new FileReader();
     reader.onload = (event) => {
       const base64Url = event.target?.result as string;
-      if (base64Url) {
+      if (!base64Url) return;
+
+      // Auto remove background for JPG/PNG/WEBP by making white/off-white transparent using Canvas processing
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          setFormData(prev => ({ ...prev, logoUrl: base64Url }));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0);
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imgData.data;
+
+        // Sample background color from top-left or top-right corner
+        const r0 = data[0];
+        const g0 = data[1];
+        const b0 = data[2];
+
+        // If background is whitish or very light, make it transparent
+        const isLightBackground = r0 > 220 && g0 > 220 && b0 > 220;
+
+        if (isLightBackground) {
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            // If near white / light grey, set alpha to 0 (transparent)
+            if (r > 215 && g > 215 && b > 215) {
+              data[i + 3] = 0;
+            }
+          }
+          ctx.putImageData(imgData, 0, 0);
+          const transparentUrl = canvas.toDataURL('image/png');
+          setFormData(prev => ({ ...prev, logoUrl: transparentUrl }));
+        } else {
+          setFormData(prev => ({ ...prev, logoUrl: base64Url }));
+        }
+      };
+      img.onerror = () => {
         setFormData(prev => ({ ...prev, logoUrl: base64Url }));
-      }
+      };
+      img.src = base64Url;
     };
     reader.readAsDataURL(file);
   };

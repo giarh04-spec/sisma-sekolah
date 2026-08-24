@@ -18,7 +18,8 @@ import {
   FonnteConfig,
   SchoolSettings,
   TarifBiaya,
-  EkstrakurikulerItem
+  EkstrakurikulerItem,
+  GajiPembayaran
 } from '../types/school';
 
 export const INITIAL_ROMBEL: RombelKelas[] = [
@@ -646,5 +647,176 @@ export const INITIAL_EKSKUL: EkstrakurikulerItem[] = [
     status: 'Aktif',
     biayaIuran: 35000,
     deskripsi: 'Pengembangan talenta vokal, instrumen musik akustik, rebana hadroh Islami, dan koreografi tarian Nusantara.'
+  }
+];
+
+export const INITIAL_GAJI: GajiPembayaran[] = [
+  {
+    id: 'gaji-001',
+    penerimaId: 'staf-101',
+    penerimaNama: 'ALYA NABIYLA',
+    penerimaTipe: 'staf',
+    penerimaNipNik: '327601002010001',
+    jabatan: 'ADMINISTRATION',
+    bulan: 'Juli',
+    tahun: '2026',
+    gajiPokok: 2000000,
+    tunjangan: 50000, // Tunjangan Fungsional
+    tunjanganWalas: 70000, // TJ Walas
+    tunjanganKetepatanWaktu: 50000, // Ketetapan Waktu
+    tunjanganKehadiran: 50000, // TJ Kehadiran
+    tunjanganPiket: 0, // Piket
+    tunjanganExcessTime: 1000, // Exces Time
+    potongan: 0,
+    potonganDendaTerlambat: 10000, // Denda Terlambat < 30 Min
+    potonganDendaTerlambatLebih: 1000, // Denda Terlambat > 30 Min
+    potonganDendaLupaFinger: 1000, // Denda Lupa Finger
+    potonganKoperasi: 26000, // Pot. Koperasi
+    potonganKasBon: 20000, // Gaji Diambil Dimuka
+    totalDiterima: 2163000, // Gaji Bersih
+    tanggalBayar: '2026-07-28',
+    metodePembayaran: 'Transfer Bank',
+    status: 'Paid',
+    penerimaRekening: 'BCA 8291029381'
+  },
+  {
+    id: 'gaji-002',
+    penerimaId: 'staf-102',
+    penerimaNama: 'NOUFAL ZAINUDIN ZIDANE',
+    penerimaTipe: 'staf',
+    penerimaNipNik: '327601002010002',
+    jabatan: 'IT ENGINEERING',
+    bulan: 'Juli',
+    tahun: '2026',
+    gajiPokok: 4500000,
+    tunjangan: 1000000, // Tunjangan Fungsional
+    tunjanganWalas: 0,
+    tunjanganKetepatanWaktu: 1170000, // Ketetapan Waktu
+    tunjanganKehadiran: 910000, // TJ Kehadiran
+    tunjanganPiket: 100000, // Piket
+    tunjanganExcessTime: 0,
+    potongan: 0,
+    potonganDendaTerlambat: 0,
+    potonganDendaTerlambatLebih: 0,
+    potonganDendaLupaFinger: 0,
+    potonganKoperasi: 0,
+    potonganKasBon: 5233000, // Gaji Diambil Dimuka
+    totalDiterima: 2447000, // Gaji Bersih
+    tanggalBayar: '2026-07-28',
+    metodePembayaran: 'Transfer Bank',
+    status: 'Paid',
+    penerimaRekening: 'Mandiri 137001928371'
+  },
+  {
+    id: 'gaji-003',
+    penerimaId: 'staf-103',
+    penerimaNama: 'MUHAMMAD LUTHFI HAKIM',
+    penerimaTipe: 'staf',
+    penerimaNipNik: '327601002010003',
+    jabatan: 'OPERATOR',
+    bulan: 'Juli',
+    tahun: '2026',
+    gajiPokok: 2000000,
+    tunjangan: 50000,
+    tunjanganWalas: 50000,
+    tunjanganKetepatanWaktu: 50000,
+    tunjanganKehadiran: 50000,
+    tunjanganPiket: 0,
+    tunjanganExcessTime: 0,
+    potongan: 0,
+    potonganDendaTerlambat: 10000,
+    potonganDendaTerlambatLebih: 0,
+    potonganDendaLupaFinger: 0,
+    potonganKoperasi: 26000,
+    potonganKasBon: 20000,
+    totalDiterima: 2144000,
+    tanggalBayar: '2026-07-28',
+    metodePembayaran: 'Transfer Bank',
+    status: 'Paid',
+    penerimaRekening: 'BRI 092819281726'
+  },
+  {
+    id: 'gaji-004',
+    penerimaId: 'gur-1',
+    penerimaNama: 'MOCHAMAD ASRORU PAHALA, S.PD.I',
+    penerimaTipe: 'guru',
+    penerimaNipNik: '327601002010009',
+    jabatan: 'GURU MATA PELAJARAN',
+    bulan: 'Juli',
+    tahun: '2026',
+    gajiPokok: 1500000,
+    tunjangan: 300000,
+    tunjanganWalas: 200000,
+    tunjanganKetepatanWaktu: 100000,
+    tunjanganKehadiran: 100000,
+    tunjanganPiket: 100000,
+    tunjanganExcessTime: 0,
+    potongan: 0,
+    potonganDendaTerlambat: 20000,
+    potonganDendaTerlambatLebih: 0,
+    potonganDendaLupaFinger: 10000,
+    potonganKoperasi: 20000,
+    potonganKasBon: 0,
+    totalDiterima: 2250000,
+    tanggalBayar: '2026-07-28',
+    metodePembayaran: 'Transfer Bank',
+    status: 'Paid',
+    penerimaRekening: 'BSI 7123984712'
+  },
+  {
+    id: 'gaji-005',
+    penerimaId: 'gur-2',
+    penerimaNama: 'GIAR HERMAWAN, S.KOM',
+    penerimaTipe: 'guru',
+    penerimaNipNik: '3276010410820010',
+    jabatan: 'GURU INFORMATIKA',
+    bulan: 'Juli',
+    tahun: '2026',
+    gajiPokok: 3500000,
+    tunjangan: 500000,
+    tunjanganWalas: 200000,
+    tunjanganKetepatanWaktu: 100000,
+    tunjanganKehadiran: 100000,
+    tunjanganPiket: 0,
+    tunjanganExcessTime: 22000,
+    potongan: 0,
+    potonganDendaTerlambat: 0,
+    potonganDendaTerlambatLebih: 0,
+    potonganDendaLupaFinger: 0,
+    potonganKoperasi: 0,
+    potonganKasBon: 0,
+    totalDiterima: 4422000,
+    tanggalBayar: '2026-07-28',
+    metodePembayaran: 'Transfer Bank',
+    status: 'Paid',
+    penerimaRekening: 'BCA 7712349182'
+  },
+  {
+    id: 'gaji-006',
+    penerimaId: 'gur-3',
+    penerimaNama: 'AULIA SAFITRI, S.PD',
+    penerimaTipe: 'guru',
+    penerimaNipNik: '3276016103820011',
+    jabatan: 'GURU SENI & BUDAYA',
+    bulan: 'Juli',
+    tahun: '2026',
+    gajiPokok: 3500000,
+    tunjangan: 400000,
+    tunjanganWalas: 200000,
+    tunjanganKetepatanWaktu: 100000,
+    tunjanganKehadiran: 100000,
+    tunjanganPiket: 0,
+    tunjanganExcessTime: 0,
+    potongan: 0,
+    potonganDendaTerlambat: 0,
+    potonganDendaTerlambatLebih: 0,
+    potonganDendaLupaFinger: 0,
+    potonganKoperasi: 0,
+    potonganKasBon: 0,
+    totalDiterima: 4300000,
+    tanggalBayar: '2026-07-28',
+    metodePembayaran: 'Transfer Bank',
+    status: 'Paid',
+    penerimaRekening: 'BRI 58291039182'
   }
 ];
