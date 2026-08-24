@@ -506,14 +506,13 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
     const msg = buildGajiWhatsAppMessage(item);
 
-    // Generate slip image blob
+    // Generate slip image blob for WhatsApp Gateway
     const slipBlob = await generateSlipImageBlob(item);
     
-    // Copy image to clipboard & download as convenience
+    // Copy image to clipboard so user can easily paste if using WhatsApp Web
     const targetEl = document.getElementById('printable-slip-gaji') || document.getElementById('printable-slip-gaji-offscreen');
     if (targetEl) {
       copyElementImageToClipboard(targetEl).catch(() => {});
-      downloadElementAsImage(targetEl, filename).catch(() => {});
     }
 
     setSlipSendingStatus('Mengirimkan slip gaji ke WhatsApp penerima...');
@@ -536,7 +535,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       const waUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`;
       const newTab = window.open(waUrl, '_blank');
       if (newTab) {
-        showToast('✅ WhatsApp dibuka! Gambar Slip Gaji telah diunduh & tersalin di clipboard (tekan Ctrl+V di chat WhatsApp).');
+        showToast('✅ WhatsApp dibuka! Rincian slip gaji & link digital siap dikirim.');
       } else {
         showToast('Gagal membuka popup WhatsApp, silakan izinkan popup di browser Anda.', 'error');
       }
