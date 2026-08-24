@@ -90,8 +90,29 @@ export default function App() {
   const [publicSlipId, setPublicSlipId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     try {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('slip') || (params.get('view') === 'slip' ? params.get('id') : null);
+      const search = window.location.search;
+      if (!search) return null;
+      const params = new URLSearchParams(search);
+      if (params.has('slip')) {
+        return params.get('slip') || 'portal';
+      }
+      if (params.has('slip_id')) {
+        return params.get('slip_id') || 'portal';
+      }
+      if (params.has('slipId')) {
+        return params.get('slipId') || 'portal';
+      }
+      if (params.has('gaji')) {
+        return params.get('gaji') || 'portal';
+      }
+      if (params.get('view') === 'slip') {
+        return params.get('id') || 'portal';
+      }
+      const searchLower = search.toLowerCase();
+      if (searchLower.includes('slip') || searchLower.includes('?sli')) {
+        return 'portal';
+      }
+      return null;
     } catch {
       return null;
     }
@@ -690,6 +711,7 @@ export default function App() {
     return (
       <LoginView
         onLoginSuccess={handleLoginSuccess}
+        onOpenPublicSlip={(id) => setPublicSlipId(id || 'portal')}
         schoolSettings={schoolSettings}
         guruList={guruList}
         stafList={stafList}
