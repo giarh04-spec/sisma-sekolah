@@ -60,14 +60,14 @@ const LocationWithMapLink = ({ text }: { text: string }) => {
       const cleanCoords = coords.trim().replace(/\s+/g, '');
       return (
         <>
-          {before}
+          {before.trim()}
           <a
             href={`https://www.google.com/maps/search/?api=1&query=${cleanCoords}`}
             target="_blank"
             rel="noreferrer"
-            className="text-blue-500 hover:underline hover:text-blue-600 transition-colors"
+            className="ml-1 text-[10px] font-bold text-blue-500 hover:text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 transition-colors uppercase"
           >
-            ({coords})
+            Peta
           </a>
           {after}
         </>
@@ -104,6 +104,7 @@ type SubTabAbsensi = 'scan_barcode' | 'harian_siswa' | 'kelas_mapel' | 'absensi_
 const getFriendlyLocationName = (lat: number, lng: number): string => {
   // School reference point (based on typical coordinates in the screenshot)
   const schoolPoints = [
+    { lat: -6.2415, lng: 106.8045, name: 'Sekolah Islam Modern Al Fakhir' },
     { lat: -6.200000, lng: 106.816666, name: 'Gerbang Utama Sekolah' },
     { lat: -6.200100, lng: 106.816700, name: 'Lobby Gedung Utama' },
     { lat: -6.200200, lng: 106.816500, name: 'Area Parkir Guru' },
@@ -192,22 +193,47 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   }, [schoolSettings?.jadwalPresensi, localJadwal]);
 
   // GPS Geotagging State & Integration
-  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number; accuracy?: number } | null>({
-    lat: -6.2415,
-    lng: 106.8045,
-    accuracy: 5
-  });
-  const [gpsStatus, setGpsStatus] = useState<'idle' | 'fetching' | 'connected' | 'error'>('connected');
-  const [gpsAddress, setGpsAddress] = useState<string>('SMP Islam Modern Al Fakhir (-6.2415, 106.8045)');
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
+  const [gpsStatus, setGpsStatus] = useState<'idle' | 'fetching' | 'connected' | 'error'>('idle');
+  const [gpsAddress, setGpsAddress] = useState<string>('Mencari Lokasi GPS...');
 
-  const fetchGpsLocation = () => {
-    setGpsStatus('fetching');
+  useEffect(() => {
     if (!navigator.geolocation) {
       setGpsStatus('error');
-      showToast('Geolocation tidak didukung oleh browser ini', 'error');
+      setGpsAddress('Geolocation tidak didukung');
       return;
     }
 
+    setGpsStatus('fetching');
+    
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const accuracy = position.coords.accuracy;
+        setGpsCoords({ lat, lng, accuracy });
+        setGpsStatus('connected');
+        const friendlyName = getFriendlyLocationName(lat, lng);
+        setGpsAddress(`${friendlyName} (Akurasi ±${Math.round(accuracy)}m)`);
+      },
+      (error) => {
+        console.error('GPS Error:', error);
+        // If error, we keep the last known or use default fallback but mark as offline/error
+        if (!gpsCoords) {
+          setGpsCoords({ lat: -6.2415, lng: 106.8045, accuracy: 10 });
+          setGpsStatus('error');
+          setGpsAddress('GPS Offline (Gunakan Lokasi Default)');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
+  const fetchGpsLocation = () => {
+    // Manual refresh if needed, though watchPosition should handle it
+    setGpsStatus('fetching');
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const lat = position.coords.latitude;
@@ -217,21 +243,14 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
         setGpsStatus('connected');
         const friendlyName = getFriendlyLocationName(lat, lng);
         setGpsAddress(`${friendlyName} (Akurasi ±${Math.round(accuracy)}m)`);
-        showToast(`GPS Terhubung: ${friendlyName}`, 'success');
+        showToast(`GPS Diperbarui: ${friendlyName}`, 'success');
       },
       (error) => {
-        // Geolocation unavailable or blocked in sandbox/iframe - use default fallback gracefully
-        setGpsCoords({ lat: -6.2415, lng: 106.8045, accuracy: 10 });
-        setGpsStatus('connected');
-        setGpsAddress('SMP Islam Modern Al Fakhir (GPS Default)');
+        showToast('Gagal memperbarui GPS. Pastikan izin lokasi aktif.', 'error');
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 5000 }
     );
   };
-
-  useEffect(() => {
-    fetchGpsLocation();
-  }, []);
 
   // Helper to calculate status attendance label (Tepat Waktu, Terlambat, Pulang Cepat)
   const calculateAttendanceStatusLabel = (timeStr: string, mode: 'Masuk' | 'Pulang') => {
