@@ -54,9 +54,17 @@ export const KartuDigitalModal: React.FC<KartuDigitalModalProps> = ({ type, data
   };
 
   const siswaData = type === 'siswa' ? (data as Siswa) : null;
-  const qrString = siswaData 
-    ? `Nama: ${siswaData.nama} | NISN: ${siswaData.nisn || siswaData.nis || '-'}` 
-    : `Nama: ${data.nama} | ID: ${data.id}`;
+  const guruData = type === 'guru' ? (data as Guru) : null;
+  const stafData = type === 'staf' ? (data as Staf) : null;
+
+  // Format QR string based on requested pattern: Nama: [Name] | ID: [Identifier]
+  // We use GUR-, STF-, SIS- prefixes to help the scanner automatically identify the category
+  const qrString = type === 'siswa' 
+    ? `Nama: ${data.nama} | ID: SIS-${(data as Siswa).nisn || (data as Siswa).nis || data.id}` 
+    : type === 'guru'
+      ? `Nama: ${data.nama} | ID: GUR-${(data as Guru).nik || (data as Guru).nip || data.id}`
+      : `Nama: ${data.nama} | ID: STF-${(data as Staf).nik || data.id}`;
+
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrString)}`;
 
   return (
@@ -70,11 +78,11 @@ export const KartuDigitalModal: React.FC<KartuDigitalModalProps> = ({ type, data
               <QrCode className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">
-                Kartu Absen Siswa
+              <h3 className="text-lg font-bold text-white uppercase tracking-wide">
+                Kartu Absen {type}
               </h3>
               <p className="text-xs text-slate-400">
-                Sesuai standar absensi digital sekolah & QR Code siswa
+                Sesuai standar absensi digital sekolah & QR Code {type}
               </p>
             </div>
           </div>
@@ -107,9 +115,9 @@ export const KartuDigitalModal: React.FC<KartuDigitalModalProps> = ({ type, data
               </div>
             </div>
 
-            {/* Circular Student Photo */}
+            {/* Circular User Photo */}
             <div className="relative z-10 flex flex-col items-center mt-24">
-              <div className="w-24 h-24 rounded-full p-1 bg-white shadow-xl border-2 border-teal-600">
+              <div className="w-24 h-24 rounded-full p-1 bg-white shadow-xl border-2 border-teal-600 overflow-hidden">
                 <img
                   src={data.fotoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
                   alt={data.nama}
@@ -117,7 +125,7 @@ export const KartuDigitalModal: React.FC<KartuDigitalModalProps> = ({ type, data
                 />
               </div>
 
-              {/* Student Name */}
+              {/* User Name */}
               <h3 className="text-sm font-black text-slate-900 mt-3 text-center px-4 uppercase tracking-tight line-clamp-1">
                 {data.nama}
               </h3>
@@ -129,10 +137,17 @@ export const KartuDigitalModal: React.FC<KartuDigitalModalProps> = ({ type, data
                 <div className="w-12 h-0.5 bg-teal-300 rounded-full" />
               </div>
 
-              {/* NISN Badge */}
+              {/* Identifier Badge (NISN/NIK/NIP) */}
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mt-1">
                 <User className="w-3.5 h-3.5 text-teal-700" />
-                <span className="font-mono">{type === 'siswa' ? ((data as Siswa).nisn || (data as Siswa).nis || '-') : '-'}</span>
+                <span className="font-mono">
+                  {type === 'siswa' 
+                    ? ((data as Siswa).nisn || (data as Siswa).nis || '-') 
+                    : type === 'guru'
+                      ? ((data as Guru).nik || (data as Guru).nip || '-')
+                      : ((data as Staf).nik || (data as Staf).id || '-')
+                  }
+                </span>
               </div>
             </div>
 
@@ -150,7 +165,7 @@ export const KartuDigitalModal: React.FC<KartuDigitalModalProps> = ({ type, data
             {/* Bottom Teal/Emerald Curved Footer */}
             <div className="h-12 bg-gradient-to-r from-[#042f2e] via-[#0f766e] to-[#115e59] rounded-t-[35%] flex items-center justify-center gap-2 text-white px-4">
               <QrCode className="w-4 h-4 text-teal-200" />
-              <span className="text-[10px] font-bold tracking-wide">Scan untuk absensi siswa</span>
+              <span className="text-[10px] font-bold tracking-wide uppercase">Scan untuk absensi {type}</span>
             </div>
 
           </div>
