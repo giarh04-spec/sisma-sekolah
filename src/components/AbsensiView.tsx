@@ -530,9 +530,11 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
 
     const foundGuru = guruList.find(g => 
       (g.kodeBarcode && g.kodeBarcode.toLowerCase() === code.toLowerCase()) ||
-      g.nip === code ||
       (g.nik && g.nik === code) ||
+      (g.nik && `GUR-${g.nik}`.toLowerCase() === code.toLowerCase()) ||
+      g.nip === code ||
       `GUR-${g.nip}`.toLowerCase() === code.toLowerCase() ||
+      g.id === code ||
       `GUR-${g.id}`.toLowerCase() === code.toLowerCase() ||
       g.nama.toLowerCase() === code.toLowerCase()
     );

@@ -62,7 +62,7 @@ export const KartuDigitalModal: React.FC<KartuDigitalModalProps> = ({ type, data
   const qrString = type === 'siswa' 
     ? `Nama: ${data.nama} | ID: SIS-${(data as Siswa).nisn || (data as Siswa).nis || data.id}` 
     : type === 'guru'
-      ? `Nama: ${data.nama} | ID: GUR-${(data as Guru).nik || (data as Guru).nip || data.id}`
+      ? `Nama: ${data.nama} | ID: GUR-${(data as Guru).nik || data.id}`
       : `Nama: ${data.nama} | ID: STF-${(data as Staf).nik || data.id}`;
 
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrString)}`;
@@ -137,15 +137,15 @@ export const KartuDigitalModal: React.FC<KartuDigitalModalProps> = ({ type, data
                 <div className="w-12 h-0.5 bg-teal-300 rounded-full" />
               </div>
 
-              {/* Identifier Badge (NISN/NIK/NIP) */}
+              {/* Identifier Badge (NISN / NIK) */}
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mt-1">
                 <User className="w-3.5 h-3.5 text-teal-700" />
                 <span className="font-mono">
                   {type === 'siswa' 
                     ? ((data as Siswa).nisn || (data as Siswa).nis || '-') 
                     : type === 'guru'
-                      ? ((data as Guru).nik || (data as Guru).nip || '-')
-                      : ((data as Staf).nik || (data as Staf).id || '-')
+                      ? ((data as Guru).nik || '-')
+                      : ((data as Staf).nik || '-')
                   }
                 </span>
               </div>
