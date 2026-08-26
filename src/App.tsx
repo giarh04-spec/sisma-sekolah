@@ -17,6 +17,7 @@ import {
   AbsensiSubTab,
   CbtSubTab,
   KeuanganSubTab,
+  AdministrasiSubTab,
   PengaturanSubTab,
   TarifBiaya,
   Siswa, 
@@ -125,6 +126,7 @@ export default function App() {
   const [databaseSubTab, setDatabaseSubTab] = useState<SubTab>('siswa');
   const [absensiSubTab, setAbsensiSubTab] = useState<AbsensiSubTab>('scan_barcode');
   const [cbtSubTab, setCbtSubTab] = useState<CbtSubTab>('bank_soal');
+  const [administrasiSubTab, setAdministrasiSubTab] = useState<AdministrasiSubTab>('perangkat');
   const [keuanganSubTab, setKeuanganSubTab] = useState<KeuanganSubTab>('pembayaran');
   const [pengaturanSubTab, setPengaturanSubTab] = useState<PengaturanSubTab>('identitas');
 
@@ -174,7 +176,7 @@ export default function App() {
     return {
       ...INITIAL_SCHOOL_SETTINGS,
       ...saved,
-      namaSekolah: saved.namaSekolah === 'SMP Modern Al Fakhir' ? INITIAL_SCHOOL_SETTINGS.namaSekolah : (saved.namaSekolah || INITIAL_SCHOOL_SETTINGS.namaSekolah),
+      namaSekolah: saved.namaSekolah === 'Sekolah Islam Modern Al Fakhir' ? INITIAL_SCHOOL_SETTINGS.namaSekolah : (saved.namaSekolah || INITIAL_SCHOOL_SETTINGS.namaSekolah),
       npsn: saved.npsn || INITIAL_SCHOOL_SETTINGS.npsn,
       akreditasi: saved.akreditasi || INITIAL_SCHOOL_SETTINGS.akreditasi,
       logoUrl: saved.logoUrl && !saved.logoUrl.includes('unsplash') ? saved.logoUrl : INITIAL_SCHOOL_SETTINGS.logoUrl,
@@ -747,29 +749,31 @@ export default function App() {
       <div className="flex-1 max-w-[1400px] w-full mx-auto flex flex-col md:flex-row my-4 px-3 sm:px-6 gap-6">
         
         {/* Navigation Sidebar */}
-        <Sidebar
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          userGoogleToken={userGoogleToken}
-          currentRole={currentRole}
-          databaseSubTab={databaseSubTab}
-          setDatabaseSubTab={setDatabaseSubTab}
-          absensiSubTab={absensiSubTab}
-          setAbsensiSubTab={setAbsensiSubTab}
-          cbtSubTab={cbtSubTab}
-          setCbtSubTab={setCbtSubTab}
-          keuanganSubTab={keuanganSubTab}
-          setKeuanganSubTab={setKeuanganSubTab}
-          pengaturanSubTab={pengaturanSubTab}
-          setPengaturanSubTab={setPengaturanSubTab}
-          siswaCount={siswaList.length}
-          guruCount={guruList.length}
-          stafCount={stafList.length}
-          rombelCount={rombelList.length}
-          mapelCount={mapelList.length}
-          ekskulCount={ekskulList.length}
-          bankSoalCount={bankSoalList.length}
-        />
+          <Sidebar
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            userGoogleToken={userGoogleToken}
+            currentRole={currentRole}
+            databaseSubTab={databaseSubTab}
+            setDatabaseSubTab={setDatabaseSubTab}
+            absensiSubTab={absensiSubTab}
+            setAbsensiSubTab={setAbsensiSubTab}
+            cbtSubTab={cbtSubTab}
+            setCbtSubTab={setCbtSubTab}
+            administrasiSubTab={administrasiSubTab}
+            setAdministrasiSubTab={setAdministrasiSubTab}
+            keuanganSubTab={keuanganSubTab}
+            setKeuanganSubTab={setKeuanganSubTab}
+            pengaturanSubTab={pengaturanSubTab}
+            setPengaturanSubTab={setPengaturanSubTab}
+            siswaCount={siswaList.length}
+            guruCount={guruList.length}
+            stafCount={stafList.length}
+            rombelCount={rombelList.length}
+            mapelCount={mapelList.length}
+            ekskulCount={ekskulList.length}
+            bankSoalCount={bankSoalList.length}
+          />
 
         {/* Content View Area */}
         <main className={`flex-1 min-w-0 ${theme === 'light' ? 'bg-white text-slate-900 border-slate-200' : 'bg-[#0A0A0A] text-slate-200 border-slate-800'} rounded-2xl p-4 sm:p-6 border shadow-2xl transition-colors`}>
@@ -862,6 +866,10 @@ export default function App() {
               currentRole={currentRole}
               userEmail={userEmail}
               guruList={guruList}
+              mapelList={mapelList}
+              rombelList={rombelList}
+              subTab={administrasiSubTab}
+              setSubTab={setAdministrasiSubTab}
             />
           )}
           

@@ -181,7 +181,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     kodeMapel: 'MP-MAT-01',
     namaMapel: '',
     kategori: 'Wajib Umum',
-    tingkatKelas: 'Kelas 10 & 11',
+    tingkatKelas: 'Kelas 7',
     guruPengampuNama: guruList[0]?.nama || 'Drs. Hendra Kusuma, M.Pd.',
     nipGuru: guruList[0]?.nip || '198501152010011002',
     alokasiJamPerMinggu: 4,
@@ -210,7 +210,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   // Form State for Rombel
   const [formRombel, setFormRombel] = useState<Omit<RombelKelas, 'id'>>({
     namaRombel: '',
-    tingkatKelas: 'Kelas 10',
+    tingkatKelas: 'Kelas 7',
     jurusanPeminatan: 'MIPA / Umum',
     waliKelasNama: guruList[0]?.nama || 'Drs. Hendra Kusuma, M.Pd.',
     ruangan: 'Ruang R.101 (Gedung A)',
@@ -816,7 +816,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       setSelectedSiswaIdsForRombel([]);
       setFormRombel({
         namaRombel: '',
-        tingkatKelas: 'Kelas 10',
+        tingkatKelas: 'Kelas 7',
         jurusanPeminatan: 'MIPA / Umum',
         waliKelasNama: guruList[0]?.nama || 'Drs. Hendra Kusuma, M.Pd.',
         ruangan: 'Ruang R.101 (Gedung A)',
@@ -833,7 +833,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         kodeMapel: `MP-${Date.now().toString().slice(-4)}`,
         namaMapel: '',
         kategori: 'Wajib Umum',
-        tingkatKelas: 'Kelas 10 & 11',
+        tingkatKelas: 'Kelas 7',
         guruPengampuNama: defaultGuru?.nama || 'Drs. Hendra Kusuma, M.Pd.',
         nipGuru: defaultGuru?.nip || '198501152010011002',
         alokasiJamPerMinggu: 4,
@@ -1141,9 +1141,6 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                 className="bg-[#181818] border border-slate-800 text-slate-200 rounded-lg px-3 py-2 text-xs font-medium focus:ring-1 focus:ring-indigo-500 focus:outline-none"
               >
                 <option value="Semua">Semua Tingkat</option>
-                <option value="Kelas 10">Kelas 10</option>
-                <option value="Kelas 11">Kelas 11</option>
-                <option value="Kelas 12">Kelas 12</option>
                 <option value="Kelas 7">Kelas 7</option>
                 <option value="Kelas 8">Kelas 8</option>
                 <option value="Kelas 9">Kelas 9</option>
@@ -2756,9 +2753,6 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           <option value="Kelas 7">Kelas 7</option>
                           <option value="Kelas 8">Kelas 8</option>
                           <option value="Kelas 9">Kelas 9</option>
-                          <option value="Kelas 10">Kelas 10</option>
-                          <option value="Kelas 11">Kelas 11</option>
-                          <option value="Kelas 12">Kelas 12</option>
                         </select>
                       </div>
                       <div>
@@ -3347,9 +3341,6 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         onChange={e => setFormRombel({ ...formRombel, tingkatKelas: e.target.value })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold"
                       >
-                        <option value="Kelas 10">Kelas 10</option>
-                        <option value="Kelas 11">Kelas 11</option>
-                        <option value="Kelas 12">Kelas 12</option>
                         <option value="Kelas 7">Kelas 7</option>
                         <option value="Kelas 8">Kelas 8</option>
                         <option value="Kelas 9">Kelas 9</option>
@@ -3626,26 +3617,38 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       </select>
                     </div>
                     <div>
-                      <label className="text-[11px] font-bold text-slate-400">Tingkat Kelas</label>
-                      <select 
-                        value={formMapel.tingkatKelas} 
-                        onChange={e => setFormMapel({ ...formMapel, tingkatKelas: e.target.value })}
-                        className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
-                      >
-                        <option value="Semua Tingkat">Semua Tingkat</option>
-                        <option value="Kelas 1">Kelas 1</option>
-                        <option value="Kelas 2">Kelas 2</option>
-                        <option value="Kelas 3">Kelas 3</option>
-                        <option value="Kelas 4">Kelas 4</option>
-                        <option value="Kelas 5">Kelas 5</option>
-                        <option value="Kelas 6">Kelas 6</option>
-                        <option value="Kelas 7">Kelas 7</option>
-                        <option value="Kelas 8">Kelas 8</option>
-                        <option value="Kelas 9">Kelas 9</option>
-                        <option value="Kelas 10">Kelas 10</option>
-                        <option value="Kelas 11">Kelas 11</option>
-                        <option value="Kelas 12">Kelas 12</option>
-                      </select>
+                      <label className="text-[11px] font-bold text-slate-400 mb-1 block">Tingkat Kelas (Dapat Dipilih Lebih dari Satu)</label>
+                      <div className="max-h-36 overflow-y-auto p-2.5 bg-[#181818] border border-slate-800 rounded-xl space-y-1.5">
+                        {['Semua Tingkat', 'Kelas 7', 'Kelas 8', 'Kelas 9'].map(tingkat => {
+                          const selectedTingkats = formMapel.tingkatKelas ? formMapel.tingkatKelas.split(',').map(s => s.trim()) : [];
+                          const isChecked = selectedTingkats.includes(tingkat);
+                          return (
+                            <label key={tingkat} className="flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-slate-800/80 rounded-lg cursor-pointer text-xs text-slate-200 transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {
+                                  let updated: string[];
+                                  if (tingkat === 'Semua Tingkat') {
+                                    updated = ['Semua Tingkat'];
+                                  } else {
+                                    const withoutSemua = selectedTingkats.filter(t => t !== 'Semua Tingkat');
+                                    if (withoutSemua.includes(tingkat)) {
+                                      updated = withoutSemua.filter(t => t !== tingkat);
+                                    } else {
+                                      updated = [...withoutSemua, tingkat];
+                                    }
+                                  }
+                                  setFormMapel({ ...formMapel, tingkatKelas: updated.length > 0 ? updated.join(', ') : 'Kelas 7' });
+                                }}
+                                className="rounded border-slate-700 bg-slate-900 text-amber-600 focus:ring-amber-500 w-3.5 h-3.5"
+                              />
+                              <span className="font-semibold">{tingkat}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+
                     </div>
                   </div>
 
@@ -4054,11 +4057,10 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-emerald-500"
                       >
                         <option value="Semua Tingkat (Kelas 7, 8, 9)">Semua Tingkat (Kelas 7, 8, 9)</option>
-                        <option value="Semua Tingkat (Kelas 10, 11, 12)">Semua Tingkat (Kelas 10, 11, 12)</option>
                         <option value="Kelas 7 & 8">Kelas 7 & 8</option>
-                        <option value="Kelas 10 & 11">Kelas 10 & 11</option>
                         <option value="Khusus Kelas 7">Khusus Kelas 7</option>
-                        <option value="Khusus Kelas 10">Khusus Kelas 10</option>
+                        <option value="Khusus Kelas 8">Khusus Kelas 8</option>
+                        <option value="Khusus Kelas 9">Khusus Kelas 9</option>
                       </select>
                     </div>
                   </div>

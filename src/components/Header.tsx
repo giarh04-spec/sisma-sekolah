@@ -105,8 +105,8 @@ export const Header: React.FC<HeaderProps> = ({
                 v2026
               </span>
             </h1>
-            <p className={`text-[11px] hidden sm:block ${theme === 'light' ? 'text-slate-500' : 'text-slate-500'}`}>
-              {schoolSettings ? `NPSN: ${schoolSettings.npsn} • Akreditasi ${schoolSettings.akreditasi}` : 'Sistem Informasi Manajemen, CBT & Keuangan Terpadu'}
+            <p className={`text-[13px] font-bold hidden sm:block tracking-wide ${theme === 'light' ? 'text-blue-600' : 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]'}`}>
+              {schoolSettings ? `Akreditasi ${schoolSettings.akreditasi}` : 'Sistem Informasi Manajemen, CBT & Keuangan Terpadu'}
             </p>
           </div>
         </div>

@@ -28,7 +28,7 @@ import {
   Trophy,
   Coins
 } from 'lucide-react';
-import { Role, SubTab, AbsensiSubTab, CbtSubTab, KeuanganSubTab, PengaturanSubTab } from '../types/school';
+import { Role, SubTab, AbsensiSubTab, CbtSubTab, KeuanganSubTab, AdministrasiSubTab, PengaturanSubTab } from '../types/school';
 
 export type TabType = 'dashboard' | 'database' | 'absensi' | 'cbt' | 'administrasi' | 'keuangan' | 'pengaturan';
 
@@ -43,6 +43,8 @@ interface SidebarProps {
   setAbsensiSubTab?: (subTab: AbsensiSubTab) => void;
   cbtSubTab?: CbtSubTab;
   setCbtSubTab?: (subTab: CbtSubTab) => void;
+  administrasiSubTab?: AdministrasiSubTab;
+  setAdministrasiSubTab?: (subTab: AdministrasiSubTab) => void;
   keuanganSubTab?: KeuanganSubTab;
   setKeuanganSubTab?: (subTab: KeuanganSubTab) => void;
   pengaturanSubTab?: PengaturanSubTab;
@@ -67,6 +69,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setAbsensiSubTab,
   cbtSubTab = 'bank_soal',
   setCbtSubTab,
+  administrasiSubTab = 'perangkat',
+  setAdministrasiSubTab,
   keuanganSubTab = 'pembayaran',
   setKeuanganSubTab,
   pengaturanSubTab = 'identitas',
@@ -109,7 +113,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'administrasi',
       label: 'Administrasi Guru',
       icon: <FileText className="w-5 h-5" />,
-      desc: 'Modul Ajar, ATP, Prota'
+      desc: 'Modul Ajar, Jadwal, Kalender'
     },
     {
       id: 'keuangan',
@@ -524,28 +528,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </button>
                       )}
 
-                      {/* 3. AI Generator Soal */}
-                      <button
-                        onClick={() => {
-                          setActiveTab('cbt');
-                          if (setCbtSubTab) setCbtSubTab('ai_generator');
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
-                          cbtSubTab === 'ai_generator'
-                            ? 'bg-purple-600/10 text-purple-400 border border-purple-500/20 shadow-sm'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                          <span>AI Generator Soal</span>
-                        </div>
-                        <span className="text-[9px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1 py-0.5 rounded font-bold">
-                          AI
-                        </span>
-                      </button>
-
-                      {/* 4. Simulasi CBT Anti-Cheat */}
+                      {/* 3. Simulasi CBT Anti-Cheat */}
                       <button
                         onClick={() => {
                           setActiveTab('cbt');
@@ -563,7 +546,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </div>
                       </button>
 
-                      {/* 5. Hasil Ujian (Firebase) */}
+                      {/* 4. Hasil Ujian (Firebase) */}
                       <button
                         onClick={() => {
                           setActiveTab('cbt');
@@ -578,6 +561,93 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <div className="flex items-center gap-2">
                           <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
                           <span>Hasil Ujian (Firebase)</span>
+                        </div>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            if (item.id === 'administrasi') {
+              return (
+                <div key={item.id} className="space-y-1">
+                  <button
+                    onClick={() => {
+                      setActiveTab('administrasi');
+                    }}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-xl transition-all flex items-center justify-between group ${
+                      isActive
+                        ? 'bg-slate-800/90 text-blue-400 font-bold border border-slate-700/80 shadow-md ring-1 ring-blue-500/20'
+                        : 'hover:bg-slate-800/50 hover:text-white text-slate-400'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'}`}>
+                        {item.icon}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold leading-none">{item.label}</div>
+                        <div className={`text-[10px] mt-1 ${isActive ? 'text-slate-300' : 'text-slate-500'}`}>
+                          {item.desc}
+                        </div>
+                      </div>
+                    </div>
+
+                    <ChevronDown className={`w-4 h-4 text-slate-500 group-hover:text-slate-300 transition-transform duration-300 ${isActive ? 'transform rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Dropdown nested items for Administrasi Guru */}
+                  {isActive && (
+                    <div className="pl-3 pr-1 py-1 space-y-1 border-l border-slate-800 ml-6 mt-1 transition-all">
+                      <button
+                        onClick={() => {
+                          setActiveTab('administrasi');
+                          if (setAdministrasiSubTab) setAdministrasiSubTab('perangkat');
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
+                          administrasiSubTab === 'perangkat'
+                            ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-sm'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Dokumen Administrasi</span>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setActiveTab('administrasi');
+                          if (setAdministrasiSubTab) setAdministrasiSubTab('jadwal');
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
+                          administrasiSubTab === 'jadwal'
+                            ? 'bg-amber-600/10 text-amber-400 border border-amber-500/20 shadow-sm'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Jadwal Mengajar</span>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setActiveTab('administrasi');
+                          if (setAdministrasiSubTab) setAdministrasiSubTab('kalender');
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
+                          administrasiSubTab === 'kalender'
+                            ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-sm'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Kalender Pendidikan</span>
                         </div>
                       </button>
                     </div>

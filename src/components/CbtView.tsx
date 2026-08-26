@@ -604,13 +604,37 @@ export const CbtView: React.FC<CbtViewProps> = ({
   };
 
   // --- AI Generator State ---
-  const [aiMapel, setAiMapel] = useState('IPA');
-  const [aiKelas, setAiKelas] = useState('VIII - Al Biruni');
+  const [aiMapel, setAiMapel] = useState(availableMapelList[0] || 'Informatika / TIK');
+  const [aiKelas, setAiKelas] = useState<string[]>(availableKelasList.length > 0 ? [availableKelasList[0]] : []);
+  const [aiTipeSoal, setAiTipeSoal] = useState<string[]>(['pg', 'multiple_choice', 'isian', 'esai']);
   const [aiTopik, setAiTopik] = useState('Sistem Peredaran Darah & Fotosintesis');
   const [aiJumlah, setAiJumlah] = useState(4);
   const [loadingAi, setLoadingAi] = useState(false);
 
+  const handleToggleAiKelas = (kelasName: string) => {
+    setAiKelas(prev => {
+      if (prev.includes(kelasName)) {
+        return prev.filter(k => k !== kelasName);
+      }
+      return [...prev, kelasName];
+    });
+  };
+
+  const handleToggleAiTipe = (tipeName: string) => {
+    setAiTipeSoal(prev => {
+      if (prev.includes(tipeName)) {
+        if (prev.length === 1) return prev; // prevent emptying
+        return prev.filter(t => t !== tipeName);
+      }
+      return [...prev, tipeName];
+    });
+  };
+
   const handleGenerateAi = async () => {
+    if (aiKelas.length === 0) {
+      alert('Pilih minimal satu kelas target!');
+      return;
+    }
     setLoadingAi(true);
     try {
       const res = await fetch('/api/ai/generate-questions', {
@@ -618,9 +642,10 @@ export const CbtView: React.FC<CbtViewProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mataPelajaran: aiMapel,
-          kelas: aiKelas,
+          kelas: aiKelas.join(', '),
           topik: aiTopik,
-          jumlahSoal: aiJumlah
+          jumlahSoal: aiJumlah,
+          tipeSoal: aiTipeSoal
         })
       });
       const data = await res.json();
@@ -640,7 +665,7 @@ export const CbtView: React.FC<CbtViewProps> = ({
           judul: `AI Bank Soal: ${aiMapel} - ${aiTopik}`,
           kode: `AI-${aiMapel.slice(0,3).toUpperCase()}-${Date.now().toString().slice(-4)}`,
           mataPelajaran: aiMapel,
-          kelas: aiKelas,
+          kelas: aiKelas.join(', '),
           durasiMenit: 60,
           jumlahSoal: formattedSoal.length,
           daftarSoal: formattedSoal,
@@ -858,7 +883,6 @@ export const CbtView: React.FC<CbtViewProps> = ({
           <span className="text-xs px-3 py-1.5 rounded-lg font-bold bg-slate-800/80 text-blue-400 border border-slate-700/60">
             {subTab === 'bank_soal' && `Bank Soal (${bankSoalList.length})`}
             {subTab === 'jadwal_kartu' && 'Jadwal & Kartu Ujian'}
-            {subTab === 'ai_generator' && 'AI Generator Soal'}
             {subTab === 'simulasi_ujian' && 'Simulasi CBT Anti-Cheat'}
           </span>
         </div>
@@ -1157,55 +1181,96 @@ export const CbtView: React.FC<CbtViewProps> = ({
       {subTab === 'ai_generator' && (
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm max-w-2xl mx-auto space-y-4">
           <div className="flex items-center gap-2 text-emerald-600 font-bold text-lg border-b pb-3">
-            <Sparkles className="w-5 h-5" /> Gemini AI Question Generator (4 Tipe Soal)
+            <Sparkles className="w-5 h-5" /> Gemini AI Question Generator
           </div>
 
           <p className="text-xs text-slate-600 leading-relaxed">
-            Hasilkan set soal Ujian CBT otomatis berisi Pilihan Ganda (PG), Pilihan Ganda Kompleks (MC &gt; 1 jawaban), Isian Singkat, dan Esai lengkap dengan pembahasan dan kunci jawaban!
+            Hasilkan set soal Ujian CBT otomatis berdasarkan mata pelajaran <span className="font-bold text-slate-800">{aiMapel}</span> dan topik <span className="font-bold text-slate-800">{aiTopik || 'umum'}</span>, lengkap dengan pembahasan dan kunci jawaban!
           </p>
 
           <div className="space-y-3">
             <div>
               <label className="text-[11px] font-bold text-slate-700">Mata Pelajaran</label>
-              <input 
-                type="text" 
-                value={aiMapel} 
+              <select
+                value={aiMapel}
                 onChange={e => setAiMapel(e.target.value)}
-                className="w-full p-2 bg-slate-50 border rounded-lg text-xs font-bold" 
-              />
+                className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none"
+              >
+                {availableMapelList.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[11px] font-bold text-slate-700">Kelas Target</label>
-                <input 
-                  type="text" 
-                  value={aiKelas} 
-                  onChange={e => setAiKelas(e.target.value)}
-                  className="w-full p-2 bg-slate-50 border rounded-lg text-xs" 
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-slate-700">Jumlah Soal</label>
-                <input 
-                  type="number" 
-                  min={1}
-                  max={10}
-                  value={aiJumlah} 
-                  onChange={e => setAiJumlah(Number(e.target.value))}
-                  className="w-full p-2 bg-slate-50 border rounded-lg text-xs font-bold" 
-                />
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">Kelas Target (Pilih lebih dari satu)</label>
+              <div className="flex flex-wrap gap-2">
+                {availableKelasList.map(k => (
+                  <button
+                    key={k}
+                    onClick={() => handleToggleAiKelas(k)}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
+                      aiKelas.includes(k)
+                        ? 'bg-blue-100 border-blue-500 text-blue-700'
+                        : 'bg-slate-50 border-slate-300 text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    {k}
+                  </button>
+                ))}
               </div>
             </div>
 
             <div>
-              <label className="text-[11px] font-bold text-slate-700">Topik / Bahasan Soal</label>
-              <input 
-                type="text" 
-                value={aiTopik} 
-                onChange={e => setAiTopik(e.target.value)}
-                className="w-full p-2 bg-slate-50 border rounded-lg text-xs" 
-              />
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">Tipe Soal (Pilih yang akan di-generate)</label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: 'pg', label: 'Pilihan Ganda' },
+                  { id: 'multiple_choice', label: 'Ganda Kompleks' },
+                  { id: 'isian', label: 'Isian Singkat' },
+                  { id: 'esai', label: 'Esai Uraian' }
+                ].map(tipe => (
+                  <button
+                    key={tipe.id}
+                    onClick={() => handleToggleAiTipe(tipe.id)}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${
+                      aiTipeSoal.includes(tipe.id)
+                        ? 'bg-emerald-100 border-emerald-500 text-emerald-700'
+                        : 'bg-slate-50 border-slate-300 text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className={`w-3 h-3 rounded flex items-center justify-center border ${
+                      aiTipeSoal.includes(tipe.id) ? 'bg-emerald-500 border-emerald-600' : 'bg-white border-slate-300'
+                    }`}>
+                      {aiTipeSoal.includes(tipe.id) && <Check className="w-2 h-2 text-white" />}
+                    </div>
+                    {tipe.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-700">Jumlah Soal Total</label>
+                <input 
+                  type="number" 
+                  min={1}
+                  max={20}
+                  value={aiJumlah} 
+                  onChange={e => setAiJumlah(Number(e.target.value))}
+                  className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 placeholder:text-slate-400" 
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-700">Topik / Bahasan Soal</label>
+                <input 
+                  type="text" 
+                  value={aiTopik} 
+                  onChange={e => setAiTopik(e.target.value)}
+                  className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 placeholder:text-slate-400" 
+                />
+              </div>
             </div>
 
             <button
@@ -1328,7 +1393,7 @@ export const CbtView: React.FC<CbtViewProps> = ({
                           value={(siswaJawaban[currentSoal.id]?.jawaban as string) || ''}
                           onChange={e => handleAnswerSelect(currentSoal.id, e.target.value)}
                           placeholder="Masukkan jawaban..."
-                          className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold"
+                          className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
                         />
                       </div>
                     )}
@@ -1341,7 +1406,7 @@ export const CbtView: React.FC<CbtViewProps> = ({
                           value={(siswaJawaban[currentSoal.id]?.jawaban as string) || ''}
                           onChange={e => handleAnswerSelect(currentSoal.id, e.target.value)}
                           placeholder="Ketikkan uraian penjelas..."
-                          className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium"
+                          className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900"
                         />
                       </div>
                     )}
@@ -1774,8 +1839,10 @@ export const CbtView: React.FC<CbtViewProps> = ({
                     <span className="font-mono font-bold text-slate-800">{selectedKartuSiswa.nisn} / {selectedKartuSiswa.nis}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Kelas / Ruang Lab:</span>
-                    <span className="font-bold text-slate-800">{selectedKartuSiswa.kelas} (Ruang Lab 01)</span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Kelas / Ruang Ujian:</span>
+                    <span className="font-bold text-slate-800">
+                      {selectedKartuSiswa.kelas} ({jadwalList.find(j => (j.kelasTarget && (j.kelasTarget.includes(selectedKartuSiswa.kelas) || (selectedKartuSiswa.rombel && j.kelasTarget.includes(selectedKartuSiswa.rombel)))) || j.kelasTarget === 'Semua Tingkat')?.ruang || rombelList.find(r => r.namaRombel === selectedKartuSiswa.kelas || r.namaRombel === selectedKartuSiswa.rombel)?.ruangan || 'Ruang 01'})
+                    </span>
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-slate-500 uppercase block">Password Login CBT:</span>
@@ -2183,11 +2250,11 @@ export const CbtView: React.FC<CbtViewProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1.5">
-                    Ruang / Laboratorium CBT
+                    Ruang Ujian
                   </label>
                   <input
                     type="text"
-                    placeholder="cth: Lab Komputer 01"
+                    placeholder="cth: Ruang Ujian 01"
                     value={formJadwal.ruang}
                     onChange={(e) => setFormJadwal({ ...formJadwal, ruang: e.target.value })}
                     className="w-full bg-[#181818] border border-slate-800 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 text-xs focus:border-blue-500 outline-none"

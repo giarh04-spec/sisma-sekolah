@@ -1,6 +1,5 @@
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { google } from 'googleapis';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
@@ -89,12 +88,14 @@ app.post('/api/ai/generate-questions', async (req, res) => {
   let kelas = '';
   let topik = '';
   let jumlahSoal = 4;
+  let tipeSoal: string[] = ['pg', 'multiple_choice', 'isian', 'esai'];
   try {
     const body = req.body || {};
     mataPelajaran = body.mataPelajaran;
     kelas = body.kelas;
     topik = body.topik;
     jumlahSoal = body.jumlahSoal || 4;
+    tipeSoal = body.tipeSoal && Array.isArray(body.tipeSoal) && body.tipeSoal.length > 0 ? body.tipeSoal : ['pg', 'multiple_choice', 'isian', 'esai'];
 
     const apiKey = process.env.GEMINI_API_KEY;
 
@@ -104,18 +105,27 @@ app.post('/api/ai/generate-questions', async (req, res) => {
 
     const ai = new GoogleGenAI({ apiKey });
 
+    const tipeSoalMap: Record<string, string> = {
+      'pg': '1. Pilihan Ganda (pg)',
+      'multiple_choice': '2. Pilihan Ganda Kompleks (multiple_choice) - jawaban benar lebih dari satu.',
+      'isian': '3. Isian Singkat (isian)',
+      'esai': '4. Esai (esai)'
+    };
+    const tipeSoalListText = tipeSoal.map(t => tipeSoalMap[t] || t).join('\n');
+
     const prompt = `Anda adalah pakar pembuat soal Ujian Berbasis Komputer (CBT) Kurikulum Merdeka Indonesia.
 Buatkan ${jumlahSoal || 4} soal untuk mata pelajaran: "${mataPelajaran}", Kelas: "${kelas}", Topik: "${topik || 'Umum'}".
-Harus mencakup 4 tipe soal:
-1. Pilihan Ganda (pg)
-2. Pilihan Ganda Kompleks (multiple_choice) - jawaban benar lebih dari satu.
-3. Isian Singkat (isian)
-4. Esai (esai)
+Harus mencakup tipe-tipe soal berikut (sesuaikan proporsinya jika jumlah soal terbatas, utamakan pembagian merata):
+${tipeSoalListText}
+
+PENTING:
+- Hanya hasilkan soal tipe: ${tipeSoal.join(', ')}
+- Jangan sertakan tipe soal lain selain yang diminta.
 
 Kembalikan respon murni dalam format JSON array dengan struktur berikut (jangan tambahkan teks markdown di luar array):
 [
   {
-    "tipe": "pg", // atau "multiple_choice", "isian", "esai"
+    "tipe": "pg", // harus salah satu dari: ${tipeSoal.join(', ')}
     "pertanyaan": "...",
     "opsi": [ // wajib ada untuk pg dan multiple_choice. Untuk isian dan esai, berikan array kosong []
       { "id": "A", "teks": "..." },
@@ -297,7 +307,9 @@ Format output lengkap dalam Bahasa Indonesia yang sangat rapi, jelas, dan siap p
 
 // Vite & Static file handling
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
+  const isProd = process.env.NODE_ENV === 'production';
+  if (!isProd) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',

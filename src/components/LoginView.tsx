@@ -220,8 +220,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
               {schoolSettings.namaSekolah}
             </h1>
             <p className="text-[11px] text-zinc-400 font-medium mt-0.5 flex items-center gap-2">
-              <span>NPSN: {schoolSettings.npsn}</span>
-              <span className="text-zinc-600">•</span>
+
+
               <span className="text-blue-400 font-semibold bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 text-[10px]">Akreditasi A</span>
             </p>
           </div>

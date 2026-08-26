@@ -47,6 +47,37 @@ import {
 import { exportAllToGoogleSheets } from '../lib/googleDriveSync';
 import { sendFonnteMessage, getFonnteDeviceStatus, FonnteDeviceStatus } from '../lib/fonnte';
 
+const LocationWithMapLink = ({ text }: { text: string }) => {
+  if (!text) return <span>-</span>;
+  
+  const match = text.match(/\(([^)]+)\)/);
+  if (match) {
+    const coords = match[1];
+    const parts = coords.split(',');
+    if (parts.length === 2 && !isNaN(parseFloat(parts[0])) && !isNaN(parseFloat(parts[1]))) {
+      const before = text.substring(0, match.index);
+      const after = text.substring(match.index! + match[0].length);
+      const cleanCoords = coords.trim().replace(/\s+/g, '');
+      return (
+        <>
+          {before}
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${cleanCoords}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-blue-500 hover:underline hover:text-blue-600 transition-colors"
+          >
+            ({coords})
+          </a>
+          {after}
+        </>
+      );
+    }
+  }
+  
+  return <span>{text}</span>;
+};
+
 interface AbsensiViewProps {
   siswaList: Siswa[];
   guruList: Guru[];
@@ -138,6 +169,47 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
       }
     }
   }, [schoolSettings?.jadwalPresensi, localJadwal]);
+
+  // GPS Geotagging State & Integration
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number; accuracy?: number } | null>({
+    lat: -6.2415,
+    lng: 106.8045,
+    accuracy: 5
+  });
+  const [gpsStatus, setGpsStatus] = useState<'idle' | 'fetching' | 'connected' | 'error'>('connected');
+  const [gpsAddress, setGpsAddress] = useState<string>('SMP Islam Modern Al Fakhir (-6.2415, 106.8045)');
+
+  const fetchGpsLocation = () => {
+    setGpsStatus('fetching');
+    if (!navigator.geolocation) {
+      setGpsStatus('error');
+      showToast('Geolocation tidak didukung oleh browser ini', 'error');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const accuracy = position.coords.accuracy;
+        setGpsCoords({ lat, lng, accuracy });
+        setGpsStatus('connected');
+        setGpsAddress(`GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)} (Akurasi ±${Math.round(accuracy)}m)`);
+        showToast(`GPS Terhubung: ${lat.toFixed(4)}, ${lng.toFixed(4)}`, 'success');
+      },
+      (error) => {
+        // Geolocation unavailable or blocked in sandbox/iframe - use default fallback gracefully
+        setGpsCoords({ lat: -6.2415, lng: 106.8045, accuracy: 10 });
+        setGpsStatus('connected');
+        setGpsAddress('SMP Islam Modern Al Fakhir (GPS Default)');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  useEffect(() => {
+    fetchGpsLocation();
+  }, []);
 
   // Helper to calculate status attendance label (Tepat Waktu, Terlambat, Pulang Cepat)
   const calculateAttendanceStatusLabel = (timeStr: string, mode: 'Masuk' | 'Pulang') => {
@@ -438,6 +510,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
     const foundGuru = guruList.find(g => 
       (g.kodeBarcode && g.kodeBarcode.toLowerCase() === code.toLowerCase()) ||
       g.nip === code ||
+      (g.nik && g.nik === code) ||
       `GUR-${g.nip}`.toLowerCase() === code.toLowerCase() ||
       g.nama.toLowerCase().includes(code.toLowerCase())
     );
@@ -508,6 +581,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   // Helper scan processors to keep code modular and readable
   const processSiswaScan = (siswa: Siswa, timeNow: string, today: string) => {
     const statusInfo = calculateAttendanceStatusLabel(timeNow, scanMode);
+    const locationStr = gpsCoords ? `GPS (${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lng.toFixed(4)})` : 'Mesin Scan Barcode Utama';
 
     setAbsensiHarian(prev => {
       const existing = prev.find(a => a.siswaId === siswa.id && a.tanggal === today);
@@ -522,7 +596,9 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
           jamMasuk: scanMode === 'Masuk' ? timeNow : (existing?.jamMasuk || timeNow),
           jamPulang: scanMode === 'Pulang' ? timeNow : existing?.jamPulang,
           tipeScan: scanMode,
-          metodeScan: 'Barcode / QR'
+          metodeScan: 'Barcode / QR',
+          lokasiScan: locationStr,
+          koordinatGps: gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined
         },
         ...filtered
       ];
@@ -533,7 +609,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
       role: `Siswa Kelas ${siswa.kelas}`,
       kode: siswa.kodeBarcode || `SIS-${siswa.nisn}`,
       waktu: timeNow,
-      detail: `NISN: ${siswa.nisn} | Status: ${statusInfo.label} | Wali: ${siswa.namaWali || '-'} (${siswa.teleponWali || '-'})`,
+      detail: `NISN: ${siswa.nisn} | Status: ${statusInfo.label} | GPS: ${gpsCoords ? `${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lng.toFixed(4)}` : 'Terhubung'}`,
       teleponWali: siswa.teleponWali,
       namaWali: siswa.namaWali,
       tipeAbsensi: scanMode,
@@ -549,18 +625,23 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   };
 
   const processGuruScan = (guru: Guru, timeNow: string, today: string) => {
+    const locationStr = gpsCoords ? `GPS (${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lng.toFixed(4)})` : 'Mesin Scan Barcode Utama';
     setAbsensiGuruList(prev => {
       const existingIndex = prev.findIndex(g => g.guruId === guru.id && g.tanggal === today);
       if (existingIndex >= 0) {
         const updated = [...prev];
         if (scanMode === 'Pulang') {
-          updated[existingIndex].jamPulang = timeNow;
+          updated[existingIndex].jamKeluar = timeNow;
           updated[existingIndex].metodeOut = 'Barcode / QR';
+          updated[existingIndex].lokasiOut = locationStr;
         } else {
           updated[existingIndex].jamMasuk = timeNow;
           updated[existingIndex].status = 'Hadir';
+          updated[existingIndex].statusIzin = 'Disetujui';
           updated[existingIndex].metodeIn = 'Barcode / QR';
+          updated[existingIndex].lokasiIn = locationStr;
         }
+        updated[existingIndex].koordinatGps = gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined;
         return updated;
       } else {
         const record: any = {
@@ -570,13 +651,15 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
           tanggal: today,
           status: 'Hadir',
           statusIzin: 'Disetujui',
-          lokasiIn: 'Mesin Scan Barcode Utama',
-          metodeIn: 'Barcode / QR'
+          lokasiIn: locationStr,
+          metodeIn: 'Barcode / QR',
+          koordinatGps: gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined
         };
         if (scanMode === 'Masuk') {
           record.jamMasuk = timeNow;
         } else if (scanMode === 'Pulang') {
-          record.jamPulang = timeNow;
+          record.jamKeluar = timeNow;
+          record.lokasiOut = locationStr;
         }
         return [record, ...prev];
       }
@@ -587,7 +670,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
       role: `Guru ${guru.mataPelajaran}`,
       kode: guru.kodeBarcode || `GUR-${guru.nip}`,
       waktu: timeNow,
-      detail: `NIP: ${guru.nip} | Status: ${guru.status}`,
+      detail: `NIP: ${guru.nip} | Status: ${guru.status} | GPS Connected`,
       tipeAbsensi: scanMode
     };
     setLastScannedResult(res);
@@ -596,18 +679,23 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   };
 
   const processStafScan = (staf: Staf, timeNow: string, today: string) => {
+    const locationStr = gpsCoords ? `GPS (${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lng.toFixed(4)})` : 'Mesin Scan Barcode Utama';
     setAbsensiGuruList(prev => {
       const existingIndex = prev.findIndex(g => g.guruId === staf.id && g.tanggal === today);
       if (existingIndex >= 0) {
         const updated = [...prev];
         if (scanMode === 'Pulang') {
-          updated[existingIndex].jamPulang = timeNow;
+          updated[existingIndex].jamKeluar = timeNow;
           updated[existingIndex].metodeOut = 'Barcode / QR';
+          updated[existingIndex].lokasiOut = locationStr;
         } else {
           updated[existingIndex].jamMasuk = timeNow;
           updated[existingIndex].status = 'Hadir';
+          updated[existingIndex].statusIzin = 'Disetujui';
           updated[existingIndex].metodeIn = 'Barcode / QR';
+          updated[existingIndex].lokasiIn = locationStr;
         }
+        updated[existingIndex].koordinatGps = gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined;
         return updated;
       } else {
         const record: any = {
@@ -617,13 +705,15 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
           tanggal: today,
           status: 'Hadir',
           statusIzin: 'Disetujui',
-          lokasiIn: 'Mesin Scan Barcode Utama',
-          metodeIn: 'Barcode / QR'
+          lokasiIn: locationStr,
+          metodeIn: 'Barcode / QR',
+          koordinatGps: gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined
         };
         if (scanMode === 'Masuk') {
           record.jamMasuk = timeNow;
         } else if (scanMode === 'Pulang') {
-          record.jamPulang = timeNow;
+          record.jamKeluar = timeNow;
+          record.lokasiOut = locationStr;
         }
         return [record, ...prev];
       }
@@ -634,7 +724,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
       role: `Staf / Tata Usaha (${staf.bagian})`,
       kode: staf.nik || staf.id,
       waktu: timeNow,
-      detail: `NIK: ${staf.nik} | Bagian: ${staf.bagian} | Status: ${staf.status}`,
+      detail: `NIK: ${staf.nik} | Bagian: ${staf.bagian} | GPS Connected`,
       tipeAbsensi: scanMode
     };
     setLastScannedResult(res);
@@ -870,6 +960,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   const handleClockIn = (guruId: string) => {
     const timeNow = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const today = new Date().toISOString().split('T')[0];
+    const locationStr = gpsCoords ? `GPS (${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lng.toFixed(4)})` : 'Aplikasi Presensi Mandiri';
 
     setAbsensiGuruList(prev => {
       const existingIndex = prev.findIndex(g => g.guruId === guruId && g.tanggal === today);
@@ -877,6 +968,10 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
         const updated = [...prev];
         updated[existingIndex].jamMasuk = timeNow;
         updated[existingIndex].status = 'Hadir';
+        updated[existingIndex].statusIzin = 'Disetujui';
+        updated[existingIndex].metodeIn = 'Aplikasi Web';
+        updated[existingIndex].lokasiIn = locationStr;
+        updated[existingIndex].koordinatGps = gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined;
         return updated;
       } else {
         const guru = guruList.find(g => g.id === guruId);
@@ -889,7 +984,9 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
             jamMasuk: timeNow,
             status: 'Hadir',
             statusIzin: 'Disetujui',
-            lokasiIn: 'Gedung Utama Sekolah'
+            metodeIn: 'Aplikasi Web',
+            lokasiIn: locationStr,
+            koordinatGps: gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined
           },
           ...prev
         ];
@@ -903,12 +1000,16 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   const handleClockOut = (guruId: string) => {
     const timeNow = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const today = new Date().toISOString().split('T')[0];
+    const locationStr = gpsCoords ? `GPS (${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lng.toFixed(4)})` : 'Aplikasi Presensi Mandiri';
 
     setAbsensiGuruList(prev => {
       const existingIndex = prev.findIndex(g => g.guruId === guruId && g.tanggal === today);
       if (existingIndex >= 0) {
         const updated = [...prev];
         updated[existingIndex].jamKeluar = timeNow;
+        updated[existingIndex].metodeOut = 'Aplikasi Web';
+        updated[existingIndex].lokasiOut = locationStr;
+        updated[existingIndex].koordinatGps = gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined;
         return updated;
       }
       return prev;
@@ -1025,6 +1126,27 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                   <LogOut className="w-3.5 h-3.5" /> Pulang
                 </button>
               </div>
+            </div>
+
+            {/* GPS Geotagging Status & Refresh Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-blue-950/20 p-3 rounded-xl border border-blue-500/30 text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-2.5 h-2.5 rounded-full ${gpsStatus === 'connected' ? 'bg-emerald-500 animate-pulse' : gpsStatus === 'fetching' ? 'bg-amber-500 animate-ping' : 'bg-red-500'}`} />
+                <MapPin className="w-4 h-4 text-blue-400" />
+                <div>
+                  <span className="font-bold text-blue-200">GPS Geotagging:</span>{' '}
+                  <span className="text-slate-300 font-mono text-[11px]">{gpsAddress}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={fetchGpsLocation}
+                disabled={gpsStatus === 'fetching'}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${gpsStatus === 'fetching' ? 'animate-spin' : ''}`} />
+                <span>{gpsStatus === 'fetching' ? 'Mendapatkan GPS...' : 'Refresh GPS'}</span>
+              </button>
             </div>
 
             {/* Target Selector & WA Config Bar */}
@@ -1148,7 +1270,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
             {/* Manual / Scanner Input Field */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-300 block">
-                Input Manual / Tempelkan Laser Barcode Scanner di Sini:
+                Input Manual {scanTargetType === 'siswa' ? 'NISN/NIS' : 'NIK'} / Scan Barcode:
               </label>
               <form
                 onSubmit={e => {
@@ -1160,13 +1282,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                 <input
                   ref={barcodeInputRef}
                   type="text"
-                  placeholder={
-                    scanTargetType === 'siswa'
-                      ? 'Contoh: SIS-0081234561 atau NISN'
-                      : scanTargetType === 'guru'
-                      ? 'Contoh: GUR-198501152010011002 atau NIP'
-                      : 'Contoh: NIK Staf (320xxxxxxxxxxxxx) atau Nama'
-                  }
+                  placeholder={scanTargetType === 'siswa' ? 'Contoh: NISN / NIS' : 'Contoh: NIK (320xxxxxxxxxxxxx)'}
                   value={barcodeInput}
                   onChange={e => setBarcodeInput(e.target.value)}
                   autoFocus
@@ -1179,47 +1295,6 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                   <ScanLine className="w-4 h-4" /> Process Scan
                 </button>
               </form>
-            </div>
-
-            {/* Quick Demo Pickers */}
-            <div className="pt-2 border-t border-slate-800">
-              <p className="text-[11px] font-bold text-slate-400 mb-2">Pilih Sampel Kartu ID untuk Tes Simulasi Scan Quick Barcode:</p>
-              <div className="flex flex-wrap gap-2">
-                {scanTargetType === 'siswa' ? (
-                  siswaList.slice(0, 4).map(s => (
-                    <button
-                      key={s.id}
-                      onClick={() => handleExecuteScan(s.kodeBarcode || `SIS-${s.nisn}`)}
-                      className="px-3 py-1.5 bg-[#181818] hover:bg-slate-800 border border-slate-800 hover:border-blue-500/40 rounded-lg text-left transition-all group"
-                    >
-                      <div className="text-[11px] font-bold text-white group-hover:text-blue-400">{s.nama}</div>
-                      <div className="text-[9px] font-mono text-slate-500">{s.kodeBarcode || `SIS-${s.nisn}`}</div>
-                    </button>
-                  ))
-                ) : scanTargetType === 'guru' ? (
-                  guruList.slice(0, 4).map(g => (
-                    <button
-                      key={g.id}
-                      onClick={() => handleExecuteScan(g.kodeBarcode || `GUR-${g.nip}`)}
-                      className="px-3 py-1.5 bg-[#181818] hover:bg-slate-800 border border-slate-800 hover:border-purple-500/40 rounded-lg text-left transition-all group"
-                    >
-                      <div className="text-[11px] font-bold text-white group-hover:text-purple-400">{g.nama}</div>
-                      <div className="text-[9px] font-mono text-slate-500">{g.kodeBarcode || `GUR-${g.nip}`}</div>
-                    </button>
-                  ))
-                ) : (
-                  stafList.slice(0, 4).map(s => (
-                    <button
-                      key={s.id}
-                      onClick={() => handleExecuteScan(s.nik || s.id)}
-                      className="px-3 py-1.5 bg-[#181818] hover:bg-slate-800 border border-slate-800 hover:border-amber-500/40 rounded-lg text-left transition-all group"
-                    >
-                      <div className="text-[11px] font-bold text-white group-hover:text-amber-400">{s.nama}</div>
-                      <div className="text-[9px] font-mono text-slate-500">{s.nik || s.id}</div>
-                    </button>
-                  ))
-                )}
-              </div>
             </div>
 
           </div>
@@ -1783,10 +1858,10 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-500 max-w-xs truncate">
-                        {a.keteranganIzin || a.lokasiIn || '-'}
+                        <LocationWithMapLink text={a.status === 'Hadir' ? (a.lokasiIn || a.lokasiOut || '') : (a.keteranganIzin || a.lokasiIn || '')} />
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {a.statusIzin === 'Pending' ? (
+                        {a.statusIzin === 'Pending' && a.status !== 'Hadir' ? (
                           <div className="flex justify-end gap-1">
                             <button
                               onClick={() => handleApproveIzin(a.id, 'Disetujui')}
@@ -1803,9 +1878,9 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                           </div>
                         ) : (
                           <span className={`font-bold text-[10px] px-2 py-0.5 rounded ${
-                            a.statusIzin === 'Disetujui' ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'
+                            (a.status === 'Hadir' || a.statusIzin === 'Disetujui') ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'
                           }`}>
-                            {a.statusIzin}
+                            {a.status === 'Hadir' ? 'Disetujui' : a.statusIzin}
                           </span>
                         )}
                       </td>

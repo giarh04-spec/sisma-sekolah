@@ -5825,9 +5825,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     <option value="Kelas 7">Kelas 7</option>
                     <option value="Kelas 8">Kelas 8</option>
                     <option value="Kelas 9">Kelas 9</option>
-                    <option value="Kelas 10">Kelas 10</option>
-                    <option value="Kelas 11">Kelas 11</option>
-                    <option value="Kelas 12">Kelas 12</option>
                   </select>
                 </div>
                 <div>

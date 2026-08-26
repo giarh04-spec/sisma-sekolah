@@ -23,7 +23,9 @@ import {
   FileDown,
   GraduationCap
 } from 'lucide-react';
-import { AdministrasiGuru, TipeAdministrasi, Role, Guru } from '../types/school';
+import { AdministrasiGuru, TipeAdministrasi, Role, Guru, MataPelajaranItem, RombelKelas, AdministrasiSubTab } from '../types/school';
+import { JadwalMengajar } from './administrasi/JadwalMengajar';
+import { KalenderPendidikan } from './administrasi/KalenderPendidikan';
 
 interface AdministrasiGuruViewProps {
   administrasiList: AdministrasiGuru[];
@@ -31,6 +33,10 @@ interface AdministrasiGuruViewProps {
   currentRole?: Role;
   userEmail?: string;
   guruList?: Guru[];
+  mapelList?: MataPelajaranItem[];
+  rombelList?: RombelKelas[];
+  subTab?: AdministrasiSubTab;
+  setSubTab?: (subTab: AdministrasiSubTab) => void;
 }
 
 export function generateModulAjarTemplateText(
@@ -137,14 +143,35 @@ export const AdministrasiGuruView: React.FC<AdministrasiGuruViewProps> = ({
   setAdministrasiList,
   currentRole = 'admin',
   userEmail = '',
-  guruList = []
+  guruList = [],
+  mapelList = [],
+  rombelList = [],
+  subTab,
+  setSubTab
 }) => {
   const [filterTipe, setFilterTipe] = useState<string>('Semua');
   const [search, setSearch] = useState('');
+  const [localSubTab, setLocalSubTab] = useState<AdministrasiSubTab>('perangkat');
+  
+  const activeSubTab = subTab || localSubTab;
+  const setActiveSubTab = (t: AdministrasiSubTab) => {
+    if (setSubTab) setSubTab(t);
+    setLocalSubTab(t);
+  };
+
+  const availableMapelList = React.useMemo(() => {
+    const set = new Set<string>();
+    mapelList.forEach(m => {
+      const name = m.namaMapel || (m as any).nama;
+      if (name && typeof name === 'string' && name.trim()) set.add(name.trim());
+    });
+    return Array.from(set).sort();
+  }, [mapelList]);
 
   // Find active teacher based on email or default
   const activeTeacher = guruList.find(g => g.email.toLowerCase() === userEmail.toLowerCase());
-  const initialMapel = activeTeacher?.mataPelajaran || (userEmail.includes('guru.ahmad') ? 'Pendidikan Agama Islam' : currentRole === 'guru' ? 'Pendidikan Agama Islam' : 'Semua');
+  const fallbackMapel = availableMapelList.length > 0 ? availableMapelList[0] : 'Umum';
+  const initialMapel = activeTeacher?.mataPelajaran || (userEmail.includes('guru.ahmad') ? fallbackMapel : currentRole === 'guru' ? fallbackMapel : 'Semua');
 
   const [selectedMapelFilter, setSelectedMapelFilter] = useState<string>(initialMapel);
 
@@ -178,7 +205,7 @@ export const AdministrasiGuruView: React.FC<AdministrasiGuruViewProps> = ({
   // AI Generator Modal
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [aiTipe, setAiTipe] = useState<TipeAdministrasi>('modul_ajar');
-  const [aiMapel, setAiMapel] = useState(selectedMapelFilter !== 'Semua' ? selectedMapelFilter : 'Pendidikan Agama Islam');
+  const [aiMapel, setAiMapel] = useState(selectedMapelFilter !== 'Semua' ? selectedMapelFilter : fallbackMapel);
   const [aiKelas, setAiKelas] = useState('VII');
   const [aiTopik, setAiTopik] = useState('Bab I – Al-Qur’an dan Sunnah Sebagai Pedoman Hidup');
   const [loadingAi, setLoadingAi] = useState(false);
@@ -383,11 +410,13 @@ export const AdministrasiGuruView: React.FC<AdministrasiGuruViewProps> = ({
         <div class="kop-surat">
           <h1>SMP ISLAM MODERN AL FAKHIR</h1>
           <h2>PERANGKAT ADMINISTRASI GURU • STANDAR KURIKULUM MERDEKA</h2>
-        </div>
+          </div>
+    </div>
         
         <div class="document-title">
           ${activeDoc.judul}
-        </div>
+          </div>
+    </div>
         
         <table class="table-info">
           <tr>
@@ -488,7 +517,7 @@ export const AdministrasiGuruView: React.FC<AdministrasiGuruViewProps> = ({
   };
 
   // Sample official Kemendikdasmen 2026 subjects list
-  const kemendikdasmenMapelList = [
+  const kemendikdasmenMapelList = availableMapelList.length > 0 ? availableMapelList : [
     'Pendidikan Agama Islam',
     'Fisika & Informatika',
     'Bahasa Indonesia Fase E/F',
@@ -527,7 +556,7 @@ export const AdministrasiGuruView: React.FC<AdministrasiGuruViewProps> = ({
     alert(`File template "${file.name}" berhasil diunggah dan disimpan untuk Mapel ${mapelName}!`);
   };
 
-  const [templateSelectedMapel, setTemplateSelectedMapel] = useState<string>('Pendidikan Agama Islam');
+  const [templateSelectedMapel, setTemplateSelectedMapel] = useState<string>(fallbackMapel);
   const [templateSelectedTipe, setTemplateSelectedTipe] = useState<string>('modul_ajar');
   const [templateSelectedKelas, setTemplateSelectedKelas] = useState<string>('VII');
   const [templateSelectedFase, setTemplateSelectedFase] = useState<string>('Fase D');
@@ -646,7 +675,8 @@ F. Libur Akhir Semester Ganjil: 21 Desember 2026 - 2 Januari 2027`;
             <h1 style="font-size: 18pt; margin: 0; color: #059669;">KEMENTERIAN PENDIDIKAN, KEBUDAYAAN, RISET, DAN TEKNOLOGI</h1>
             <h3 style="font-size: 12pt; margin: 5px 0 20px 0; color: #475569; letter-spacing: 1px;">TEMPLATE STANDAR RESMI KURIKULUM MERDEKA 2026</h3>
             <div style="border-top: 3px double #059669; margin: 10px auto; width: 90%;"></div>
-          </div>
+            </div>
+    </div>
           
           <table class="header-table">
             <tr>
@@ -826,275 +856,276 @@ F. Libur Akhir Semester Ganjil: 21 Desember 2026 - 2 Januari 2027`;
         </div>
       </div>
 
-      {/* Guru Subject Active Filter Banner */}
-      <div className="bg-purple-950/40 border border-purple-800/60 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-purple-200 shadow-md">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-purple-500/20 rounded-xl border border-purple-500/30 text-purple-300 shrink-0">
-            <GraduationCap className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[10px] font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="w-3 h-3 text-amber-400" /> Administrasi Disesuaikan Dengan Mata Pelajaran
+      {/* Content Area */}
+      {activeSubTab === 'jadwal' && (
+        <JadwalMengajar guruList={guruList} mapelList={mapelList} rombelList={rombelList} />
+      )}
+
+      {activeSubTab === 'kalender' && (
+        <KalenderPendidikan />
+      )}
+
+      <div className={activeSubTab === 'perangkat' ? 'space-y-6' : 'hidden'}>
+        {/* Guru Subject Active Filter Banner */}
+        <div className="bg-purple-950/40 border border-purple-800/60 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-purple-200 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-purple-500/20 rounded-xl border border-purple-500/30 text-purple-300 shrink-0">
+              <GraduationCap className="w-5 h-5" />
             </div>
-            <div className="text-sm font-bold text-white flex items-center gap-2">
-              Filter Mapel Guru: <span className="text-purple-300 underline underline-offset-2 font-black">{selectedMapelFilter}</span>
-              {currentRole === 'guru' && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 font-bold border border-purple-500/40">
-                  Guru Pengampu Active
-                </span>
-              )}
+            <div>
+              <div className="text-[10px] font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3 text-amber-400" /> Administrasi Disesuaikan Dengan Mata Pelajaran
+              </div>
+              <div className="text-sm font-bold text-white flex items-center gap-2">
+                Filter Mapel Guru: <span className="text-purple-300 underline underline-offset-2 font-black">{selectedMapelFilter}</span>
+                {currentRole === 'guru' && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 font-bold border border-purple-500/40">
+                    Guru Pengampu Active
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-purple-300/80 mt-0.5">
+                Sistem menampilkan draf Modul Ajar, ATP, CP, Jurnal, Prota, dan Prosem yang sesuai dengan mata pelajaran yang Anda ampu.
+              </p>
             </div>
-            <p className="text-[11px] text-purple-300/80 mt-0.5">
-              Sistem menampilkan draf Modul Ajar, ATP, CP, Jurnal, Prota, dan Prosem yang sesuai dengan mata pelajaran yang Anda ampu.
-            </p>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-          <label className="text-xs font-semibold text-purple-300 shrink-0">Pilih Mapel:</label>
-          <select
-            value={selectedMapelFilter}
-            onChange={e => {
-              setSelectedMapelFilter(e.target.value);
-              if (e.target.value !== 'Semua') {
-                setAiMapel(e.target.value);
-              }
-            }}
-            className="bg-[#121212] border border-purple-700/60 text-white rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-inner"
-          >
-            <option value="Semua">-- Semua Mapel Sekolah --</option>
-            <option value="Pendidikan Agama Islam">Pendidikan Agama Islam</option>
-            <option value="Fisika & Informatika">Fisika & Informatika</option>
-            <option value="Bahasa Indonesia & Sastra">Bahasa Indonesia & Sastra</option>
-            <option value="Matematika Tingkat Lanjut">Matematika Tingkat Lanjut</option>
-            <option value="Biologi & Lingkungan">Biologi & Lingkungan</option>
-            <option value="Kimia Praktikum">Kimia Praktikum</option>
-            <option value="Bahasa Inggris Komunikasi">Bahasa Inggris Komunikasi</option>
-            <option value="Ekonomi & Bisnis">Ekonomi & Bisnis</option>
-            <option value="Sosiologi & Sejarah">Sosiologi & Sejarah</option>
-            <option value="PPKn & Pancasila">PPKn & Pancasila</option>
-          </select>
-        </div>
-      </div>
-
-      {/* 2026 Kemendikdasmen Official Standard Templates Banner */}
-      <div className="bg-[#121212] rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4 text-white">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800 pb-3.5">
-          <div>
-            <span className="px-2.5 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px] font-bold uppercase tracking-wider border border-blue-500/30">
-              UPDATE KURIKULUM MERDEKA 2026
-            </span>
-            <h3 className="text-base font-bold text-white mt-1 flex items-center gap-2">
-              <Award className="w-5 h-5 text-amber-400" /> Template Resmi Kemendikdasmen 2026 Semua Mata Pelajaran
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Unduh draf resmi Modul Ajar, ATP, CP, Prota, Prosem, dan Kaldik standar kementerian terintegrasi 2026.
-            </p>
-          </div>
-        </div>
-
-        {/* Dropdown Selector Panel */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end bg-[#181818] p-4 rounded-xl border border-slate-800">
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Mata Pelajaran</label>
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+            <label className="text-xs font-semibold text-purple-300 shrink-0">Pilih Mapel:</label>
             <select
-              value={templateSelectedMapel}
-              onChange={e => setTemplateSelectedMapel(e.target.value)}
-              className="w-full bg-[#121212] border border-slate-800 text-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all cursor-pointer"
+              value={selectedMapelFilter}
+              onChange={e => {
+                setSelectedMapelFilter(e.target.value);
+                if (e.target.value !== 'Semua') {
+                  setAiMapel(e.target.value);
+                }
+              }}
+              className="bg-[#121212] border border-purple-700/60 text-white rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-inner"
             >
-              {kemendikdasmenMapelList.map((mapel, idx) => (
-                <option key={idx} value={mapel} className="bg-[#181818]">{mapel}</option>
+              <option value="Semua">-- Semua Mapel Sekolah --</option>
+              {availableMapelList.map(m => (
+                <option key={m} value={m}>{m}</option>
               ))}
             </select>
           </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Jenis Dokumen</label>
-            <select
-              value={templateSelectedTipe}
-              onChange={e => setTemplateSelectedTipe(e.target.value)}
-              className="w-full bg-[#121212] border border-slate-800 text-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all cursor-pointer"
-            >
-              <option value="modul_ajar" className="bg-[#181818]">Modul Ajar Berdiferensiasi (RPP+)</option>
-              <option value="atp_cp" className="bg-[#181818]">ATP & CP (Alur & Capaian Pembelajaran)</option>
-              <option value="prota" className="bg-[#181818]">Program Tahunan (Prota)</option>
-              <option value="prosem" className="bg-[#181818]">Program Semester (Prosem)</option>
-              <option value="kaldik" className="bg-[#181818]">Kalender Pendidikan (Kaldik)</option>
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Kelas</label>
-            <select
-              value={templateSelectedKelas}
-              onChange={e => setTemplateSelectedKelas(e.target.value)}
-              className="w-full bg-[#121212] border border-slate-800 text-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all cursor-pointer"
-            >
-              <option value="VII" className="bg-[#181818]">Kelas VII (SMP)</option>
-              <option value="VIII" className="bg-[#181818]">Kelas VIII (SMP)</option>
-              <option value="IX" className="bg-[#181818]">Kelas IX (SMP)</option>
-              <option value="X" className="bg-[#181818]">Kelas X (SMA)</option>
-              <option value="XI" className="bg-[#181818]">Kelas XI (SMA)</option>
-              <option value="XII" className="bg-[#181818]">Kelas XII (SMA)</option>
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Fase</label>
-            <select
-              value={templateSelectedFase}
-              onChange={e => setTemplateSelectedFase(e.target.value)}
-              className="w-full bg-[#121212] border border-slate-800 text-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all cursor-pointer"
-            >
-              <option value="Fase A" className="bg-[#181818]">Fase A (Kelas 1-2 SD)</option>
-              <option value="Fase B" className="bg-[#181818]">Fase B (Kelas 3-4 SD)</option>
-              <option value="Fase C" className="bg-[#181818]">Fase C (Kelas 5-6 SD)</option>
-              <option value="Fase D" className="bg-[#181818]">Fase D (Kelas 7-9 SMP)</option>
-              <option value="Fase E" className="bg-[#181818]">Fase E (Kelas 10 SMA)</option>
-              <option value="Fase F" className="bg-[#181818]">Fase F (Kelas 11-12 SMA)</option>
-            </select>
-          </div>
         </div>
 
-        {/* Live Template Editor Workspace */}
-        <div className="bg-[#181818] rounded-xl p-5 border border-slate-800 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg">
-                <Edit3 className="w-4 h-4" />
+        {/* 2026 Kemendikdasmen Official Standard Templates Banner */}
+        <div className="bg-[#121212] rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4 text-white">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800 pb-3.5">
+            <div>
+              <span className="px-2.5 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px] font-bold uppercase tracking-wider border border-blue-500/30">
+                UPDATE KURIKULUM MERDEKA 2026
+              </span>
+              <h3 className="text-base font-bold text-white mt-1 flex items-center gap-2">
+                <Award className="w-5 h-5 text-amber-400" /> Template Resmi Kemendikdasmen 2026 Semua Mata Pelajaran
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Unduh draf resmi Modul Ajar, ATP, CP, Prota, Prosem, dan Kaldik standar kementerian terintegrasi 2026.
+              </p>
+            </div>
+          </div>
+
+          {/* Dropdown Selector Panel */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end bg-[#181818] p-4 rounded-xl border border-slate-800">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Mata Pelajaran</label>
+              <select
+                value={templateSelectedMapel}
+                onChange={e => setTemplateSelectedMapel(e.target.value)}
+                className="w-full bg-[#121212] border border-slate-800 text-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all cursor-pointer"
+              >
+                {kemendikdasmenMapelList.map((mapel, idx) => (
+                  <option key={idx} value={mapel} className="bg-[#181818]">{mapel}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Jenis Dokumen</label>
+              <select
+                value={templateSelectedTipe}
+                onChange={e => setTemplateSelectedTipe(e.target.value)}
+                className="w-full bg-[#121212] border border-slate-800 text-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all cursor-pointer"
+              >
+                <option value="modul_ajar" className="bg-[#181818]">Modul Ajar Berdiferensiasi (RPP+)</option>
+                <option value="atp_cp" className="bg-[#181818]">ATP & CP (Alur & Capaian Pembelajaran)</option>
+                <option value="prota" className="bg-[#181818]">Program Tahunan (Prota)</option>
+                <option value="prosem" className="bg-[#181818]">Program Semester (Prosem)</option>
+                <option value="kaldik" className="bg-[#181818]">Kalender Pendidikan (Kaldik)</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Kelas</label>
+              <select
+                value={templateSelectedKelas}
+                onChange={e => setTemplateSelectedKelas(e.target.value)}
+                className="w-full bg-[#121212] border border-slate-800 text-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all cursor-pointer"
+              >
+                <option value="VII" className="bg-[#181818]">Kelas VII (SMP)</option>
+                <option value="VIII" className="bg-[#181818]">Kelas VIII (SMP)</option>
+                <option value="IX" className="bg-[#181818]">Kelas IX (SMP)</option>
+                <option value="X" className="bg-[#181818]">Kelas X (SMA)</option>
+                <option value="XI" className="bg-[#181818]">Kelas XI (SMA)</option>
+                <option value="XII" className="bg-[#181818]">Kelas XII (SMA)</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Fase</label>
+              <select
+                value={templateSelectedFase}
+                onChange={e => setTemplateSelectedFase(e.target.value)}
+                className="w-full bg-[#121212] border border-slate-800 text-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all cursor-pointer"
+              >
+                <option value="Fase A" className="bg-[#181818]">Fase A (Kelas 1-2 SD)</option>
+                <option value="Fase B" className="bg-[#181818]">Fase B (Kelas 3-4 SD)</option>
+                <option value="Fase C" className="bg-[#181818]">Fase C (Kelas 5-6 SD)</option>
+                <option value="Fase D" className="bg-[#181818]">Fase D (Kelas 7-9 SMP)</option>
+                <option value="Fase E" className="bg-[#181818]">Fase E (Kelas 10 SMA)</option>
+                <option value="Fase F" className="bg-[#181818]">Fase F (Kelas 11-12 SMA)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Live Template Editor Workspace */}
+          <div className="bg-[#181818] rounded-xl p-5 border border-slate-800 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                  <Edit3 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-xs text-slate-200">Workspace Editor & Kustomisasi Sekolah</h4>
+                  <p className="text-[10px] text-slate-500">Sesuaikan draf di bawah dengan kop surat, visi misi, atau format khusus sekolah Anda sebelum diunduh.</p>
+                </div>
               </div>
-              <div>
-                <h4 className="font-bold text-xs text-slate-200">Workspace Editor & Kustomisasi Sekolah</h4>
-                <p className="text-[10px] text-slate-500">Sesuaikan draf di bawah dengan kop surat, visi misi, atau format khusus sekolah Anda sebelum diunduh.</p>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-500 bg-[#121212] px-2 py-1 rounded border border-slate-800">
+                  {editedTemplateText.length} Karakter
+                </span>
+                <span className="text-[10px] text-slate-500 bg-[#121212] px-2 py-1 rounded border border-slate-800">
+                  {editedTemplateText.split(/\s+/).filter(Boolean).length} Kata
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const text = getTemplateTextContent(templateSelectedMapel, templateSelectedTipe, templateSelectedKelas, templateSelectedFase);
+                    setEditedTemplateText(text);
+                  }}
+                  className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded text-[10px] font-bold transition-all active:scale-95 cursor-pointer"
+                  title="Reset draf kembali ke standar kementerian"
+                >
+                  Reset Standar
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-slate-500 bg-[#121212] px-2 py-1 rounded border border-slate-800">
-                {editedTemplateText.length} Karakter
-              </span>
-              <span className="text-[10px] text-slate-500 bg-[#121212] px-2 py-1 rounded border border-slate-800">
-                {editedTemplateText.split(/\s+/).filter(Boolean).length} Kata
-              </span>
+            <div className="relative">
+              <textarea
+                value={editedTemplateText}
+                onChange={e => setEditedTemplateText(e.target.value)}
+                className="w-full h-80 bg-[#121212] border border-slate-800 rounded-xl p-4 text-xs font-mono text-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 leading-relaxed resize-y shadow-inner"
+                placeholder="Ketik atau edit draf template di sini sesuai dengan kebutuhan kurikulum sekolah Anda..."
+              />
+              <div className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-[#181818]/90 backdrop-blur-sm px-2.5 py-1 rounded-md text-[9px] font-semibold text-slate-400 border border-slate-800">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                Live-Editing Active
+              </div>
+            </div>
+
+            {/* Download Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => {
-                  const text = getTemplateTextContent(templateSelectedMapel, templateSelectedTipe, templateSelectedKelas, templateSelectedFase);
-                  setEditedTemplateText(text);
-                }}
-                className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded text-[10px] font-bold transition-all active:scale-95 cursor-pointer"
-                title="Reset draf kembali ke standar kementerian"
+                onClick={() => handleDownloadOfficialTemplate(templateSelectedMapel, templateSelectedTipe, 'doc')}
+                className="flex-1 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10 active:scale-95 cursor-pointer"
               >
-                Reset Standar
+                <FolderDown className="w-4 h-4 text-slate-950" /> Unduh Dokumen Hasil Edit (.DOC)
               </button>
-            </div>
-          </div>
-
-          <div className="relative">
-            <textarea
-              value={editedTemplateText}
-              onChange={e => setEditedTemplateText(e.target.value)}
-              className="w-full h-80 bg-[#121212] border border-slate-800 rounded-xl p-4 text-xs font-mono text-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 leading-relaxed resize-y shadow-inner"
-              placeholder="Ketik atau edit draf template di sini sesuai dengan kebutuhan kurikulum sekolah Anda..."
-            />
-            <div className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-[#181818]/90 backdrop-blur-sm px-2.5 py-1 rounded-md text-[9px] font-semibold text-slate-400 border border-slate-800">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-              Live-Editing Active
-            </div>
-          </div>
-
-          {/* Download Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => handleDownloadOfficialTemplate(templateSelectedMapel, templateSelectedTipe, 'doc')}
-              className="flex-1 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10 active:scale-95 cursor-pointer"
-            >
-              <FolderDown className="w-4 h-4 text-slate-950" /> Unduh Dokumen Hasil Edit (.DOC)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDownloadOfficialTemplate(templateSelectedMapel, templateSelectedTipe, 'txt')}
-              className="px-4 py-2.5 bg-transparent border border-slate-700 hover:border-slate-500 text-slate-300 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
-              title="Unduh draf hasil edit sebagai file teks"
-            >
-              <FileText className="w-3.5 h-3.5 text-slate-400" /> Unduh .TXT
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div className="relative flex-1 w-full">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Cari judul dokumen, nama guru, atau mata pelajaran..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-          />
-        </div>
-
-        {/* Tipe Filter */}
-        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-          <Filter className="w-4 h-4 text-slate-400 flex-shrink-0" />
-          <select
-            value={filterTipe}
-            onChange={e => setFilterTipe(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none"
-          >
-            <option value="Semua">Semua Jenis Dokumen</option>
-            <option value="modul_ajar">Modul Ajar</option>
-            <option value="atp">ATP (Alur Tujuan Pembelajaran)</option>
-            <option value="cp">CP (Capaian Pembelajaran)</option>
-            <option value="jurnal">Jurnal Mengajar</option>
-            <option value="prota">Prota (Program Tahunan)</option>
-            <option value="prosem">Prosem (Program Semester)</option>
-            <option value="kaldik">Kaldik (Kalender Pendidikan)</option>
-            <option value="jadwal">Jadwal Mengajar</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Document Grid Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredDocs.map(doc => (
-          <div key={doc.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-800 font-bold text-[10px] uppercase border border-purple-200">
-                  {doc.tipe.replace('_', ' ')}
-                </span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  doc.status === 'Disetujui Kepala Sekolah'
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-blue-100 text-blue-800'
-                }`}>
-                  {doc.status}
-                </span>
-              </div>
-
-              <h4 className="font-bold text-slate-900 text-sm mt-3 leading-snug">{doc.judul}</h4>
-              <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">{doc.deskripsi}</p>
-            </div>
-
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-              <div className="text-[11px] text-slate-500">
-                <div className="font-semibold text-slate-800">{doc.guruNama}</div>
-                <div>{doc.mataPelajaran} • Kelas {doc.kelas}</div>
-              </div>
-
               <button
-                onClick={() => openDocModal(doc)}
-                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-xs transition-all flex items-center gap-1"
+                type="button"
+                onClick={() => handleDownloadOfficialTemplate(templateSelectedMapel, templateSelectedTipe, 'txt')}
+                className="px-4 py-2.5 bg-transparent border border-slate-700 hover:border-slate-500 text-slate-300 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                title="Unduh draf hasil edit sebagai file teks"
               >
-                Lihat / Cetak
+                <FileText className="w-3.5 h-3.5 text-slate-400" /> Unduh .TXT
               </button>
             </div>
           </div>
-        ))}
+        </div>
+
+        {/* Filter and Search Bar */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="relative flex-1 w-full">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari judul dokumen, nama guru, atau mata pelajaran..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+            <Filter className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <select
+              value={filterTipe}
+              onChange={e => setFilterTipe(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none"
+            >
+              <option value="Semua">Semua Jenis Dokumen</option>
+              <option value="modul_ajar">Modul Ajar</option>
+              <option value="atp">ATP (Alur Tujuan Pembelajaran)</option>
+              <option value="cp">CP (Capaian Pembelajaran)</option>
+              <option value="jurnal">Jurnal Mengajar</option>
+              <option value="prota">Prota (Program Tahunan)</option>
+              <option value="prosem">Prosem (Program Semester)</option>
+              <option value="kaldik">Kaldik (Kalender Pendidikan)</option>
+              <option value="jadwal">Jadwal Mengajar</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Document Grid Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredDocs.map(doc => (
+            <div key={doc.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-800 font-bold text-[10px] uppercase border border-purple-200">
+                    {doc.tipe.replace('_', ' ')}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    doc.status === 'Disetujui Kepala Sekolah'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {doc.status}
+                  </span>
+                </div>
+                <h4 className="font-bold text-slate-900 text-sm mt-3 leading-snug">{doc.judul}</h4>
+                <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">{doc.deskripsi}</p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                <div className="text-[11px] text-slate-500">
+                  <div className="font-semibold text-slate-800">{doc.guruNama}</div>
+                  <div>{doc.mataPelajaran} • Kelas {doc.kelas}</div>
+                </div>
+                <button
+                  onClick={() => openDocModal(doc)}
+                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-xs transition-all flex items-center gap-1"
+                >
+                  Lihat / Cetak
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* AI GENERATOR MODAL */}
@@ -1116,7 +1147,7 @@ F. Libur Akhir Semester Ganjil: 21 Desember 2026 - 2 Januari 2027`;
                 <select
                   value={aiTipe}
                   onChange={e => setAiTipe(e.target.value as TipeAdministrasi)}
-                  className="w-full p-2 bg-slate-50 border rounded-lg text-xs font-bold"
+                  className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none"
                 >
                   <option value="modul_ajar">Modul Ajar Berdiferensiasi & Inklusi</option>
                   <option value="atp">Alur Tujuan Pembelajaran (ATP)</option>
@@ -1130,12 +1161,19 @@ F. Libur Akhir Semester Ganjil: 21 Desember 2026 - 2 Januari 2027`;
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-bold text-slate-700">Mata Pelajaran</label>
-                  <input
-                    type="text"
+                  <select
                     value={aiMapel}
                     onChange={e => setAiMapel(e.target.value)}
-                    className="w-full p-2 bg-slate-50 border rounded-lg text-xs font-bold"
-                  />
+                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none"
+                  >
+                    {availableMapelList.length > 0 ? (
+                      availableMapelList.map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))
+                    ) : (
+                      <option value="Umum">Umum</option>
+                    )}
+                  </select>
                 </div>
                 <div>
                   <label className="text-[11px] font-bold text-slate-700">Kelas / Fase</label>
@@ -1143,7 +1181,7 @@ F. Libur Akhir Semester Ganjil: 21 Desember 2026 - 2 Januari 2027`;
                     type="text"
                     value={aiKelas}
                     onChange={e => setAiKelas(e.target.value)}
-                    className="w-full p-2 bg-slate-50 border rounded-lg text-xs"
+                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500"
                   />
                 </div>
               </div>
@@ -1154,7 +1192,7 @@ F. Libur Akhir Semester Ganjil: 21 Desember 2026 - 2 Januari 2027`;
                   rows={2}
                   value={aiTopik}
                   onChange={e => setAiTopik(e.target.value)}
-                  className="w-full p-2 bg-slate-50 border rounded-lg text-xs"
+                  className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
@@ -1173,7 +1211,7 @@ F. Libur Akhir Semester Ganjil: 21 Desember 2026 - 2 Januari 2027`;
       {/* VIEW / EDIT / PRINT DOKUMEN MODAL */}
       {activeDoc && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] flex flex-col justify-between">
+          <div className="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] flex flex-col">
             {/* Header Modal */}
             <div className="flex items-center justify-between border-b pb-3">
               <div>
@@ -1188,7 +1226,6 @@ F. Libur Akhir Semester Ganjil: 21 Desember 2026 - 2 Januari 2027`;
                 <h3 className="font-bold text-slate-900 text-lg mt-1">{activeDoc.judul}</h3>
                 <p className="text-xs text-slate-500">Penyusun: <span className="font-semibold text-slate-800">{activeDoc.guruNama}</span> • Mapel: <span className="font-semibold text-slate-800">{activeDoc.mataPelajaran}</span> ({activeDoc.kelas})</p>
               </div>
-              
               <button onClick={() => setActiveDoc(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
                 <X className="w-5 h-5" />
               </button>
@@ -1222,41 +1259,33 @@ F. Libur Akhir Semester Ganjil: 21 Desember 2026 - 2 Januari 2027`;
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleDownloadDocx}
-                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold border border-blue-200 rounded-lg flex items-center gap-1.5 transition-all"
-                  title="Unduh format MS Word (.doc)"
+                  className="px-3 py-1.5 bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 font-bold rounded-lg flex items-center gap-1.5 transition-all"
                 >
-                  <FileDown className="w-3.5 h-3.5" /> Unduh .DOCX (Word)
+                  <Download className="w-3.5 h-3.5 text-blue-600" /> .DOC
                 </button>
-
                 <button
                   onClick={handleDownloadTxt}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold border border-slate-300 rounded-lg flex items-center gap-1.5 transition-all"
-                  title="Unduh Teks Polos"
+                  className="px-3 py-1.5 bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 font-bold rounded-lg flex items-center gap-1.5 transition-all"
                 >
-                  <Download className="w-3.5 h-3.5" /> Unduh .TXT
+                  <FileText className="w-3.5 h-3.5 text-slate-500" /> .TXT
                 </button>
-
                 <button
                   onClick={handlePrintDoc}
-                  className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm"
+                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg flex items-center gap-1.5 transition-all shadow-sm"
                 >
-                  <Printer className="w-3.5 h-3.5" /> Cetak / PDF
+                  <Printer className="w-3.5 h-3.5" /> Cetak Sekarang
                 </button>
               </div>
             </div>
 
-            {/* Document Content View / Textarea Editor */}
-            <div className="flex-1 overflow-y-auto pr-1">
+            {/* Document Content */}
+            <div className="flex-1 overflow-y-auto min-h-0 pt-2">
               {isEditingActiveDoc ? (
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700">Edit Isi Modul Ajar (Format Teks Terstruktur):</label>
-                  <textarea
-                    rows={18}
-                    value={editedContent}
-                    onChange={e => setEditedContent(e.target.value)}
-                    className="w-full p-4 bg-slate-900 text-slate-100 font-mono text-xs rounded-xl border border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none leading-relaxed"
-                  />
-                </div>
+                <textarea
+                  value={editedContent}
+                  onChange={e => setEditedContent(e.target.value)}
+                  className="w-full h-full min-h-[400px] p-5 bg-slate-50 border border-amber-200 rounded-xl text-xs text-slate-800 leading-relaxed font-mono focus:outline-none focus:ring-1 focus:ring-amber-400 shadow-inner"
+                />
               ) : (
                 <div className="p-5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 leading-relaxed font-mono whitespace-pre-wrap shadow-inner selection:bg-emerald-100">
                   {activeDoc.content || activeDoc.deskripsi}
@@ -1277,7 +1306,6 @@ F. Libur Akhir Semester Ganjil: 21 Desember 2026 - 2 Januari 2027`;
           </div>
         </div>
       )}
-
     </div>
   );
 };
