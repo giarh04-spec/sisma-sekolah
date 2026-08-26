@@ -100,6 +100,27 @@ interface AbsensiViewProps {
 
 type SubTabAbsensi = 'scan_barcode' | 'harian_siswa' | 'kelas_mapel' | 'absensi_guru' | 'redaksi';
 
+// Helper to resolve coordinates to known school locations or format nicely
+const getFriendlyLocationName = (lat: number, lng: number): string => {
+  // School reference point (based on typical coordinates in the screenshot)
+  const schoolPoints = [
+    { lat: -6.200000, lng: 106.816666, name: 'Gerbang Utama Sekolah' },
+    { lat: -6.200100, lng: 106.816700, name: 'Lobby Gedung Utama' },
+    { lat: -6.200200, lng: 106.816500, name: 'Area Parkir Guru' },
+    { lat: -6.200500, lng: 106.816800, name: 'Kantor Tata Usaha' }
+  ];
+
+  // Check if within ~50 meters (roughly 0.0005 degrees)
+  const found = schoolPoints.find(p => 
+    Math.abs(p.lat - lat) < 0.0005 && Math.abs(p.lng - lng) < 0.0005
+  );
+
+  if (found) return found.name;
+  
+  // Otherwise return formatted GPS
+  return `Lokasi Luar (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+};
+
 export const AbsensiView: React.FC<AbsensiViewProps> = ({
   siswaList,
   guruList,
@@ -194,8 +215,9 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
         const accuracy = position.coords.accuracy;
         setGpsCoords({ lat, lng, accuracy });
         setGpsStatus('connected');
-        setGpsAddress(`GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)} (Akurasi ±${Math.round(accuracy)}m)`);
-        showToast(`GPS Terhubung: ${lat.toFixed(4)}, ${lng.toFixed(4)}`, 'success');
+        const friendlyName = getFriendlyLocationName(lat, lng);
+        setGpsAddress(`${friendlyName} (Akurasi ±${Math.round(accuracy)}m)`);
+        showToast(`GPS Terhubung: ${friendlyName}`, 'success');
       },
       (error) => {
         // Geolocation unavailable or blocked in sandbox/iframe - use default fallback gracefully
@@ -605,7 +627,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   // Helper scan processors to keep code modular and readable
   const processSiswaScan = (siswa: Siswa, timeNow: string, today: string) => {
     const statusInfo = calculateAttendanceStatusLabel(timeNow, scanMode);
-    const locationStr = gpsCoords ? `GPS (${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lng.toFixed(4)})` : 'Mesin Scan Barcode Utama';
+    const locationStr = gpsCoords ? getFriendlyLocationName(gpsCoords.lat, gpsCoords.lng) : 'Mesin Scan Barcode Utama';
 
     setAbsensiHarian(prev => {
       const existing = prev.find(a => a.siswaId === siswa.id && a.tanggal === today);
@@ -633,7 +655,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
       role: `Siswa Kelas ${siswa.kelas}`,
       kode: siswa.kodeBarcode || `SIS-${siswa.nisn}`,
       waktu: timeNow,
-      detail: `NISN: ${siswa.nisn} | Status: ${statusInfo.label} | GPS: ${gpsCoords ? `${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lng.toFixed(4)}` : 'Terhubung'}`,
+      detail: `NISN: ${siswa.nisn} | Status: ${statusInfo.label} | Lokasi: ${gpsCoords ? getFriendlyLocationName(gpsCoords.lat, gpsCoords.lng) : 'Terhubung'}`,
       teleponWali: siswa.teleponWali,
       namaWali: siswa.namaWali,
       tipeAbsensi: scanMode,
@@ -649,7 +671,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   };
 
   const processGuruScan = (guru: Guru, timeNow: string, today: string) => {
-    const locationStr = gpsCoords ? `GPS (${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lng.toFixed(4)})` : 'Mesin Scan Barcode Utama';
+    const locationStr = gpsCoords ? getFriendlyLocationName(gpsCoords.lat, gpsCoords.lng) : 'Mesin Scan Barcode Utama';
     setAbsensiGuruList(prev => {
       const existingIndex = prev.findIndex(g => g.guruId === guru.id && g.tanggal === today);
       if (existingIndex >= 0) {
@@ -694,7 +716,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
       role: `Guru ${guru.mataPelajaran}`,
       kode: guru.kodeBarcode || `GUR-${guru.nip}`,
       waktu: timeNow,
-      detail: `NIP: ${guru.nip} | Status: ${guru.status} | GPS Connected`,
+      detail: `NIP: ${guru.nip} | Status: ${guru.status} | Lokasi: ${gpsCoords ? getFriendlyLocationName(gpsCoords.lat, gpsCoords.lng) : 'Terhubung'}`,
       tipeAbsensi: scanMode
     };
     setLastScannedResult(res);
@@ -703,7 +725,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   };
 
   const processStafScan = (staf: Staf, timeNow: string, today: string) => {
-    const locationStr = gpsCoords ? `GPS (${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lng.toFixed(4)})` : 'Mesin Scan Barcode Utama';
+    const locationStr = gpsCoords ? getFriendlyLocationName(gpsCoords.lat, gpsCoords.lng) : 'Mesin Scan Barcode Utama';
     setAbsensiGuruList(prev => {
       const existingIndex = prev.findIndex(g => g.guruId === staf.id && g.tanggal === today);
       if (existingIndex >= 0) {
@@ -748,7 +770,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
       role: `Staf / Tata Usaha (${staf.bagian})`,
       kode: staf.nik || staf.id,
       waktu: timeNow,
-      detail: `NIK: ${staf.nik} | Bagian: ${staf.bagian} | GPS Connected`,
+      detail: `NIK: ${staf.nik} | Bagian: ${staf.bagian} | Lokasi: ${gpsCoords ? getFriendlyLocationName(gpsCoords.lat, gpsCoords.lng) : 'Terhubung'}`,
       tipeAbsensi: scanMode
     };
     setLastScannedResult(res);
@@ -984,7 +1006,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   const handleClockIn = (guruId: string) => {
     const timeNow = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const today = new Date().toISOString().split('T')[0];
-    const locationStr = gpsCoords ? `GPS (${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lng.toFixed(4)})` : 'Aplikasi Presensi Mandiri';
+    const locationStr = gpsCoords ? getFriendlyLocationName(gpsCoords.lat, gpsCoords.lng) : 'Aplikasi Presensi Mandiri';
 
     setAbsensiGuruList(prev => {
       const existingIndex = prev.findIndex(g => g.guruId === guruId && g.tanggal === today);
@@ -1024,7 +1046,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   const handleClockOut = (guruId: string) => {
     const timeNow = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const today = new Date().toISOString().split('T')[0];
-    const locationStr = gpsCoords ? `GPS (${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lng.toFixed(4)})` : 'Aplikasi Presensi Mandiri';
+    const locationStr = gpsCoords ? getFriendlyLocationName(gpsCoords.lat, gpsCoords.lng) : 'Aplikasi Presensi Mandiri';
 
     setAbsensiGuruList(prev => {
       const existingIndex = prev.findIndex(g => g.guruId === guruId && g.tanggal === today);
