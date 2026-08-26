@@ -477,18 +477,39 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   };
 
   const handleExecuteScan = (codeToScan: string) => {
-    let code = codeToScan.trim();
-    if (!code) return;
+    let rawCode = codeToScan.trim();
+    if (!rawCode) return;
+
+    // Smart Parsing: extract ID from complex strings (e.g. "Nama: Giar | ID: gur-123")
+    let code = rawCode;
+    if (rawCode.includes('ID:')) {
+      const parts = rawCode.split('ID:');
+      if (parts.length > 1) {
+        code = parts[1].split('|')[0].trim();
+      }
+    } else if (rawCode.includes('|')) {
+      const parts = rawCode.split('|');
+      // Try to find part with SIS-, GUR-, or STF- prefix
+      const prefixedPart = parts.find(p => {
+        const up = p.trim().toUpperCase();
+        return up.startsWith('SIS-') || up.startsWith('GUR-') || up.startsWith('STF-');
+      });
+      if (prefixedPart) {
+        code = prefixedPart.trim();
+      }
+    }
 
     // Detect prefix and automatically switch scanTargetType to ensure flawless mapping
     let currentTargetType = scanTargetType;
-    if (code.toUpperCase().startsWith('SIS-')) {
+    const upperCode = code.toUpperCase();
+    
+    if (upperCode.startsWith('SIS-')) {
       currentTargetType = 'siswa';
       setScanTargetType('siswa');
-    } else if (code.toUpperCase().startsWith('GUR-')) {
+    } else if (upperCode.startsWith('GUR-')) {
       currentTargetType = 'guru';
       setScanTargetType('guru');
-    } else if (code.toUpperCase().startsWith('STF-')) {
+    } else if (upperCode.startsWith('STF-')) {
       currentTargetType = 'staf';
       setScanTargetType('staf');
     }
@@ -504,7 +525,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
       s.nis === code ||
       `SIS-${s.nisn}`.toLowerCase() === code.toLowerCase() ||
       `SIS-${s.nis}`.toLowerCase() === code.toLowerCase() ||
-      s.nama.toLowerCase().includes(code.toLowerCase())
+      s.nama.toLowerCase() === code.toLowerCase()
     );
 
     const foundGuru = guruList.find(g => 
@@ -512,7 +533,8 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
       g.nip === code ||
       (g.nik && g.nik === code) ||
       `GUR-${g.nip}`.toLowerCase() === code.toLowerCase() ||
-      g.nama.toLowerCase().includes(code.toLowerCase())
+      `GUR-${g.id}`.toLowerCase() === code.toLowerCase() ||
+      g.nama.toLowerCase() === code.toLowerCase()
     );
 
     const foundStaf = stafList.find(s => 
@@ -521,55 +543,55 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
       (s.nik && `STF-${s.nik}`.toLowerCase() === code.toLowerCase()) ||
       s.id === code ||
       `STF-${s.id}`.toLowerCase() === code.toLowerCase() ||
-      s.nama.toLowerCase().includes(code.toLowerCase())
+      s.nama.toLowerCase() === code.toLowerCase()
     );
 
-    // Process based on who was actually found (prioritizing the selected currentTargetType)
+    // Process based on who was actually found (prioritizing the detected currentTargetType)
     let processed = false;
 
-    if (currentTargetType === 'siswa' && foundSiswa) {
+    if (foundSiswa && (currentTargetType === 'siswa' || (!foundGuru && !foundStaf))) {
+      setScanTargetType('siswa');
       processSiswaScan(foundSiswa, timeNow, today);
       processed = true;
-    } else if (currentTargetType === 'guru' && foundGuru) {
+    } else if (foundGuru && (currentTargetType === 'guru' || (!foundSiswa && !foundStaf))) {
+      setScanTargetType('guru');
       processGuruScan(foundGuru, timeNow, today);
       processed = true;
-    } else if (currentTargetType === 'staf' && foundStaf) {
+    } else if (foundStaf && (currentTargetType === 'staf' || (!foundSiswa && !foundGuru))) {
+      setScanTargetType('staf');
       processStafScan(foundStaf, timeNow, today);
       processed = true;
     } else {
-      // If not found in selected type but found in another, process with correct type
+      // Final specific check if not processed yet
       if (foundSiswa) {
         setScanTargetType('siswa');
         processSiswaScan(foundSiswa, timeNow, today);
         processed = true;
-        showToast(`Otomatis mendeteksi Siswa: ${foundSiswa.nama}`, 'success');
       } else if (foundGuru) {
         setScanTargetType('guru');
         processGuruScan(foundGuru, timeNow, today);
         processed = true;
-        showToast(`Otomatis mendeteksi Guru: ${foundGuru.nama}`, 'success');
       } else if (foundStaf) {
         setScanTargetType('staf');
         processStafScan(foundStaf, timeNow, today);
         processed = true;
-        showToast(`Otomatis mendeteksi Staf: ${foundStaf.nama}`, 'success');
       }
     }
 
     // Fallback: If code is not found in any database list, STILL display it in "Hasil Scan Terakhir" as requested!
     if (!processed) {
       const fallbackResult = {
-        nama: `ID / Kartu: ${code}`,
-        role: `Tidak Terdaftar (${scanTargetType.toUpperCase()})`,
+        nama: `ID / Kartu: ${rawCode.length > 30 ? rawCode.substring(0, 30) + '...' : rawCode}`,
+        role: `KARTU TIDAK DIKENAL`,
         kode: code,
         waktu: timeNow,
-        detail: `Pemindaian sukses, namun kode "${code}" belum terdaftar di Database ${scanTargetType.toUpperCase()}.`,
+        detail: `Pemindaian sukses, namun kode "${code}" belum terdaftar di Database ${upperCode.startsWith('GUR-') ? 'GURU' : upperCode.startsWith('STF-') ? 'STAF' : 'SISWA'}.`,
         tipeAbsensi: scanMode,
         isUnknown: true
       };
       setLastScannedResult(fallbackResult);
       setScanHistory(prev => [fallbackResult, ...prev]);
-      showToast(`ID / Barcode "${code}" tidak dikenal di Database ${scanTargetType.toUpperCase()}!`, 'error');
+      showToast(`ID / Barcode "${code}" tidak dikenal!`, 'error');
     }
 
     setBarcodeInput('');
