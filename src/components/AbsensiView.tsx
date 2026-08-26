@@ -48,34 +48,44 @@ import { exportAllToGoogleSheets } from '../lib/googleDriveSync';
 import { sendFonnteMessage, getFonnteDeviceStatus, FonnteDeviceStatus } from '../lib/fonnte';
 
 const LocationWithMapLink = ({ text }: { text: string }) => {
-  if (!text) return <span>-</span>;
+  if (!text || text === '-' || text === 'N/A') return <span>-</span>;
   
   const match = text.match(/\(([^)]+)\)/);
+  let cleanCoords = '';
+  let before = text;
+  let after = '';
+  let hasCoords = false;
+
   if (match) {
     const coords = match[1];
     const parts = coords.split(',');
     if (parts.length === 2 && !isNaN(parseFloat(parts[0])) && !isNaN(parseFloat(parts[1]))) {
-      const before = text.substring(0, match.index);
-      const after = text.substring(match.index! + match[0].length);
-      const cleanCoords = coords.trim().replace(/\s+/g, '');
-      return (
-        <>
-          {before.trim()}
-          <a
-            href={`https://www.google.com/maps/search/?api=1&query=${cleanCoords}`}
-            target="_blank"
-            rel="noreferrer"
-            className="ml-1 text-[10px] font-bold text-blue-500 hover:text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 transition-colors uppercase"
-          >
-            Peta
-          </a>
-          {after}
-        </>
-      );
+      before = text.substring(0, match.index);
+      after = text.substring(match.index! + match[0].length);
+      cleanCoords = coords.trim().replace(/\s+/g, '');
+      hasCoords = true;
     }
   }
-  
-  return <span>{text}</span>;
+
+  const query = hasCoords ? cleanCoords : `${text} Sekolah Islam Modern Al Fakhir`;
+  const href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+
+  return (
+    <div className="flex items-center flex-wrap gap-1">
+      <span className="text-slate-700">{hasCoords ? before.trim() : text}</span>
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center px-1.5 py-0.5 rounded border border-blue-100 bg-blue-50 text-[9px] font-bold text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors uppercase tracking-tight shadow-sm"
+        title="Buka di Google Maps"
+      >
+        <MapPin className="w-2 h-2 mr-0.5" />
+        Peta
+      </a>
+      {hasCoords && <span className="text-slate-500 text-[10px]">{after}</span>}
+    </div>
+  );
 };
 
 interface AbsensiViewProps {
@@ -116,10 +126,11 @@ const getFriendlyLocationName = (lat: number, lng: number): string => {
     Math.abs(p.lat - lat) < 0.0005 && Math.abs(p.lng - lng) < 0.0005
   );
 
-  if (found) return found.name;
+  const coordsStr = `(${lat.toFixed(6)}, ${lng.toFixed(6)})`;
+  if (found) return `${found.name} ${coordsStr}`;
   
   // Otherwise return formatted GPS
-  return `Lokasi Luar (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+  return `Lokasi Luar ${coordsStr}`;
 };
 
 export const AbsensiView: React.FC<AbsensiViewProps> = ({
