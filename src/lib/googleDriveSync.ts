@@ -139,9 +139,25 @@ export const exportAllToGoogleSheets = async (
     });
 
     // Sheet 7: Jurnal & Absensi Mapel
-    const absKelasHeaders = ['ID Jurnal', 'Kelas', 'Mata Pelajaran', 'Guru Pengajar', 'Tanggal', 'Jam Ke', 'Materi', 'Catatan'];
+    const absKelasHeaders = [
+      'ID Jurnal', 'Kelas', 'Mata Pelajaran', 'Guru Pengajar', 'Tanggal', 'Jam Ke', 
+      'Materi', 'Tujuan Pembelajaran', 'Metode Pembelajaran', 'Media Pembelajaran', 
+      'Refleksi', 'Tindak Lanjut', 'Catatan'
+    ];
     const absKelasRows = data.absensiKelasList.map(k => [
-      k.id, k.kelas, k.mataPelajaran, k.guruNama, k.tanggal, k.jamKe, k.materi, k.catatan || ''
+      k.id, 
+      k.kelas, 
+      k.mataPelajaran, 
+      k.guruNama, 
+      k.tanggal, 
+      k.jamKe, 
+      k.materi,
+      k.tujuanPembelajaran || '',
+      k.metodePembelajaran || '',
+      k.mediaPembelajaran || '',
+      k.refleksi || '',
+      k.tindakLanjut || '',
+      k.catatan || ''
     ]);
     valueRanges.push({
       range: "'Jurnal & Absensi Mapel'!A1",

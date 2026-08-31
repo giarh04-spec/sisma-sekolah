@@ -353,6 +353,45 @@
       },
       "description": "List of completed CBT student exam results"
     },
+    "edu_jadwalList": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "guruName": { "type": "string" },
+          "teacherCode": { "type": "string" },
+          "hari": { "type": "string" },
+          "jamMulai": { "type": "string" },
+          "jamSelesai": { "type": "string" },
+          "kelas": { "type": "string" },
+          "mataPelajaran": { "type": "string" },
+          "ruang": { "type": "string" }
+        },
+        "required": ["id", "guruName", "hari", "jamMulai", "jamSelesai", "kelas", "mataPelajaran"]
+      },
+      "description": "List of school teaching schedules"
+    },
+    "edu_jadwalSettings": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "timeSlots": { "type": "array", "items": { "type": "string" } },
+          "teacherMappings": { 
+            "type": "array", 
+            "items": { 
+              "type": "object",
+              "properties": {
+                "code": { "type": "string" },
+                "name": { "type": "string" },
+                "subject": { "type": "string" }
+              }
+            } 
+          }
+        }
+      },
+      "description": "Global settings for teaching schedules"
+    },
     "edu_schoolSettings": {
       "schema": { "$ref": "#/entities/SchoolSettings" },
       "description": "General school profile settings document"

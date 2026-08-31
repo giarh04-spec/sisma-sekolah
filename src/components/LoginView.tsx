@@ -274,6 +274,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
           </button>
         </form>
 
+
+
         {/* Footer */}
         <div className="pt-3 border-t border-zinc-800/80 flex items-center justify-between text-[10px] text-zinc-500">
           <span>Gie Technologi</span>

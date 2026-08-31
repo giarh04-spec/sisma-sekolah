@@ -79,7 +79,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </h2>
           <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
             {currentRole === 'admin' && 'Akses penuh seluruh modul sistem: Manajemen Database Siswa/Guru/Staf, Absensi QR, Ujian CBT, Modul Ajar, serta Laporan Keuangan SPP terintegrasi Google Workspace.'}
-            {currentRole === 'guru' && 'Akses khusus Pendidik: Presensi Harian/Kelas, Bank Soal & Ujian Online CBT Anti-Cheat, Administrasi Guru (Modul Ajar, CP, ATP & Prota).'}
+            {currentRole === 'guru' && 'Akses khusus Pendidik: Presensi Harian/Kelas, Bank Soal & Ujian Online CBT Anti-Cheat, Administrasi Guru (Modul Ajar, CP, ATP & Jurnal).'}
             {currentRole === 'staf' && 'Akses Tata Usaha & Administrasi: Pengelolaan Data Master Sekolah, Rekapitulasi Absensi Pegawai/Siswa, dan Pembayaran SPP Keuangan.'}
             {currentRole === 'siswa' && 'Akses Portal Siswa/Wali: Informasi Jadwal Ujian CBT, Kartu Digital QR Presensi, Rekap Kehadiran dan Tagihan SPP Bulanan.'}
           </p>
@@ -223,7 +223,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
                   <div>
                     <h4 className="font-bold text-white text-sm">Administrasi Kurikulum</h4>
-                    <p className="text-xs text-slate-400">Modul Ajar, ATP, CP, Jurnal, Prota, Prosem</p>
+                    <p className="text-xs text-slate-400">Modul Ajar, ATP, CP, dan Jurnal Mengajar</p>
                   </div>
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />

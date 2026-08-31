@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   LayoutDashboard, 
   Users, 
@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   UserCheck,
   ChevronDown,
+  ChevronRight,
   Layers,
   BookOpen,
   Calendar,
@@ -26,7 +27,9 @@ import {
   Clock,
   Building,
   Trophy,
-  Coins
+  Coins,
+  FolderOpen,
+  LayoutList
 } from 'lucide-react';
 import { Role, SubTab, AbsensiSubTab, CbtSubTab, KeuanganSubTab, AdministrasiSubTab, PengaturanSubTab } from '../types/school';
 
@@ -83,6 +86,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ekskulCount = 0,
   bankSoalCount
 }) => {
+  const [perangkatOpen, setPerangkatOpen] = useState(false);
+
   const allMenuItems: { id: TabType; label: string; icon: React.ReactNode; badge?: string; desc: string }[] = [
     {
       id: 'dashboard',
@@ -140,7 +145,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return item.id === 'keuangan';
     }
     if (currentRole === 'siswa') {
-      return item.id === 'dashboard' || item.id === 'absensi' || item.id === 'cbt' || item.id === 'keuangan';
+      return item.id === 'cbt';
     }
     // Admin gets all
     return true;
@@ -388,23 +393,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </button>
                       )}
 
-                      {/* 3. Absensi Kelas Per Mapel */}
-                      <button
-                        onClick={() => {
-                          setActiveTab('absensi');
-                          if (setAbsensiSubTab) setAbsensiSubTab('kelas_mapel');
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
-                          absensiSubTab === 'kelas_mapel'
-                            ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-sm'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
-                          <span>Absensi Kelas Per Mapel</span>
-                        </div>
-                      </button>
 
                       {/* 4. Presensi Guru */}
                       {currentRole !== 'guru' && (
@@ -486,27 +474,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {isActive && (
                     <div className="pl-3 pr-1 py-1 space-y-1 border-l border-slate-800 ml-6 mt-1 transition-all">
                       {/* 1. Bank Soal */}
-                      <button
-                        onClick={() => {
-                          setActiveTab('cbt');
-                          if (setCbtSubTab) setCbtSubTab('bank_soal');
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
-                          cbtSubTab === 'bank_soal'
-                            ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-sm'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <BookOpen className="w-3.5 h-3.5 text-blue-400" />
-                          <span>Bank Soal Ujian</span>
-                        </div>
-                        {bankSoalCount !== undefined && (
-                          <span className="text-[9px] bg-slate-800/80 text-slate-400 px-1.5 py-0.5 rounded font-mono">
-                            {bankSoalCount}
-                          </span>
-                        )}
-                      </button>
+                      {currentRole !== 'siswa' && (
+                        <button
+                          onClick={() => {
+                            setActiveTab('cbt');
+                            if (setCbtSubTab) setCbtSubTab('bank_soal');
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
+                            cbtSubTab === 'bank_soal'
+                              ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-sm'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <BookOpen className="w-3.5 h-3.5 text-blue-400" />
+                            <span>Bank Soal Ujian</span>
+                          </div>
+                          {bankSoalCount !== undefined && (
+                            <span className="text-[9px] bg-slate-800/80 text-slate-400 px-1.5 py-0.5 rounded font-mono">
+                              {bankSoalCount}
+                            </span>
+                          )}
+                        </button>
+                      )}
 
                       {/* 2. Jadwal & Kartu Ujian */}
                       {currentRole !== 'guru' && (
@@ -600,22 +590,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {/* Dropdown nested items for Administrasi Guru */}
                   {isActive && (
                     <div className="pl-3 pr-1 py-1 space-y-1 border-l border-slate-800 ml-6 mt-1 transition-all">
-                      <button
-                        onClick={() => {
-                          setActiveTab('administrasi');
-                          if (setAdministrasiSubTab) setAdministrasiSubTab('perangkat');
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
-                          administrasiSubTab === 'perangkat'
-                            ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-sm'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-3.5 h-3.5 text-blue-400" />
-                          <span>Dokumen Administrasi</span>
-                        </div>
-                      </button>
+                      {/* Sub-Dropdown Perangkat Pembelajaran */}
+                      <div>
+                        <button
+                          onClick={() => setPerangkatOpen(!perangkatOpen)}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-bold flex items-center justify-between transition-all ${
+                            ['modul_ajar', 'cp', 'atp', 'kktp', 'prota', 'prosem'].includes(administrasiSubTab || '')
+                              ? 'text-blue-400 bg-blue-600/5'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <FolderOpen className="w-3.5 h-3.5" />
+                            <span>Perangkat Pembelajaran</span>
+                          </div>
+                          {perangkatOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                        </button>
+
+                        {perangkatOpen && (
+                          <div className="pl-4 mt-1 space-y-0.5 border-l border-slate-800/50 ml-1.5">
+                            {[
+                              { id: 'modul_ajar', label: 'Modul Ajar' },
+                              { id: 'cp', label: 'Capaian Pembelajaran (CP)' },
+                              { id: 'atp', label: 'Alur Tujuan (ATP)' },
+                              { id: 'kktp', label: 'KKTP' },
+                              { id: 'prota', label: 'Program Tahunan' },
+                              { id: 'prosem', label: 'Program Semester' },
+                            ].map((sub) => (
+                              <button
+                                key={sub.id}
+                                onClick={() => {
+                                  setActiveTab('administrasi');
+                                  if (setAdministrasiSubTab) setAdministrasiSubTab(sub.id as AdministrasiSubTab);
+                                }}
+                                className={`w-full text-left px-3 py-1.5 rounded-md text-[10px] font-medium transition-all ${
+                                  administrasiSubTab === sub.id
+                                    ? 'text-blue-400 bg-blue-600/10'
+                                    : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/20'
+                                }`}
+                              >
+                                {sub.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
 
                       <button
                         onClick={() => {
@@ -648,6 +667,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <div className="flex items-center gap-2">
                           <Calendar className="w-3.5 h-3.5 text-indigo-400" />
                           <span>Kalender Pendidikan</span>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setActiveTab('administrasi');
+                          if (setAdministrasiSubTab) setAdministrasiSubTab('jurnal_guru');
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
+                          administrasiSubTab === 'jurnal_guru'
+                            ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Jurnal Guru</span>
                         </div>
                       </button>
                     </div>

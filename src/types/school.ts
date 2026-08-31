@@ -15,10 +15,10 @@ export interface RombelKelas {
 
 export type Role = 'admin' | 'guru' | 'siswa' | 'staf';
 export type SubTab = 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel' | 'ekskul';
-export type AbsensiSubTab = 'scan_barcode' | 'harian_siswa' | 'kelas_mapel' | 'absensi_guru' | 'redaksi';
+export type AbsensiSubTab = 'scan_barcode' | 'harian_siswa' | 'absensi_guru' | 'redaksi';
 export type CbtSubTab = 'bank_soal' | 'jadwal_kartu' | 'ai_generator' | 'simulasi_ujian' | 'hasil_ujian';
 export type KeuanganSubTab = 'pembayaran' | 'pengaturan_biaya' | 'rekap' | 'redaksi' | 'gaji';
-export type AdministrasiSubTab = 'perangkat' | 'jadwal' | 'kalender';
+export type AdministrasiSubTab = 'modul_ajar' | 'cp' | 'atp' | 'kktp' | 'prota' | 'prosem' | 'jadwal' | 'kalender' | 'jurnal_guru';
 export type PengaturanSubTab = 'identitas' | 'logo' | 'google_drive' | 'fonnte' | 'jadwal' | 'sistem';
 
 export interface TarifBiaya {
@@ -185,6 +185,11 @@ export interface AbsensiSiswaKelas {
   materi: string;
   kehadiranMap: Record<string, StatusAbsensi>; // siswaId -> status
   catatan?: string;
+  tujuanPembelajaran?: string;
+  metodePembelajaran?: string;
+  mediaPembelajaran?: string;
+  refleksi?: string;
+  tindakLanjut?: string;
 }
 
 export interface AbsensiGuru {
@@ -217,6 +222,8 @@ export interface SoalCBT {
   kunciJawaban: string | string[]; // Single string untuk PG/Isian, array untuk Multiple Choice / Esai keyword
   pembahasan?: string;
   bobot: number;
+  imageUrl?: string;
+  videoUrl?: string;
 }
 
 export interface BankSoal {
@@ -291,6 +298,75 @@ export interface HasilUjian {
   logKecurangan?: string[];
 }
 
+export interface ModulAjarContent {
+  // A. INFORMASI UMUM
+  informasiUmum: {
+    namaPenyusun: string;
+    namaSekolah: string;
+    mataPelajaran: string;
+    fase: string;
+    kelas: string;
+    semester: string;
+    tahunAjaran: string;
+    alokasiWaktu: string;
+    materi: string;
+  };
+  // B. KOMPETENSI AWAL
+  kompetensiAwal: string;
+  // C. PROFIL / KOMPETENSI YANG DITUJU
+  profilPelajarPancasila: string[];
+  // D. SARANA DAN PRASARANA
+  saranaPrasarana: string[]; // Laptop, Internet, etc.
+  // E. TARGET PESERTA DIDIK
+  targetPesertaDidik: 'Reguler' | 'Dukungan tambahan' | 'Pengayaan';
+  // F. MODEL PEMBELAJARAN
+  modelPembelajaran: string;
+  // G. TUJUAN PEMBELAJARAN
+  tujuanPembelajaran: string[];
+  // H. PEMAHAMAN BERMAKNA
+  pemahamanBermakna: string;
+  // I. PERTANYAAN PEMANTIK
+  pertanyaanPemantik: string[];
+  // J. KEGIATAN PEMBELAJARAN
+  kegiatanPembelajaran: {
+    pendahuluan: { deskripsi: string; durasi: string };
+    inti: { deskripsi: string; durasi: string };
+    penutup: { deskripsi: string; durasi: string };
+  };
+  // K. ASESMEN
+  asesmen: {
+    diagnostik: string;
+    formatif: string;
+    sumatif: string;
+    teknik: string;
+    instrumen: string;
+    rubrik: string;
+    kriteriaPenilaian: string;
+  };
+  // L. DIFERENSIASI PEMBELAJARAN
+  diferensiasi: {
+    konten: string;
+    proses: string;
+    produk: string;
+  };
+  // M. REMEDIAL
+  remedial: string;
+  // N. PENGAYAAN
+  pengayaan: string;
+  // O. REFLEKSI GURU
+  refleksiGuru: string;
+  // P. REFLEKSI PESERTA DIDIK
+  refleksiPesertaDidik: string;
+  // Q. LAMPIRAN
+  lampiran: {
+    lkpd: string;
+    bahanBacaan: string;
+    rubrik: string;
+    instrumenAsesmen: string;
+    daftarPustaka: string;
+  };
+}
+
 export type TipeAdministrasi = 
   | 'modul_ajar'
   | 'atp'
@@ -298,6 +374,7 @@ export type TipeAdministrasi =
   | 'jurnal'
   | 'prota'
   | 'prosem'
+  | 'kktp'
   | 'kaldik'
   | 'jadwal';
 

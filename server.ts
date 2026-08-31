@@ -11,6 +11,41 @@ const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
+const apiKey = process.env.GEMINI_API_KEY;
+const ai = new GoogleGenAI({
+  apiKey: apiKey || '',
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    }
+  }
+});
+
+// Helper function to safely call Gemini generateContent with fallback models in case of high demand (503/429/etc.)
+async function generateContentWithFallback(options: { model: string; contents: string; config?: any }) {
+  const models = [options.model, 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+  const uniqueModels = Array.from(new Set(models.filter(Boolean)));
+  
+  let lastError: any = null;
+  for (const model of uniqueModels) {
+    try {
+      console.log(`[Gemini API] Attempting generation with model: ${model}`);
+      const res = await ai.models.generateContent({
+        ...options,
+        model: model,
+      });
+      console.log(`[Gemini API] Success using model: ${model}`);
+      return res;
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[Gemini API] Model ${model} failed with error:`, err.message || err);
+      // Wait 500ms before trying next model
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+  throw lastError;
+}
+
 // 1. Google Workspace Export to Google Sheets & Google Drive
 app.post('/api/export-sheets', async (req, res) => {
   try {
@@ -103,8 +138,6 @@ app.post('/api/ai/generate-questions', async (req, res) => {
       return res.status(500).json({ success: false, message: 'GEMINI_API_KEY tidak dikonfigurasi.' });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
-
     const tipeSoalMap: Record<string, string> = {
       'pg': '1. Pilihan Ganda (pg)',
       'multiple_choice': '2. Pilihan Ganda Kompleks (multiple_choice) - jawaban benar lebih dari satu.',
@@ -137,8 +170,8 @@ Kembalikan respon murni dalam format JSON array dengan struktur berikut (jangan 
   }
 ]`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const response = await generateContentWithFallback({
+      model: 'gemini-3.7-flash',
       contents: prompt,
     });
 
@@ -220,34 +253,96 @@ app.post('/api/ai/generate-administrasi', async (req, res) => {
       return res.status(500).json({ success: false, message: 'GEMINI_API_KEY tidak dikonfigurasi.' });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    if (tipe === 'modul_ajar') {
+      const prompt = `Anda adalah konsultan Kurikulum Merdeka Kementerian Pendidikan Indonesia.
+Buatkan Modul Ajar lengkap Kurikulum Merdeka yang sangat detail, profesional, berlandaskan prinsip deep learning (Mindful, Meaningful, Joyful) dan ramah inklusi dalam format JSON terstruktur yang valid.
+
+Mata Pelajaran: "${mataPelajaran}"
+Kelas: "${kelas}"
+Topik/Materi: "${topik || 'Standard Kurikulum Merdeka'}"
+Tahun Ajaran: "${tahunAjaran || '2026/2027'}"
+
+Format output HARUS berupa JSON object valid yang memiliki struktur berikut (jangan gunakan pembungkus markdown, langsung kembalikan raw JSON):
+{
+  "informasiUmum": {
+    "namaPenyusun": "[Nama Penyusun Guru]",
+    "namaSekolah": "SMP Islam Modern Al Fakhir",
+    "mataPelajaran": "${mataPelajaran}",
+    "fase": "D",
+    "kelas": "${kelas}",
+    "semester": "Ganjil",
+    "tahunAjaran": "${tahunAjaran || '2026/2027'}",
+    "alokasiWaktu": "2 JP (2 x 40 Menit)",
+    "materi": "${topik}"
+  },
+  "kompetensiAwal": "Deskripsi detail tentang kompetensi awal murid sebelum memulai materi ini.",
+  "profilPelajarPancasila": ["Beriman, Bertakwa kepada Tuhan YME, dan Berakhlak Mulia", "Bernalar Kritis", "Kreatif", "Gotong Royong"],
+  "saranaPrasarana": ["Laptop/Chromebook", "Koneksi Internet", "Proyektor LCD", "Slide Presentasi Interaktif", "Buku Paket Pendamping"],
+  "targetPesertaDidik": "Reguler",
+  "modelPembelajaran": "Problem Based Learning (PBL) / Project Based Learning",
+  "tujuanPembelajaran": [
+    "Menjelaskan konsep dasar dari ${topik} dengan tepat.",
+    "Menganalisis penerapan ${topik} dalam kehidupan nyata.",
+    "Menunjukkan karakter bernalar kritis dan kreatif melalui penugasan mandiri maupun kelompok."
+  ],
+  "pemahamanBermakna": "Penjelasan mengapa materi ${topik} ini bermakna bagi kehidupan siswa di masa depan.",
+  "pertanyaanPemantik": [
+    "Apa yang pertama kali terlintas di pikiran kalian saat mendengar tentang ${topik}?",
+    "Bagaimana jika konsep ${topik} ini tidak pernah diterapkan dalam kehidupan sehari-hari?"
+  ],
+  "kegiatanPembelajaran": {
+    "pendahuluan": { "deskripsi": "1. Guru mengucapkan salam dan berdoa bersama.\\n2. Guru memeriksa kehadiran siswa.\\n3. Apersepsi: Mengaitkan materi dengan kehidupan sehari-hari.\\n4. Guru menyampaikan tujuan pembelajaran.", "durasi": "15 Menit" },
+    "inti": { "deskripsi": "Tahap 1: Orientasi Masalah\\n- Siswa menyimak tayangan presentasi tentang kasus nyata ${topik}.\\n\\nTahap 2: Mengorganisasikan Siswa\\n- Siswa dibagi kelompok 4-5 orang secara inklusif.\\n\\nTahap 3: Membimbing Penyelidikan\\n- Guru membimbing penyelidikan kelompok dengan diferensiasi proses bagi murid yang membutuhkan bantuan lebih.\\n\\nTahap 4: Mengembangkan & Menyajikan Hasil Karya\\n- Perwakilan kelompok mempresentasikan hasil diskusi.", "durasi": "50 Menit" },
+    "penutup": { "deskripsi": "1. Siswa bersama guru menyimpulkan pembelajaran hari ini.\\n2. Refleksi bersama mengenai apa yang sudah dipelajari.\\n3. Guru memberikan apresiasi dan informasi materi pertemuan selanjutnya.\\n4. Doa penutup dan salam.", "durasi": "15 Menit" }
+  },
+  "asesmen": {
+    "diagnostik": "Tanya jawab non-kognitif sebelum pembelajaran dimulai untuk mengukur kesiapan belajar.",
+    "formatif": "Observasi sikap saat diskusi kelompok dan rubrik performa presentasi.",
+    "sumatif": "Tes tertulis berupa soal pemecahan masalah atau proyek sederhana di akhir bab.",
+    "teknik": "Tertulis & Performa Kelompok",
+    "instrumen": "Lembar Kerja Siswa (LKPD) & Rubrik Penilaian Presentasi",
+    "rubrik": "Skor 4: Sangat Baik (Memahami seluruh konsep dan aktif)\\nSkor 3: Baik (Memahami konsep dasar dan berpartisipasi)\\nSkor 2: Cukup (Kurang memahami konsep dasar, pasif)\\nSkor 1: Perlu Bimbingan (Tidak memahami konsep)",
+    "kriteriaPenilaian": "Siswa dinyatakan tuntas jika mencapai minimal skor 3 (Baik) pada seluruh kriteria penilaian asesmen formatif."
+  },
+  "diferensiasi": {
+    "konten": "Menyediakan bahan bacaan dalam bentuk teks, infografis, maupun video penjelasan tambahan untuk siswa visual/auditori.",
+    "proses": "Memberikan pendampingan lebih intensif bagi siswa kelompok slow learner dan tantangan mandiri bagi kelompok fast learner.",
+    "produk": "Siswa bebas memilih menyajikan hasil laporan kelompok dalam bentuk poster, infografis, file presentasi PPT, atau tulisan tangan."
+  },
+  "remedial": "Bimbingan individu atau pengerjaan ulang soal-soal asesmen formatif dengan penyederhanaan instruksi untuk siswa yang belum tuntas.",
+  "pengayaan": "Pemberian tugas eksploratif mandiri berupa analisis studi kasus lanjutan yang lebih kompleks bagi siswa yang mencapai nilai di atas rata-rata.",
+  "refleksiGuru": "Apakah tujuan pembelajaran telah tercapai secara efektif?\\nKendala apa yang paling dirasakan oleh siswa saat berdiskusi?\\nBagaimana keefektifan akomodasi inklusif yang disiapkan?",
+  "refleksiPesertaDidik": "Bagian mana dari materi ini yang paling kalian senangi?\\nApakah kalian merasa terbantu dengan metode belajar kelompok ini?\\nApa tantangan terbesar yang kalian hadapi hari ini?",
+  "lampiran": {
+    "lkpd": "Lembar Kerja Peserta Didik berisi petunjuk pengerjaan studi kasus ${topik} secara berkelompok beserta lembar jawaban diskusi.",
+    "bahanBacaan": "Artikel ringkas pengantar ${topik}, glosarium istilah-istilah penting, dan rangkuman poin-poin pembelajaran utama.",
+    "rubrik": "Rubrik Penilaian Sikap (Gotong Royong, Bernalar Kritis) dan Rubrik Penilaian Produk Presentasi Kelompok.",
+    "instrumenAsesmen": "3 Butir soal formatif pilihan ganda kompleks dan 2 butir soal esai studi kasus.",
+    "daftarPustaka": "Buku Paket Informatika Kelas VII Kemendikbudristek 2022, artikel ilmiah, dan sumber digital terpercaya."
+  }
+}
+
+Pastikan isi Modul Ajar sangat lengkap, kontekstual, mendalam, dan menggunakan Bahasa Indonesia yang profesional. Jangan tambahkan komentar teks apapun di luar JSON tersebut agar JSON dapat diparse langsung.`;
+
+      const response = await generateContentWithFallback({
+        model: 'gemini-3.7-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json'
+        }
+      });
+
+      const parsedData = JSON.parse(response.text);
+      return res.json({ success: true, isJson: true, data: parsedData });
+    }
 
     let customInstructions = '';
     if (tipe === 'modul_ajar') {
-      customInstructions = `Format WAJIB Mengikuti Standar Template Modul Ajar Deep Learning & Inklusif 2026/2027 (9 Komponen Utama):
-A. IDENTITAS (Nama Penyusun, Nama Sekolah, Mata Pelajaran, Fase/Kelas, Semester, Materi, Alokasi Waktu, Tahun Pelajaran)
-B. KARAKTERISTIK PESERTA DIDIK
-   1. Karakteristik Peserta Didik Reguler (Kemampuan awal, kesiapan belajar, minat, gaya belajar, kemampuan sosial & komunikasi)
-   2. Karakteristik Peserta Didik Inklusif (Tabel/Rincian: Inisial, Jenis Hambatan mis. Slow Learner/Disleksia/ADHD/Autisme, Kekuatan, Hambatan, Minat, Cara Belajar Efektif, Bentuk Dukungan, Catatan Guru)
-C. KOMPONEN INTI
-   1. DIMENSI PROFIL LULUSAN (Profil Pelajar Pancasila & Rahmatan Lil Alamin)
-   2. TUJUAN PEMBELAJARAN (TP) - Target Reguler, Target Inklusi Ringan/Sedang, & Target Individual PPI
-   3. KRITERIA KETERCAPAIAN TUJUAN PEMBELAJARAN (KKTP) - Reguler & Inklusi
-   4. INTEGRASI NILAI ISLAMI (Dalil/Ayat Al-Qur'an Arab & Terjemah + Nilai Tauhid Rububiyah, Tafakur, Syukur, Tanggung Jawab Khalifah)
-D. PRINSIP PEMBELAJARAN (DEEP LEARNING)
-   1. Mindful (Berkesadaran)
-   2. Meaningful (Bermakna)
-   3. Joyful (Menyenangkan)
-E. ALUR PEMBELAJARAN (Pertemuan 1, 2, dst)
-   Setiap pertemuan terbagi 3 tahap:
-   - Tahap 1: Memahami — Mindful (10 menit)
-   - Tahap 2: Mengaplikasikan — Meaningful (40 menit) (dengan diferensiasi proses/produk)
-   - Tahap 3: Merefleksi — Joyful (10 menit)
-   - Penyesuaian Peserta Didik Inklusi
-F. PENGUATAN LITERASI DAN NUMERASI
-G. ASESMEN (Asesmen Diagnostik, Formatif, Sumatif Pilihan Ganda & Essay + Penyesuaian Asesmen Inklusi)
-I. REFLEKSI (Refleksi Guru 7 pertanyaan, Refleksi Peserta Didik Reguler, Refleksi Peserta Didik Inklusi, dan Lembar Pengesahan Kepala Sekolah & Guru Mata Pelajaran)`;
-    } else {
+      // Fallback for non-JSON or other logic paths
+      customInstructions = `Format WAJIB Mengikuti Standar Template Modul Ajar Deep Learning & Inklusif 2026/2027 (Format Profesional PDF):
+Gunakan elemen Markdown secara maksimal (Header #, ##, ###, Tabel, List, Horizontal Rule ---) untuk mensimulasikan tata letak dokumen PDF resmi.`;
+    }
+ else {
       customInstructions = `Berikan isi dokumen lengkap yang rapi, profesional, terstruktur dengan poin-poin (Identitas, Tujuan Pembelajaran, Asesmen, Langkah Pembelajaran, Media & Sumber Belajar, Refleksi, Pengesahan).`;
     }
 
@@ -258,8 +353,8 @@ ${customInstructions}
 
 Format output lengkap dalam Bahasa Indonesia yang sangat rapi, jelas, dan siap pakai.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const response = await generateContentWithFallback({
+      model: 'gemini-3.7-flash',
       contents: prompt,
     });
 
@@ -267,6 +362,62 @@ Format output lengkap dalam Bahasa Indonesia yang sangat rapi, jelas, dan siap p
 
   } catch (error: any) {
     console.error('Error generating administrasi:', error);
+    
+    if (tipe === 'modul_ajar') {
+      const fallbackData = {
+        informasiUmum: {
+          namaPenyusun: "Guru Pengampu Mapel",
+          namaSekolah: "SMP Islam Modern Al Fakhir",
+          mataPelajaran: mataPelajaran || "Umum",
+          fase: "D",
+          kelas: kelas || "7",
+          semester: "Ganjil",
+          tahunAjaran: "2026/2027",
+          alokasiWaktu: "2 JP (2 x 40 Menit)",
+          materi: topik || "Materi Pokok"
+        },
+        kompetensiAwal: "Siswa telah mengetahui pengenalan dasar mata pelajaran.",
+        profilPelajarPancasila: ["Beriman, Bertakwa kepada Tuhan YME, dan Berakhlak Mulia", "Bernalar Kritis", "Kreatif"],
+        saranaPrasarana: ["Laptop/Chromebook", "Koneksi Internet", "Proyektor LCD"],
+        targetPesertaDidik: "Reguler",
+        modelPembelajaran: "Problem Based Learning",
+        tujuanPembelajaran: [`Siswa dapat menganalisis materi ${topik || "pembelajaran"} dengan baik.`],
+        pemahamanBermakna: "Pembelajaran ini memberikan pemahaman mendalam tentang konsep kehidupan nyata.",
+        pertanyaanPemantik: ["Mengapa konsep ini penting bagi masa depan kalian?"],
+        kegiatanPembelajaran: {
+          pendahuluan: { deskripsi: "1. Doa dan salam.\n2. Absensi dan apersepsi.", durasi: "10 Menit" },
+          inti: { deskripsi: "1. Orientasi masalah siswa.\n2. Diskusi kelompok terdiferensiasi.\n3. Presentasi karya kelompok.", durasi: "60 Menit" },
+          penutup: { deskripsi: "1. Kesimpulan pembelajaran.\n2. Refleksi dan penutup.", durasi: "10 Menit" }
+        },
+        asesmen: {
+          diagnostik: "Tanya jawab non-kognitif awal belajar.",
+          formatif: "Observasi diskusi kelompok.",
+          sumatif: "Tes tertulis di akhir pertemuan.",
+          teknik: "Tertulis & Observasi",
+          instrumen: "Lembar Observasi & Lembar Soal",
+          rubrik: "Skor 4 (Sangat Baik), Skor 3 (Baik), Skor 2 (Cukup), Skor 1 (Kurang)",
+          kriteriaPenilaian: "Ketuntasan minimal jika mencapai predikat Baik."
+        },
+        diferensiasi: {
+          konten: "Menyediakan bacaan visual dan penugasan audio.",
+          proses: "Pendampingan khusus bagi yang membutuhkan.",
+          produk: "Laporan dibebaskan berupa slide, tulisan, atau gambar."
+        },
+        remedial: "Penjelasan ulang materi esensial dan latihan soal sederhana.",
+        pengayaan: "Pemberian materi tambahan tingkat lanjut.",
+        refleksiGuru: "Apakah seluruh siswa aktif berpartisipasi?",
+        refleksiPesertaDidik: "Apa bagian paling berkesan hari ini?",
+        lampiran: {
+          lkpd: "Lembar Kerja berisi langkah eksperimen mandiri.",
+          bahanBacaan: "Modul ringkas materi pelajaran.",
+          rubrik: "Rubrik penilaian keaktifan kerja sama.",
+          instrumenAsesmen: "Soal uraian pendek sebanyak 3 butir.",
+          daftarPustaka: "Buku Panduan Guru Kurikulum Merdeka 2022."
+        }
+      };
+      return res.json({ success: true, isJson: true, data: fallbackData, isFallback: true });
+    }
+
     const fallbackContent = `# DOKUMEN ADMINISTRASI GURU (MODE FALLBACK PINTAR)
 **Mata Pelajaran:** ${mataPelajaran || 'Umum'}
 **Kelas:** ${kelas || '7'}

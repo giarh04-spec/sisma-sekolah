@@ -27,8 +27,11 @@ import {
   Sparkles,
   Bell,
   Sliders,
-  RefreshCw
-, Calendar
+  RefreshCw,
+  Calendar,
+  Trash2,
+  Square,
+  CheckSquare
 } from 'lucide-react';
 import { 
   Siswa, 
@@ -108,7 +111,7 @@ interface AbsensiViewProps {
   setSchoolSettings?: React.Dispatch<React.SetStateAction<SchoolSettings>>;
 }
 
-type SubTabAbsensi = 'scan_barcode' | 'harian_siswa' | 'kelas_mapel' | 'absensi_guru' | 'redaksi';
+type SubTabAbsensi = 'scan_barcode' | 'harian_siswa' | 'absensi_guru' | 'redaksi' | 'jurnal_guru';
 
 // Helper to resolve coordinates to known school locations or format nicely
 const getFriendlyLocationName = (lat: number, lng: number): string => {
@@ -152,7 +155,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   schoolSettings,
   setSchoolSettings
 }) => {
-  const [internalSubTab, setInternalSubTab] = useState<SubTabAbsensi>(currentRole === 'guru' ? 'kelas_mapel' : 'scan_barcode');
+  const [internalSubTab, setInternalSubTab] = useState<SubTabAbsensi>('scan_barcode');
 
   const subTab = controlledSubTab ?? internalSubTab;
   const setSubTab = (val: SubTabAbsensi) => {
@@ -162,12 +165,9 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
 
   useEffect(() => {
     if (currentRole === 'guru') {
-      if (subTab === 'harian_siswa' || subTab === 'absensi_guru') {
-        setSubTab('kelas_mapel');
-      }
       setScanTargetType('siswa');
     }
-  }, [currentRole, subTab]);
+  }, [currentRole]);
 
   // --- Subtab Barcode Scanner, Jadwal & Fonnte Modal State ---
   const [showFonnteModal, setShowFonnteModal] = useState(false);
@@ -176,11 +176,14 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
     schoolSettings?.jadwalPresensi || {
       jamMasuk: '07:00',
       jamToleransi: '07:15',
-      jamPulang: '14:30',
+      jamPulang: '16:00',
       hariKerja: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'],
       autoSwitchScanMode: true
     }
   );
+
+  // Selection state for bulk actions
+  const [selectedGuruIds, setSelectedGuruIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (schoolSettings?.jadwalPresensi) {
@@ -228,12 +231,37 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
         setGpsAddress(`${friendlyName} (Akurasi ±${Math.round(accuracy)}m)`);
       },
       (error) => {
-        console.error('GPS Error:', error);
-        // If error, we keep the last known or use default fallback but mark as offline/error
+        let errorMsg = 'GPS Offline';
+        let detailMsg = 'Silakan periksa pengaturan GPS Anda.';
+        
+        switch (error.code) {
+          case 1: // PERMISSION_DENIED
+            errorMsg = 'Izin Lokasi Ditolak';
+            detailMsg = 'Silakan izinkan akses lokasi di browser. ';
+            if (window.self !== window.top) {
+              detailMsg += 'Klik ikon "Buka di Tab Baru" di pojok kanan atas jika izin tidak muncul.';
+            }
+            break;
+          case 2: // POSITION_UNAVAILABLE
+            errorMsg = 'Lokasi Tidak Terdeteksi';
+            detailMsg = 'Pastikan GPS perangkat Anda aktif.';
+            break;
+          case 3: // TIMEOUT
+            errorMsg = 'Waktu Tunggu GPS Habis';
+            detailMsg = 'Mencoba mendapatkan lokasi kembali...';
+            break;
+          default:
+            errorMsg = 'Gagal Mengakses GPS';
+        }
+        
+        console.error(`GPS Error [${error.code}]:`, errorMsg);
+        
+        setGpsStatus('error');
+        setGpsAddress(`${errorMsg} - ${detailMsg}`);
+
+        // Set fallback coordinates if none exist
         if (!gpsCoords) {
-          setGpsCoords({ lat: -6.2415, lng: 106.8045, accuracy: 10 });
-          setGpsStatus('error');
-          setGpsAddress('GPS Offline (Gunakan Lokasi Default)');
+          setGpsCoords({ lat: -6.2415, lng: 106.8045, accuracy: 100 });
         }
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
@@ -257,7 +285,20 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
         showToast(`GPS Diperbarui: ${friendlyName}`, 'success');
       },
       (error) => {
-        showToast('Gagal memperbarui GPS. Pastikan izin lokasi aktif.', 'error');
+        let errorMsg = 'GPS Error';
+        let detailMsg = 'Pastikan GPS aktif.';
+        switch (error.code) {
+          case 1: 
+            errorMsg = 'Izin Lokasi Ditolak'; 
+            detailMsg = 'Buka di tab baru jika izin tidak muncul.';
+            break;
+          case 2: errorMsg = 'Lokasi Tidak Terdeteksi'; break;
+          case 3: errorMsg = 'Waktu Tunggu Habis'; break;
+          default: errorMsg = 'Gagal Mengakses GPS';
+        }
+        showToast(`Gagal: ${errorMsg}. ${detailMsg}`, 'error');
+        setGpsStatus('error');
+        setGpsAddress(`${errorMsg} - ${detailMsg}`);
       },
       { enableHighAccuracy: true, timeout: 5000 }
     );
@@ -287,7 +328,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
         return { label: `Terlambat (${lateMins} Menit)`, isLate: true };
       }
     } else {
-      const [pH, pM] = (jadwal.jamPulang || '14:30').split(':').map(Number);
+      const [pH, pM] = (jadwal.jamPulang || '16:00').split(':').map(Number);
       const pulangSec = pH * 3600 + pM * 60;
 
       if (curTotalSec < pulangSec) {
@@ -654,6 +695,40 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
     }, 50);
   };
 
+  // Logic to get separate status for Masuk and Pulang
+  const getDualStatus = (a: AbsensiGuru) => {
+    const statusMasuk = { label: '-', color: 'text-slate-400' };
+    const statusPulang = { label: '-', color: 'text-slate-400' };
+
+    if (a.status !== 'Hadir') {
+      const color = a.status === 'Izin' ? 'bg-amber-100 text-amber-800' : a.status === 'Sakit' ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800';
+      return { 
+        masuk: { label: a.status, color }, 
+        pulang: { label: a.status, color } 
+      };
+    }
+
+    if (a.jamMasuk) {
+      const res = calculateAttendanceStatusLabel(a.jamMasuk, 'Masuk');
+      statusMasuk.label = res.label;
+      statusMasuk.color = res.isLate ? 'bg-rose-100 text-rose-800' : res.label.includes('Toleransi') ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800';
+    } else {
+      statusMasuk.label = 'Tanpa Scan';
+      statusMasuk.color = 'bg-slate-100 text-slate-500';
+    }
+
+    if (a.jamKeluar) {
+      const res = calculateAttendanceStatusLabel(a.jamKeluar, 'Pulang');
+      statusPulang.label = res.label;
+      statusPulang.color = res.label.includes('Pulang Cepat') ? 'bg-orange-100 text-orange-800' : 'bg-emerald-100 text-emerald-800';
+    } else {
+      statusPulang.label = 'Tanpa Scan';
+      statusPulang.color = 'bg-slate-100 text-slate-500';
+    }
+
+    return { masuk: statusMasuk, pulang: statusPulang };
+  };
+
   // Helper scan processors to keep code modular and readable
   const processSiswaScan = (siswa: Siswa, timeNow: string, today: string) => {
     const statusInfo = calculateAttendanceStatusLabel(timeNow, scanMode);
@@ -907,126 +982,6 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
-  // --- Subtab 2: Absensi Kelas Per Mapel State ---
-  const [mapelKelas, setMapelKelas] = useState(() => availableKelasOptions[0] || 'VIII - Al Biruni');
-  const [mapelNama, setMapelNama] = useState('Fisika & Informatika');
-  const [mapelGuru, setMapelGuru] = useState('Siti Rahmawati, S.Si., M.Sc.');
-  const [mapelJam, setMapelJam] = useState('1 - 2 (07:00 - 08:30)');
-  const [mapelMateri, setMapelMateri] = useState('Eksperimen Praktikum Vektor & Simulasi Komputer');
-
-  // Auto ensure mapelKelas is valid if available options change
-  useEffect(() => {
-    if (availableKelasOptions.length > 0 && !availableKelasOptions.includes(mapelKelas)) {
-      setMapelKelas(availableKelasOptions[0]);
-    }
-  }, [availableKelasOptions, mapelKelas]);
-
-  // Memoized student list for Subtab 2 (Absensi Mapel)
-  const classSiswaMapelList = useMemo(() => {
-    if (!mapelKelas) return [];
-    const target = mapelKelas.trim().toLowerCase();
-    return siswaList.filter(s => s.kelas && s.kelas.trim().toLowerCase() === target);
-  }, [siswaList, mapelKelas]);
-  
-  const [localMapelState, setLocalMapelState] = useState<Record<string, StatusAbsensi>>({});
-  const [savingToDrive, setSavingToDrive] = useState(false);
-  const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
-
-  // Dynamic selection lists
-  const subjectsOptions = Array.from(new Set([
-    ...mapelList.map(m => m.namaMapel),
-    'Fisika & Informatika',
-    'Matematika Tingkat Lanjut',
-    'Bahasa Indonesia',
-    'Bahasa Inggris',
-    'Pendidikan Pancasila',
-    'IPA Terpadu',
-    'IPS Terpadu',
-    'Seni & Musik',
-    'PJOK'
-  ]));
-
-  const teachersOptions = Array.from(new Set([
-    ...guruList.map(g => g.nama),
-    'Siti Rahmawati, S.Si., M.Sc.',
-    'Drs. Hendra Kusuma, M.Pd.',
-    'Budi Santoso, S.Pd.',
-    'Rina Wijaya, M.Pd.',
-    'Achmad Fauzi, S.Kom.'
-  ]));
-
-  const hoursOptions = [
-    '1 - 2 (07:00 - 08:30)',
-    '3 - 4 (08:30 - 10:00)',
-    '5 - 6 (10:15 - 11:45)',
-    '7 - 8 (12:30 - 14:00)',
-    '9 - 10 (14:00 - 15:30)'
-  ];
-
-  // Auto fill teacher based on selected subject from mapelList
-  useEffect(() => {
-    if (mapelList && mapelList.length > 0) {
-      const matchingMapel = mapelList.find(m => m.namaMapel === mapelNama);
-      if (matchingMapel) {
-        setMapelGuru(matchingMapel.guruPengampuNama);
-      }
-    }
-  }, [mapelNama, mapelList]);
-
-  // Reset local mapel state when class changes to clear previous selections
-  useEffect(() => {
-    setLocalMapelState({});
-  }, [mapelKelas]);
-
-  const handleSaveAbsensiMapel = async () => {
-    // Fill in default 'Hadir' status for all students in the class who don't have a status yet
-    const finalKehadiranMap: Record<string, StatusAbsensi> = {};
-    classSiswaMapelList.forEach(s => {
-      finalKehadiranMap[s.id] = localMapelState[s.id] || 'Hadir';
-    });
-
-    const newEntry: AbsensiSiswaKelas = {
-      id: `abk-${Date.now()}`,
-      kelas: mapelKelas,
-      mataPelajaran: mapelNama,
-      guruNama: mapelGuru,
-      tanggal: selectedTanggal,
-      jamKe: mapelJam,
-      materi: mapelMateri,
-      kehadiranMap: finalKehadiranMap,
-      catatan: 'Absensi jurnal mengajar berhasil disimpan.'
-    };
-    
-    setAbsensiKelasList(prev => [newEntry, ...prev]);
-
-    setSavingToDrive(true);
-    try {
-      const res = await exportAllToGoogleSheets(userGoogleToken, {
-        siswaList,
-        guruList,
-        stafList,
-        rombelList,
-        mapelList,
-        absensiHarian,
-        absensiKelasList: [newEntry, ...absensiKelasList]
-      });
-
-      if (res.success) {
-        alert(`Jurnal & Absensi Kelas Berhasil Disimpan!\n\n${res.message}`);
-        if (res.url) {
-          setSpreadsheetUrl(res.url);
-        }
-      } else {
-        alert(`Jurnal & Absensi Kelas disimpan secara lokal, namun gagal sync ke Google Sheets: ${res.message}`);
-      }
-    } catch (err: any) {
-      console.error(err);
-      alert('Jurnal & Absensi Kelas berhasil disimpan secara lokal.');
-    } finally {
-      setSavingToDrive(false);
-    }
-  };
-
   // --- Subtab 3: Absensi Guru Clock In / Clock Out & Izin ---
   const [guruClockStatus, setGuruClockStatus] = useState<string | null>(null);
   const [showFormIzin, setShowFormIzin] = useState(false);
@@ -1120,6 +1075,36 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
     setAbsensiGuruList(prev => prev.map(a => a.id === id ? { ...a, statusIzin: newStatus } : a));
   };
 
+  const handleDeleteGuruRecords = (ids: string[], forceConfirm: boolean = false) => {
+    // Show confirmation if forced or if deleting multiple items
+    if (forceConfirm || ids.length > 1) {
+      if (!confirm(`Yakin ingin menghapus ${ids.length} data terpilih?`)) return;
+    }
+    
+    // Perform deletion
+    setAbsensiGuruList(prev => prev.filter(a => !ids.includes(a.id)));
+    
+    // Clear selection
+    setSelectedGuruIds(prev => prev.filter(id => !ids.includes(id)));
+    
+    // Feedback
+    showToast(`${ids.length} data berhasil dihapus`, 'success');
+  };
+
+  const toggleSelectGuru = (id: string) => {
+    setSelectedGuruIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllGuru = () => {
+    if (selectedGuruIds.length === absensiGuruList.length) {
+      setSelectedGuruIds([]);
+    } else {
+      setSelectedGuruIds(absensiGuruList.map(a => a.id));
+    }
+  };
+
   return (
     <div className="space-y-6 relative">
       
@@ -1154,7 +1139,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
           <span className="px-3 py-1 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-lg text-xs font-extrabold flex items-center gap-1.5 shadow-sm">
             {subTab === 'scan_barcode' && <><QrCode className="w-3.5 h-3.5" /> Scan Barcode / QR</>}
             {subTab === 'harian_siswa' && <><CalendarCheck className="w-3.5 h-3.5" /> Absensi Harian Siswa</>}
-            {subTab === 'kelas_mapel' && <><BookOpen className="w-3.5 h-3.5" /> Absensi Kelas Per Mapel</>}
+            {subTab === 'jurnal_guru' && <><BookOpen className="w-3.5 h-3.5" /> Jurnal Guru</>}
             {subTab === 'absensi_guru' && <><UserCheck className="w-3.5 h-3.5" /> Presensi Guru</>}
             {subTab === 'redaksi' && <><MessageSquare className="w-3.5 h-3.5" /> Redaksi Notifikasi WA</>}
           </span>
@@ -1214,15 +1199,32 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                   <span className="text-slate-300 font-mono text-[11px]">{gpsAddress}</span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={fetchGpsLocation}
-                disabled={gpsStatus === 'fetching'}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50 cursor-pointer"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${gpsStatus === 'fetching' ? 'animate-spin' : ''}`} />
-                <span>{gpsStatus === 'fetching' ? 'Mendapatkan GPS...' : 'Refresh GPS'}</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {gpsStatus === 'error' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGpsCoords({ lat: -6.2415, lng: 106.8045, accuracy: 5 });
+                      setGpsStatus('connected');
+                      setGpsAddress('Sekolah Islam Modern Al Fakhir (Manual)');
+                      showToast('Menggunakan Lokasi Sekolah secara manual', 'success');
+                    }}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm"
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    Paksa Lokasi Sekolah
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={fetchGpsLocation}
+                  disabled={gpsStatus === 'fetching'}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${gpsStatus === 'fetching' ? 'animate-spin' : ''}`} />
+                  <span>{gpsStatus === 'fetching' ? 'Mendapatkan GPS...' : 'Refresh GPS'}</span>
+                </button>
+              </div>
             </div>
 
             {/* Target Selector & WA Config Bar */}
@@ -1384,17 +1386,29 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                 <span className="flex items-center gap-1.5">
                   <CheckCheck className="w-4 h-4 text-emerald-400" /> Hasil Scan Terakhir
                 </span>
-                {lastScannedResult?.tipeAbsensi && (
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
-                    lastScannedResult.isUnknown
-                      ? 'bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse'
-                      : lastScannedResult.tipeAbsensi === 'Masuk'
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                      : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                  }`}>
-                    {lastScannedResult.isUnknown ? 'UNREGISTERED' : lastScannedResult.tipeAbsensi.toUpperCase()}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {scanHistory.length > 0 && (
+                    <button
+                      onClick={() => {
+                        if (confirm('Bersihkan semua riwayat scan?')) setScanHistory([]);
+                      }}
+                      className="text-[10px] text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" /> Bersihkan
+                    </button>
+                  )}
+                  {lastScannedResult?.tipeAbsensi && (
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                      lastScannedResult.isUnknown
+                        ? 'bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse'
+                        : lastScannedResult.tipeAbsensi === 'Masuk'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    }`}>
+                      {lastScannedResult.isUnknown ? 'UNREGISTERED' : lastScannedResult.tipeAbsensi.toUpperCase()}
+                    </span>
+                  )}
+                </div>
               </h4>
 
               {lastScannedResult ? (
@@ -1629,179 +1643,6 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
         </div>
       )}
 
-      {/* SUBTAB 2: ABSENSI KELAS PER MAPEL */}
-      {subTab === 'kelas_mapel' && (
-        <div className="space-y-6">
-          
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-900 text-base flex items-center gap-2 border-b pb-3">
-              <BookOpen className="w-5 h-5 text-emerald-600" /> Form Jurnal & Kehadiran Per Mata Pelajaran
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div>
-                <label className="text-[11px] font-bold text-slate-700">Kelas</label>
-                <select 
-                  value={mapelKelas} 
-                  onChange={e => setMapelKelas(e.target.value)}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:text-slate-950 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-                >
-                  {availableKelasOptions.map(k => (
-                    <option key={k} value={k}>{k}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-700">Mata Pelajaran</label>
-                <select 
-                  value={mapelNama} 
-                  onChange={e => setMapelNama(e.target.value)}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:text-slate-950 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                >
-                  {subjectsOptions.map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-700">Guru Pengajar</label>
-                <select 
-                  value={mapelGuru} 
-                  onChange={e => setMapelGuru(e.target.value)}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:text-slate-950 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                >
-                  {teachersOptions.map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-700">Jam Ke- / Waktu</label>
-                <select 
-                  value={mapelJam} 
-                  onChange={e => setMapelJam(e.target.value)}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:text-slate-950 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                >
-                  {hoursOptions.map(h => (
-                    <option key={h} value={h}>{h}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold text-slate-700">Materi Pembelajaran / Ringkasan Jurnal Kelas</label>
-              <textarea 
-                rows={2} 
-                value={mapelMateri} 
-                onChange={e => setMapelMateri(e.target.value)}
-                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:text-slate-950 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500" 
-              />
-            </div>
-
-            {/* Checklist Attendance in Mapel */}
-            <div className="pt-2">
-              <h4 className="font-bold text-xs uppercase text-slate-500 mb-2">
-                Checklist Kehadiran Siswa di Jam Mapel Ini ({classSiswaMapelList.length} Siswa):
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 border rounded-xl bg-slate-50">
-                {classSiswaMapelList.length === 0 ? (
-                  <p className="text-xs text-slate-500 text-center py-4 col-span-2">
-                    Tidak ada data siswa untuk kelas <span className="font-bold text-slate-700">{mapelKelas}</span>. Silakan tambahkan siswa di kelas ini melalui Menu Database Siswa.
-                  </p>
-                ) : (
-                  classSiswaMapelList.map(s => {
-                    const status = localMapelState[s.id] || 'Hadir';
-                    return (
-                      <div key={s.id} className="p-2 bg-white rounded-lg border border-slate-200 flex items-center justify-between text-xs shadow-xs hover:border-slate-300 transition-all">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-800">{s.nama}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">NISN: {s.nisn}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {(['Hadir', 'Sakit', 'Izin', 'Alpha'] as StatusAbsensi[]).map(st => (
-                            <button
-                              key={st}
-                              type="button"
-                              onClick={() => setLocalMapelState(prev => ({ ...prev, [s.id]: st }))}
-                              className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                                status === st 
-                                  ? st === 'Hadir' ? 'bg-emerald-500 text-slate-950 font-black shadow-xs'
-                                    : st === 'Sakit' ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
-                                    : st === 'Izin' ? 'bg-blue-600 text-white font-black shadow-xs'
-                                    : 'bg-rose-600 text-white font-black shadow-xs'
-                                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                              }`}
-                            >
-                              {st}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-between pt-3 gap-3 border-t">
-              <div>
-                {spreadsheetUrl && (
-                  <a 
-                    href={spreadsheetUrl} 
-                    target="_blank" 
-                    referrerPolicy="no-referrer"
-                    rel="noopener noreferrer" 
-                    className="text-xs text-emerald-600 hover:text-emerald-500 font-bold flex items-center gap-1.5 border-b border-emerald-500/30 transition-all"
-                  >
-                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Buka Database Spreadsheet Anda di Google Drive
-                  </a>
-                )}
-              </div>
-              <button
-                onClick={handleSaveAbsensiMapel}
-                disabled={savingToDrive}
-                className={`px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition-all flex items-center gap-2 shadow-md ${
-                  savingToDrive ? 'opacity-70 cursor-not-allowed' : ''
-                }`}
-              >
-                {savingToDrive ? (
-                  <>
-                    <span className="w-3.5 h-3.5 rounded-full border-2 border-slate-950 border-t-transparent animate-spin"></span>
-                    Menyimpan & Menyinkronkan ke Drive...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" /> Simpan Jurnal & Sync Spreadsheet
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* History Jurnal Kelas */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-3">
-            <h3 className="font-bold text-slate-900 text-sm">Riwayat Jurnal Kelas & Absensi Mapel</h3>
-            <div className="space-y-2">
-              {absensiKelasList.map(item => (
-                <div key={item.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-2">
-                  <div>
-                    <div className="font-bold text-slate-900">{item.mataPelajaran} ({item.kelas}) - {item.jamKe}</div>
-                    <div className="text-slate-500 mt-0.5">Guru: {item.guruNama} | Materi: {item.materi}</div>
-                  </div>
-                  <span className="px-2.5 py-1 bg-blue-100 text-blue-800 font-bold rounded-full text-[10px] self-start sm:self-center">
-                    {item.tanggal}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-        </div>
-      )}
 
       {/* SUBTAB 3: ABSENSI GURU CLOCK IN/OUT & IZIN */}
       {subTab === 'absensi_guru' && (
@@ -1902,7 +1743,18 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
           {/* Daftar Kehadiran Guru Hari Ini */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Rekap Kehadiran Guru (Hari Ini)</h3>
+              <div className="flex items-center gap-3">
+                <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Rekap Kehadiran Guru (Hari Ini)</h3>
+                {selectedGuruIds.length > 0 && (
+                  <button
+                    onClick={() => handleDeleteGuruRecords(selectedGuruIds, true)}
+                    className="flex items-center gap-1.5 px-3 py-1 bg-rose-600 text-white rounded-lg text-[10px] font-bold hover:bg-rose-700 transition-colors shadow-sm"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Hapus ({selectedGuruIds.length})
+                  </button>
+                )}
+              </div>
               <span className="text-xs text-slate-500 font-semibold">Total: {absensiGuruList.length} Record</span>
             </div>
 
@@ -1910,55 +1762,102 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
               <table className="w-full text-left text-xs text-slate-600">
                 <thead className="bg-slate-100 text-slate-700 font-semibold uppercase tracking-wider text-[11px]">
                   <tr>
+                    <th className="px-4 py-3 w-10">
+                      <button 
+                        onClick={toggleSelectAllGuru}
+                        className="text-slate-400 hover:text-indigo-600 transition-colors"
+                      >
+                        {selectedGuruIds.length === absensiGuruList.length && absensiGuruList.length > 0 ? (
+                          <CheckSquare className="w-4 h-4 text-indigo-600" />
+                        ) : (
+                          <Square className="w-4 h-4" />
+                        )}
+                      </button>
+                    </th>
                     <th className="px-4 py-3">Nama Guru</th>
                     <th className="px-4 py-3">Tanggal</th>
                     <th className="px-4 py-3">Jam Masuk</th>
                     <th className="px-4 py-3">Jam Keluar</th>
-                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Status Masuk</th>
+                    <th className="px-4 py-3">Status Pulang</th>
                     <th className="px-4 py-3">Keterangan / Lokasi</th>
-                    <th className="px-4 py-3 text-right">Persetujuan</th>
+                    <th className="px-4 py-3 text-right">AKSI</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {absensiGuruList.map(a => (
-                    <tr key={a.id} className="hover:bg-slate-50/80 transition-colors">
+                    <tr key={a.id} className={`hover:bg-slate-50/80 transition-colors ${selectedGuruIds.includes(a.id) ? 'bg-indigo-50/30' : ''}`}>
+                      <td className="px-4 py-3">
+                        <button 
+                          onClick={() => toggleSelectGuru(a.id)}
+                          className="text-slate-400 hover:text-indigo-600 transition-colors"
+                        >
+                          {selectedGuruIds.includes(a.id) ? (
+                            <CheckSquare className="w-4 h-4 text-indigo-600" />
+                          ) : (
+                            <Square className="w-4 h-4" />
+                          )}
+                        </button>
+                      </td>
                       <td className="px-4 py-3 font-bold text-slate-900">{a.guruNama}</td>
                       <td className="px-4 py-3 font-mono">{a.tanggal}</td>
                       <td className="px-4 py-3 font-mono font-semibold text-emerald-700">{a.jamMasuk || '-'}</td>
                       <td className="px-4 py-3 font-mono font-semibold text-blue-700">{a.jamKeluar || '-'}</td>
                       <td className="px-4 py-3">
-                        <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] ${
-                          a.status === 'Hadir' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {a.status}
-                        </span>
+                        {(() => {
+                          const { masuk } = getDualStatus(a);
+                          return (
+                            <span className={`inline-block px-2 py-0.5 rounded-full font-bold text-[9px] ${masuk.color}`}>
+                              {masuk.label}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const { pulang } = getDualStatus(a);
+                          return (
+                            <span className={`inline-block px-2 py-0.5 rounded-full font-bold text-[9px] ${pulang.color}`}>
+                              {pulang.label}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-slate-500 max-w-xs truncate">
                         <LocationWithMapLink text={a.status === 'Hadir' ? (a.lokasiIn || a.lokasiOut || '') : (a.keteranganIzin || a.lokasiIn || '')} />
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {a.statusIzin === 'Pending' && a.status !== 'Hadir' ? (
-                          <div className="flex justify-end gap-1">
-                            <button
-                              onClick={() => handleApproveIzin(a.id, 'Disetujui')}
-                              className="px-2 py-1 bg-emerald-500 text-slate-950 font-bold rounded text-[10px]"
-                            >
-                              Setujui
-                            </button>
-                            <button
-                              onClick={() => handleApproveIzin(a.id, 'Ditolak')}
-                              className="px-2 py-1 bg-rose-500 text-white font-bold rounded text-[10px]"
-                            >
-                              Tolak
-                            </button>
-                          </div>
-                        ) : (
-                          <span className={`font-bold text-[10px] px-2 py-0.5 rounded ${
-                            (a.status === 'Hadir' || a.statusIzin === 'Disetujui') ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'
-                          }`}>
-                            {a.status === 'Hadir' ? 'Disetujui' : a.statusIzin}
-                          </span>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          {a.statusIzin === 'Pending' && a.status !== 'Hadir' ? (
+                            <div className="flex justify-end gap-1">
+                              <button
+                                onClick={() => handleApproveIzin(a.id, 'Disetujui')}
+                                className="px-2 py-1 bg-emerald-500 text-slate-950 font-bold rounded text-[10px]"
+                              >
+                                Setujui
+                              </button>
+                              <button
+                                onClick={() => handleApproveIzin(a.id, 'Ditolak')}
+                                className="px-2 py-1 bg-rose-500 text-white font-bold rounded text-[10px]"
+                              >
+                                Tolak
+                              </button>
+                            </div>
+                          ) : (
+                            <span className={`font-bold text-[10px] px-2 py-0.5 rounded ${
+                              (a.status === 'Hadir' || a.statusIzin === 'Disetujui') ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'
+                            }`}>
+                              {a.status === 'Hadir' ? 'Disetujui' : a.statusIzin}
+                            </span>
+                          )}
+                          <button
+                            onClick={() => handleDeleteGuruRecords([a.id])}
+                            className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all border border-transparent hover:border-rose-100 flex items-center justify-center"
+                            title="Hapus Data"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

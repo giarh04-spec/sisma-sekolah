@@ -23,21 +23,47 @@ import {
 } from '../types/school';
 
 export const INITIAL_ROMBEL: RombelKelas[] = [
-  { id: 'rom-1', namaRombel: 'VII-A', tingkatKelas: 'Kelas 7', jurusanPeminatan: 'Umum (Kurikulum Merdeka)', waliKelasNama: 'Budi Santoso, S.Pd', ruangan: 'R. 101', kurikulum: 'Kurikulum Merdeka', tahunAjaran: '2026/2027', semester: 'Ganjil', kapasitas: 32 },
-  { id: 'rom-2', namaRombel: 'VII-B', tingkatKelas: 'Kelas 7', jurusanPeminatan: 'Umum (Kurikulum Merdeka)', waliKelasNama: 'Siti Aminah, S.Pd', ruangan: 'R. 102', kurikulum: 'Kurikulum Merdeka', tahunAjaran: '2026/2027', semester: 'Ganjil', kapasitas: 32 },
-  { id: 'rom-3', namaRombel: 'VIII-A', tingkatKelas: 'Kelas 8', jurusanPeminatan: 'Umum (Kurikulum Merdeka)', waliKelasNama: 'Drs. H. Bambang Sutrisno', ruangan: 'R. 201', kurikulum: 'Kurikulum Merdeka', tahunAjaran: '2026/2027', semester: 'Ganjil', kapasitas: 32 },
-  { id: 'rom-4', namaRombel: 'IX-A', tingkatKelas: 'Kelas 9', jurusanPeminatan: 'Umum (Kurikulum Merdeka)', waliKelasNama: 'Nurhidayati, S.Pd', ruangan: 'R. 301', kurikulum: 'Kurikulum Merdeka', tahunAjaran: '2026/2027', semester: 'Ganjil', kapasitas: 30 }
+  { id: 'rom-7is', namaRombel: 'VII - Ibnu Sina', tingkatKelas: 'Kelas 7', jurusanPeminatan: 'Umum', waliKelasNama: 'Siti Aminah, S.Pd', ruangan: 'R. 101', kurikulum: 'Kurikulum Merdeka', tahunAjaran: '2026/2027', semester: 'Ganjil', kapasitas: 32 },
+  { id: 'rom-7ik', namaRombel: 'VII - Ibnu Khaldun', tingkatKelas: 'Kelas 7', jurusanPeminatan: 'Umum', waliKelasNama: 'Dedi Kurniawan', ruangan: 'R. 102', kurikulum: 'Kurikulum Merdeka', tahunAjaran: '2026/2027', semester: 'Ganjil', kapasitas: 32 },
+  { id: 'rom-7ih', namaRombel: 'VII - Ibnu Al Haytam', tingkatKelas: 'Kelas 7', jurusanPeminatan: 'Umum', waliKelasNama: 'Sri Lestari', ruangan: 'R. 103', kurikulum: 'Kurikulum Merdeka', tahunAjaran: '2026/2027', semester: 'Ganjil', kapasitas: 32 },
+  { id: 'rom-8k', namaRombel: 'VIII - Al Kindi', tingkatKelas: 'Kelas 8', jurusanPeminatan: 'Umum', waliKelasNama: 'Budi Santoso, S.Pd', ruangan: 'R. 201', kurikulum: 'Kurikulum Merdeka', tahunAjaran: '2026/2027', semester: 'Ganjil', kapasitas: 32 },
+  { id: 'rom-8kh', namaRombel: 'VIII - Al Khawarizmi', tingkatKelas: 'Kelas 8', jurusanPeminatan: 'Umum', waliKelasNama: 'Drs. H. Bambang Sutrisno', ruangan: 'R. 202', kurikulum: 'Kurikulum Merdeka', tahunAjaran: '2026/2027', semester: 'Ganjil', kapasitas: 32 },
+  { id: 'rom-8f', namaRombel: 'VIII - Al Farabi', tingkatKelas: 'Kelas 8', jurusanPeminatan: 'Umum', waliKelasNama: 'Siti Aminah, S.Pd', ruangan: 'R. 203', kurikulum: 'Kurikulum Merdeka', tahunAjaran: '2026/2027', semester: 'Ganjil', kapasitas: 32 },
+  { id: 'rom-8b', namaRombel: 'VIII - Al Biruni', tingkatKelas: 'Kelas 8', jurusanPeminatan: 'Umum', waliKelasNama: 'Siti Aminah, S.Pd', ruangan: 'R. 204', kurikulum: 'Kurikulum Merdeka', tahunAjaran: '2026/2027', semester: 'Ganjil', kapasitas: 32 },
+  { id: 'rom-9u', namaRombel: 'IX - Umar bin Khattab', tingkatKelas: 'Kelas 9', jurusanPeminatan: 'Umum', waliKelasNama: 'Nurhidayati, S.Pd', ruangan: 'R. 301', kurikulum: 'Kurikulum Merdeka', tahunAjaran: '2026/2027', semester: 'Ganjil', kapasitas: 30 },
+  { id: 'rom-9ut', namaRombel: 'IX - Utsman bin Affan', tingkatKelas: 'Kelas 9', jurusanPeminatan: 'Umum', waliKelasNama: 'Giar Hermawan, S.Kom', ruangan: 'R. 302', kurikulum: 'Kurikulum Merdeka', tahunAjaran: '2026/2027', semester: 'Ganjil', kapasitas: 30 }
 ];
 
 export const INITIAL_SISWA: Siswa[] = [
   {
+    id: 'sis-000',
+    nisn: '123901126',
+    nis: '10210',
+    nik: '3276032808100109',
+    nama: 'Azahra Habibatul Kamilah',
+    kelas: 'IX - Umar bin Khattab',
+    jenisKelamin: 'P',
+    tempatLahir: 'Jakarta',
+    tanggalLahir: '2011-05-15',
+    agama: 'Islam',
+    alamat: 'Jl. Umar bin Khattab No. 24',
+    namaWali: 'Ahmad Kamil',
+    teleponWali: '081299998888',
+    status: 'Aktif',
+    fotoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
+    kodeBarcode: 'SIS-123901126',
+    email: 'giarhermawan.gh@gmail.com',
+    username: 'giarhermawan.gh',
+    password: 'password123'
+  },
+  {
     id: 'sis-001',
-    nisn: '3109281000',
+    nisn: '117899483',
     nis: '10200',
     nik: '3276031101120000',
-    nama: 'BAYU ADITYA RIFAI',
-    kelas: 'Ibnu Al haytam',
-    jenisKelamin: 'L',
+    nama: 'ALIA DINA SYAHIRA',
+    kelas: 'IX - Utsman bin Affan',
+    jenisKelamin: 'P',
     tempatLahir: 'Jakarta',
     tanggalLahir: '2013-01-10',
     agama: 'Islam',
@@ -53,11 +79,11 @@ export const INITIAL_SISWA: Siswa[] = [
   },
   {
     id: 'sis-002',
-    nisn: '3109281009',
+    nisn: '122600683',
     nis: '10209',
     nik: '3276031101120009',
     nama: 'Alya Salsabila Amani',
-    kelas: 'Ibnu Al haytam',
+    kelas: 'IX - Utsman bin Affan',
     jenisKelamin: 'P',
     tempatLahir: 'Jakarta',
     tanggalLahir: '2013-03-15',
@@ -78,7 +104,7 @@ export const INITIAL_SISWA: Siswa[] = [
     nis: '10201',
     nik: '3276031101120001',
     nama: 'Ahmad Fauzan Al-Fikri',
-    kelas: 'VII-A',
+    kelas: 'IX - Utsman bin Affan',
     jenisKelamin: 'L',
     tempatLahir: 'Jakarta Selatan',
     tanggalLahir: '2013-05-12',
@@ -99,7 +125,7 @@ export const INITIAL_SISWA: Siswa[] = [
     nis: '10202',
     nik: '3276031202120002',
     nama: 'Nabila Zahra Maharani',
-    kelas: 'VII-A',
+    kelas: 'IX - Utsman bin Affan',
     jenisKelamin: 'P',
     tempatLahir: 'Jakarta',
     tanggalLahir: '2013-08-20',
@@ -120,7 +146,7 @@ export const INITIAL_SISWA: Siswa[] = [
     nis: '10203',
     nik: '3276031503120003',
     nama: 'Rizky Ramadhan Putra',
-    kelas: 'VII-B',
+    kelas: 'VII - Utsman bin Affan',
     jenisKelamin: 'L',
     tempatLahir: 'Jakarta',
     tanggalLahir: '2013-07-15',
@@ -141,7 +167,7 @@ export const INITIAL_SISWA: Siswa[] = [
     nis: '10204',
     nik: '3276031804110004',
     nama: 'Salsabila Putri Amalia',
-    kelas: 'VII-B',
+    kelas: 'VII - Utsman bin Affan',
     jenisKelamin: 'P',
     tempatLahir: 'Depok',
     tanggalLahir: '2012-11-03',
@@ -162,7 +188,7 @@ export const INITIAL_SISWA: Siswa[] = [
     nis: '9201',
     nik: '3276032005110005',
     nama: 'Dimas Anggara Pratama',
-    kelas: 'VIII-A',
+    kelas: 'VIII - Al Khawarizmi',
     jenisKelamin: 'L',
     tempatLahir: 'Jakarta',
     tanggalLahir: '2012-02-14',
@@ -183,7 +209,7 @@ export const INITIAL_SISWA: Siswa[] = [
     nis: '9202',
     nik: '3276032206110006',
     nama: 'Aulia Rahmawati',
-    kelas: 'VIII-A',
+    kelas: 'VIII - Al Khawarizmi',
     jenisKelamin: 'P',
     tempatLahir: 'Jakarta',
     tanggalLahir: '2012-09-09',
@@ -204,7 +230,7 @@ export const INITIAL_SISWA: Siswa[] = [
     nis: '8201',
     nik: '3276032507100007',
     nama: 'Kevin Pratama Santoso',
-    kelas: 'IX-A',
+    kelas: 'IX - Utsman bin Affan',
     jenisKelamin: 'L',
     tempatLahir: 'Bandung',
     tanggalLahir: '2011-04-05',
@@ -225,7 +251,7 @@ export const INITIAL_SISWA: Siswa[] = [
     nis: '8202',
     nik: '3276032808100008',
     nama: 'Zahra Aulia Salsabila',
-    kelas: 'IX-A',
+    kelas: 'IX - Utsman bin Affan',
     jenisKelamin: 'P',
     tempatLahir: 'Jakarta',
     tanggalLahir: '2011-12-11',
@@ -332,6 +358,24 @@ export const INITIAL_GURU: Guru[] = [
     telepon: '081166778899',
     fotoUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
     alamatLengkap: 'Jl. Olahraga No. 7'
+  },
+  {
+    id: 'gur-6',
+    nip: '198204102010011010',
+    nik: '3276010410820010',
+    nama: 'Giar Hermawan, S.Kom',
+    mataPelajaran: 'Informatika',
+    jabatan: 'Guru TIK / Wali Kelas IX - Utsman bin Affan',
+    status: 'GTY',
+    jenisKelamin: 'L',
+    tempatLahir: 'Jakarta',
+    tanggalLahir: '1982-04-10',
+    email: 'giar.hermawan@guru.sch.id',
+    username: 'giar.hermawan',
+    password: 'password123',
+    telepon: '081298765432',
+    fotoUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+    alamatLengkap: 'Jl. Merdeka No. 10'
   }
 ];
 
@@ -523,7 +567,8 @@ export const INITIAL_MAPEL: MataPelajaranItem[] = [
   { id: 'mapel-2', kodeMapel: 'MP-BIN-02', namaMapel: 'Bahasa Indonesia', kategori: 'Wajib Umum', tingkatKelas: 'Semua Tingkat', guruPengampuNama: 'Siti Aminah, S.Pd', alokasiJamPerMinggu: 4, kkm: 75, kurikulum: 'Kurikulum Merdeka', jadwalMengajar: [] },
   { id: 'mapel-3', kodeMapel: 'MP-IPA-03', namaMapel: 'Ilmu Pengetahuan Alam (IPA)', kategori: 'Wajib Umum', tingkatKelas: 'Semua Tingkat', guruPengampuNama: 'Drs. H. Bambang Sutrisno', alokasiJamPerMinggu: 5, kkm: 75, kurikulum: 'Kurikulum Merdeka', jadwalMengajar: [] },
   { id: 'mapel-4', kodeMapel: 'MP-IPS-04', namaMapel: 'Ilmu Pengetahuan Sosial (IPS)', kategori: 'Wajib Umum', tingkatKelas: 'Semua Tingkat', guruPengampuNama: 'Rina Marlina, M.Pd', alokasiJamPerMinggu: 4, kkm: 70, kurikulum: 'Kurikulum Merdeka', jadwalMengajar: [] },
-  { id: 'mapel-5', kodeMapel: 'MP-ENG-05', namaMapel: 'Bahasa Inggris', kategori: 'Wajib Umum', tingkatKelas: 'Semua Tingkat', guruPengampuNama: 'Rina Marlina, M.Pd', alokasiJamPerMinggu: 4, kkm: 75, kurikulum: 'Kurikulum Merdeka', jadwalMengajar: [] }
+  { id: 'mapel-5', kodeMapel: 'MP-ENG-05', namaMapel: 'Bahasa Inggris', kategori: 'Wajib Umum', tingkatKelas: 'Semua Tingkat', guruPengampuNama: 'Rina Marlina, M.Pd', alokasiJamPerMinggu: 4, kkm: 75, kurikulum: 'Kurikulum Merdeka', jadwalMengajar: [] },
+  { id: 'mapel-6', kodeMapel: 'MP-INF-06', namaMapel: 'Informatika', kategori: 'Wajib Umum', tingkatKelas: 'Semua Tingkat', guruPengampuNama: 'Giar Hermawan, S.Kom', alokasiJamPerMinggu: 2, kkm: 75, kurikulum: 'Kurikulum Merdeka', jadwalMengajar: [] }
 ];
 
 export const INITIAL_TARIF_BIAYA: TarifBiaya[] = [

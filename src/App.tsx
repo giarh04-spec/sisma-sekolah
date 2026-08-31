@@ -120,19 +120,25 @@ export default function App() {
     }
   });
 
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [currentRole, setCurrentRole] = useState<Role>('admin');
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    return localStorage.getItem('edu_isLoggedIn') === 'true';
+  });
+  const [currentRole, setCurrentRole] = useState<Role>(() => {
+    return (localStorage.getItem('edu_currentRole') as Role) || 'admin';
+  });
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [databaseSubTab, setDatabaseSubTab] = useState<SubTab>('siswa');
   const [absensiSubTab, setAbsensiSubTab] = useState<AbsensiSubTab>('scan_barcode');
   const [cbtSubTab, setCbtSubTab] = useState<CbtSubTab>('bank_soal');
-  const [administrasiSubTab, setAdministrasiSubTab] = useState<AdministrasiSubTab>('perangkat');
+  const [administrasiSubTab, setAdministrasiSubTab] = useState<AdministrasiSubTab>('jadwal');
   const [keuanganSubTab, setKeuanganSubTab] = useState<KeuanganSubTab>('pembayaran');
   const [pengaturanSubTab, setPengaturanSubTab] = useState<PengaturanSubTab>('identitas');
 
   // Google OAuth Auth State
   const [userGoogleToken, setUserGoogleToken] = useState<string>('');
-  const [userEmail, setUserEmail] = useState<string>('');
+  const [userEmail, setUserEmail] = useState<string>(() => {
+    return localStorage.getItem('edu_userEmail') || '';
+  });
   const [isDbLoaded, setIsDbLoaded] = useState<boolean>(false);
   const [firebaseSyncStatus, setFirebaseSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
@@ -242,9 +248,6 @@ export default function App() {
           if (ujianData.length > 0) setUjianList(ujianData);
           else await dbSaveCollection('edu_ujianList', ujianList);
 
-          if (administrasiData.length > 0) setAdministrasiList(administrasiData);
-          else await dbSaveCollection('edu_administrasiList', administrasiList);
-
           const isSystemReset = localStorage.getItem('edu_system_reset') === 'true';
           const isTagihanForceCleared = localStorage.getItem('edu_tagihan_force_clear') === 'true' || isSystemReset;
           const isTransaksiForceCleared = localStorage.getItem('edu_transaksi_force_clear') === 'true' || isSystemReset;
@@ -309,6 +312,18 @@ export default function App() {
             setTransaksiList(transaksiData);
           } else {
             await dbSaveCollection('edu_transaksiList', transaksiList);
+          }
+
+          // One-time cleanup for example administration documents as requested
+          const admClearFlag = localStorage.getItem('edu_clear_adm_v1');
+          if (!admClearFlag) {
+            await dbClearCollection('edu_administrasiList');
+            setAdministrasiList([]);
+            localStorage.setItem('edu_clear_adm_v1', 'true');
+          } else if (administrasiData.length > 0) {
+            setAdministrasiList(administrasiData);
+          } else {
+            await dbSaveCollection('edu_administrasiList', administrasiList);
           }
 
           if (hasilUjianData.length > 0) setHasilUjianList(hasilUjianData);
@@ -448,10 +463,10 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('edu_administrasiList', JSON.stringify(administrasiList));
-    if (isDbLoaded && isLoggedIn) {
-      saveCollectionWithStatus('edu_administrasiList', administrasiList);
-    }
-  }, [administrasiList, isDbLoaded, isLoggedIn]);
+    // We remove the automatic collection save here because AdministrasiGuruView
+    // handles its own persistence via dbSaveCollection and dbDeleteItem
+    // to avoid conflict with deletions.
+  }, [administrasiList]);
 
   useEffect(() => {
     localStorage.setItem('edu_tagihanList', JSON.stringify(tagihanList));
@@ -513,7 +528,7 @@ export default function App() {
 
           const items: T[] = [];
           snapshot.forEach((doc) => {
-            items.push(doc.data() as T);
+            items.push({ id: doc.id, ...doc.data() } as T);
           });
           setter((prev) => {
             // Sort to ensure stable comparison
@@ -633,13 +648,27 @@ export default function App() {
     schoolSettings.googleSyncSpreadsheetId
   ]);
 
+  // Save auth details to localStorage for persistence
+  useEffect(() => {
+    localStorage.setItem('edu_isLoggedIn', isLoggedIn ? 'true' : 'false');
+    localStorage.setItem('edu_currentRole', currentRole);
+    localStorage.setItem('edu_userEmail', userEmail || '');
+  }, [isLoggedIn, currentRole, userEmail]);
+
   // Auto initialize Google OAuth listener
   useEffect(() => {
     initAuth(
       (user, token) => {
+        const savedRole = localStorage.getItem('edu_currentRole');
+        const savedLoggedIn = localStorage.getItem('edu_isLoggedIn') === 'true';
+        // Only override if not logged in with a manual account of a different role
+        if (savedLoggedIn && savedRole && savedRole !== 'admin') {
+          return;
+        }
         setUserGoogleToken(token || '');
         setUserEmail(user.email || 'giar.hermawan4@guru.smp.belajar.id');
         setIsLoggedIn(true);
+        setCurrentRole('admin');
       },
       () => {
         // Unauthenticated
@@ -657,6 +686,9 @@ export default function App() {
       setActiveTab('absensi');
     } else if (role === 'staf') {
       setActiveTab('keuangan');
+    } else if (role === 'siswa') {
+      setActiveTab('cbt');
+      setCbtSubTab('simulasi_ujian');
     } else {
       setActiveTab('dashboard');
     }
@@ -673,11 +705,14 @@ export default function App() {
         setActiveTab('keuangan');
       }
     } else if (currentRole === 'siswa') {
-      if (activeTab === 'database' || activeTab === 'administrasi' || activeTab === 'pengaturan') {
-        setActiveTab('dashboard');
+      if (activeTab !== 'cbt') {
+        setActiveTab('cbt');
+      }
+      if (cbtSubTab === 'bank_soal' || cbtSubTab === 'ai_generator') {
+        setCbtSubTab('simulasi_ujian');
       }
     }
-  }, [currentRole, userEmail]);
+  }, [currentRole, userEmail, activeTab, cbtSubTab]);
 
   const handleLogout = async () => {
     try {
@@ -688,6 +723,10 @@ export default function App() {
     setUserEmail('');
     setUserGoogleToken('');
     setIsLoggedIn(false);
+    setCurrentRole('admin');
+    localStorage.removeItem('edu_isLoggedIn');
+    localStorage.removeItem('edu_currentRole');
+    localStorage.removeItem('edu_userEmail');
   };
 
   // If public slip link is accessed, render PublicSlipGajiView directly
@@ -868,8 +907,15 @@ export default function App() {
               guruList={guruList}
               mapelList={mapelList}
               rombelList={rombelList}
+              siswaList={siswaList}
+              absensiKelasList={absensiKelasList}
+              setAbsensiKelasList={setAbsensiKelasList}
               subTab={administrasiSubTab}
               setSubTab={setAdministrasiSubTab}
+              userGoogleToken={userGoogleToken}
+              schoolSettings={schoolSettings}
+              absensiHarian={absensiHarian}
+              stafList={stafList}
             />
           )}
           

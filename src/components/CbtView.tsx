@@ -7,6 +7,8 @@ import {
   Sparkles, 
   Play, 
   Clock, 
+  Image,
+  Film,
   CheckCircle2, 
   AlertCircle, 
   HelpCircle, 
@@ -97,6 +99,10 @@ export const CbtView: React.FC<CbtViewProps> = ({
   useEffect(() => {
     if (currentRole === 'guru' && subTab === 'jadwal_kartu') {
       setSubTab('bank_soal');
+    } else if (currentRole === 'siswa') {
+      if (subTab === 'bank_soal' || subTab === 'ai_generator') {
+        setSubTab('simulasi_ujian');
+      }
     }
   }, [currentRole, subTab]);
 
@@ -562,6 +568,8 @@ export const CbtView: React.FC<CbtViewProps> = ({
   const [newKunciEsai, setNewKunciEsai] = useState('');
   const [newPembahasan, setNewPembahasan] = useState('');
   const [newBobot, setNewBobot] = useState(25);
+  const [newImageUrl, setNewImageUrl] = useState('');
+  const [newVideoUrl, setNewVideoUrl] = useState('');
 
   const handleAddSoal = (e: React.FormEvent) => {
     e.preventDefault();
@@ -584,7 +592,9 @@ export const CbtView: React.FC<CbtViewProps> = ({
       ] : undefined,
       kunciJawaban: kunci,
       pembahasan: newPembahasan,
-      bobot: Number(newBobot)
+      bobot: Number(newBobot),
+      imageUrl: newImageUrl || undefined,
+      videoUrl: newVideoUrl || undefined
     };
 
     setBankSoalList(prev => prev.map(b => {
@@ -600,6 +610,8 @@ export const CbtView: React.FC<CbtViewProps> = ({
 
     setShowAddSoalModal(false);
     setNewPertanyaan('');
+    setNewImageUrl('');
+    setNewVideoUrl('');
     alert('Soal baru berhasil ditambahkan ke Bank Soal!');
   };
 
@@ -747,6 +759,129 @@ export const CbtView: React.FC<CbtViewProps> = ({
   const [siswaJawaban, setSiswaJawaban] = useState<Record<string, JawabanSiswa>>({});
   const [examFinished, setExamFinished] = useState(false);
   const [finalScore, setFinalScore] = useState<number | null>(null);
+  const [selectedSiswaId, setSelectedSiswaId] = useState<string>('');
+
+  // Ambil data siswa aktif secara dinamis & akurat sesuai akun login atau pilihan simulasi
+  const activeSiswa = useMemo(() => {
+    // 1. Jika admin/guru secara manual memilih siswa dari dropdown simulasi, gunakan pilihan tersebut
+    if (currentRole !== 'siswa' && selectedSiswaId) {
+      const found = (siswaList || []).find(s => s.id === selectedSiswaId);
+      if (found) return found;
+    }
+
+    const emailLower = userEmail?.toLowerCase().trim() || '';
+    const emailPrefix = emailLower.split('@')[0];
+
+    // 2. Cari siswa yang emailnya cocok atau username / NIS cocok dengan userEmail / emailPrefix
+    const foundSiswa = (siswaList || []).find(s => {
+      const sEmail = s.email?.toLowerCase().trim() || '';
+      const sUsername = s.username?.toLowerCase().trim() || '';
+      const sId = s.id?.toLowerCase().trim() || '';
+      const sNis = s.nis?.toLowerCase().trim() || '';
+      const sNisn = s.nisn?.toLowerCase().trim() || '';
+
+      // Match criteria - Ensure none of the comparison fields are empty strings to avoid false positive matches
+      return (
+        (sEmail && sEmail === emailLower) ||
+        (sUsername && sUsername === emailLower) ||
+        (sId && sId === emailLower) ||
+        (sNis && sNis === emailLower) ||
+        (sNisn && sNisn === emailLower) ||
+        (emailPrefix && (
+          (sEmail && sEmail === emailPrefix) ||
+          (sUsername && sUsername === emailPrefix) ||
+          (sId && sId === emailPrefix) ||
+          (sNis && sNis === emailPrefix) ||
+          (sNisn && sNisn === emailPrefix)
+        )) ||
+        (emailLower.length > 0 && (
+          (sUsername && emailLower.startsWith(sUsername)) ||
+          (sNis && emailLower.startsWith(sNis)) ||
+          (sId && emailLower.startsWith(sId)) ||
+          (sUsername && emailLower.includes(sUsername)) ||
+          (sNis && emailLower.includes(sNis))
+        ))
+      );
+    });
+
+    if (foundSiswa) return foundSiswa;
+
+    // 3. Jika login sebagai siswa tapi tidak ditemukan di database dengan email itu,
+    // coba cari siswa pertama yang namanya mengandung bagian dari email prefix
+    if (emailPrefix && emailPrefix.length > 2) {
+      const matchingByName = (siswaList || []).find(s => {
+        const sNama = s.nama?.toLowerCase() || '';
+        return sNama.includes(emailPrefix) || emailPrefix.includes(sNama);
+      });
+      if (matchingByName) return matchingByName;
+    }
+
+    // 4. Jika tidak ada kecocokan email tapi ada daftar siswa, berikan rekomendasi otomatis
+    // Sesuai permintaan user, prioritaskan "Azahra", "Alya Salsabila" atau "Syahira"
+    if (siswaList && siswaList.length > 0) {
+      if (emailLower.includes('azahra') || emailLower.includes('zahra') || emailLower.includes('kamilah')) {
+        const azahra = siswaList.find(s => s.nama.toLowerCase().includes('azahra') || s.nama.toLowerCase().includes('zahra'));
+        if (azahra) return azahra;
+      }
+      if (emailLower.includes('alya')) {
+        const alya = siswaList.find(s => s.nama.toLowerCase().includes('alya'));
+        if (alya) return alya;
+      }
+      if (emailLower.includes('syahira')) {
+        const syahira = siswaList.find(s => s.nama.toLowerCase().includes('syahira'));
+        if (syahira) return syahira;
+      }
+      
+      // Default fallback demo: cari siswa bernama "Azahra" (untuk visual demo terbaik sesuai screenshot user)
+      const defaultAzahra = siswaList.find(s => s.nama.toLowerCase().includes('azahra') || s.nama.toLowerCase().includes('zahra'));
+      if (defaultAzahra) return defaultAzahra;
+
+      const defaultAlya = siswaList.find(s => s.nama.toLowerCase().includes('alya'));
+      if (defaultAlya) return defaultAlya;
+
+      // Jika tidak ada "Alya" di database, cari "Syahira"
+      const defaultSyahira = siswaList.find(s => s.nama.toLowerCase().includes('syahira'));
+      if (defaultSyahira) return defaultSyahira;
+
+      return siswaList[0];
+    }
+
+    // 5. Fallback final jika list kosong
+    return {
+      id: 'sis-002',
+      nisn: '122600683',
+      nis: '10209',
+      nama: 'Alya Salsabila Amani',
+      kelas: 'IX - Utsman bin Affan',
+      jenisKelamin: 'P',
+      fotoUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80'
+    };
+  }, [siswaList, currentRole, userEmail, selectedSiswaId]);
+  
+  // Real dynamic timer matching the mockup image (1 Jam 49 Menit 51 Detik)
+  const [timeLeft, setTimeLeft] = useState(1 * 3600 + 49 * 60 + 51);
+
+  useEffect(() => {
+    if (subTab !== 'simulasi_ujian' || examFinished) return;
+    const interval = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          handleFinishExam();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [subTab, examFinished]);
+
+  const getFormattedTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h} Jam ${m} Menit ${s} Detik`;
+  };
 
   // --- Anti-Cheat Monitoring State ---
   const [cheatCount, setCheatCount] = useState(0);
@@ -833,14 +968,6 @@ export const CbtView: React.FC<CbtViewProps> = ({
         score += Math.round(s.bobot * 0.8);
       }
     });
-
-    const activeSiswa = siswaList[0] || {
-      id: 'sis-001',
-      nama: 'BAYU ADITYA RIFAI',
-      nisn: '3109281000',
-      nis: '10200',
-      kelas: 'Ibnu Al haytam'
-    };
 
     const newHasil: HasilUjian = {
       id: `hsl-${Date.now()}`,
@@ -1149,6 +1276,31 @@ export const CbtView: React.FC<CbtViewProps> = ({
                       </div>
                       <p className="font-bold text-slate-900 text-xs leading-relaxed">{soal.pertanyaan}</p>
 
+                      {/* Media Display (Image / Video) */}
+                      {(soal.imageUrl || soal.videoUrl) && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 my-2.5">
+                          {soal.imageUrl && (
+                            <div className="rounded-xl overflow-hidden border border-slate-200 bg-white p-1">
+                              <img 
+                                src={soal.imageUrl} 
+                                alt={`Media Soal #${idx + 1}`} 
+                                className="max-h-48 w-full object-contain rounded-lg mx-auto"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          )}
+                          {soal.videoUrl && (
+                            <div className="rounded-xl overflow-hidden border border-slate-200 bg-white p-1 flex items-center justify-center">
+                              <video 
+                                src={soal.videoUrl} 
+                                controls 
+                                className="max-h-48 w-full rounded-lg"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Options for PG & MC */}
                       {soal.opsi && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pl-2 pt-1">
@@ -1320,35 +1472,56 @@ export const CbtView: React.FC<CbtViewProps> = ({
           )}
 
           {!examFinished ? (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               
-              {/* Main Question Display */}
-              <div className="lg:col-span-3 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+              {/* Main Question Display - Left side (8 Cols to accommodate the 4-col sidebar perfectly) */}
+              <div className="lg:col-span-8 bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
                 
-                {/* Exam Top Status */}
-                <div className="flex items-center justify-between border-b pb-3">
-                  <div>
-                    <span className="text-[10px] font-mono bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded">
-                      SOAL NO #{soalIndex + 1}
-                    </span>
-                    <h3 className="font-bold text-slate-900 text-sm mt-1">{currentExam?.judul}</h3>
-                  </div>
-
-                  <div className="flex items-center gap-2 px-3 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl font-mono text-xs font-bold">
-                    <Clock className="w-4 h-4" /> 01:29:45
-                  </div>
+                {/* Header: Soal No.X and Subject Badge */}
+                <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                  <span className="text-xl font-extrabold text-slate-800 tracking-tight">Soal No.{soalIndex + 1}</span>
+                  <span className="text-xs font-bold text-[#4f46e5] bg-[#eef2ff] px-4 py-1.5 rounded-full border border-indigo-100 uppercase tracking-wider">
+                    {currentExam?.mapel || "Matematika"}
+                  </span>
                 </div>
 
                 {/* Question Body */}
                 {currentSoal ? (
-                  <div className="space-y-4 py-2">
-                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm text-slate-900 leading-relaxed font-semibold">
+                  <div className="space-y-6">
+                    <div className="text-slate-800 text-[15px] font-semibold leading-relaxed">
                       {currentSoal.pertanyaan}
                     </div>
 
+                    {/* Student Exam Question Media Display */}
+                    {(currentSoal.imageUrl || currentSoal.videoUrl) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {currentSoal.imageUrl && (
+                          <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white p-2 shadow-sm flex flex-col items-center justify-center">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Gambar Soal</span>
+                            <img 
+                              src={currentSoal.imageUrl} 
+                              alt="Gambar Lampiran" 
+                              className="max-h-64 object-contain rounded-xl w-full"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                        )}
+                        {currentSoal.videoUrl && (
+                          <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white p-2 shadow-sm flex flex-col items-center justify-center">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Video Lampiran</span>
+                            <video 
+                              src={currentSoal.videoUrl} 
+                              controls 
+                              className="max-h-64 rounded-xl w-full"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Answer Inputs based on Question Type */}
                     {(currentSoal.tipe === 'pg' || currentSoal.tipe === 'multiple_choice') && currentSoal.opsi && (
-                      <div className="space-y-2">
+                      <div className="space-y-3 pt-2">
                         {currentSoal.opsi.map(o => {
                           const isSelected = Array.isArray(siswaJawaban[currentSoal.id]?.jawaban)
                             ? (siswaJawaban[currentSoal.id]?.jawaban as string[]).includes(o.id)
@@ -1369,16 +1542,20 @@ export const CbtView: React.FC<CbtViewProps> = ({
                                   handleAnswerSelect(currentSoal.id, newArr);
                                 }
                               }}
-                              className={`p-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all flex items-center gap-3 ${
-                                isSelected
-                                  ? 'bg-emerald-500 text-slate-950 border-emerald-600 font-bold shadow-sm'
-                                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                              }`}
+                              className="group flex items-start gap-3 cursor-pointer text-slate-800 hover:text-slate-950 text-sm font-semibold transition-all py-1.5"
                             >
-                              <span className="w-6 h-6 rounded-full bg-slate-900/10 flex items-center justify-center font-bold text-xs">
-                                {o.id}
+                              {/* Circular Radio Indicator - matching hollow green/teal/slate style */}
+                              <span className={`w-5.5 h-5.5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${
+                                isSelected 
+                                  ? 'border-teal-500 bg-white' 
+                                  : 'border-slate-300 group-hover:border-slate-400 bg-white'
+                              }`}>
+                                {isSelected && <span className="w-3 h-3 rounded-full bg-teal-500"></span>}
                               </span>
-                              <span>{o.teks}</span>
+                              <span className="leading-relaxed">
+                                <span className="lowercase font-bold text-slate-800 mr-2">{o.id.toLowerCase()}.</span> 
+                                <span className="text-slate-700 font-semibold group-hover:text-slate-900">{o.teks}</span>
+                              </span>
                             </div>
                           );
                         })}
@@ -1386,60 +1563,68 @@ export const CbtView: React.FC<CbtViewProps> = ({
                     )}
 
                     {currentSoal.tipe === 'isian' && (
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 mb-1 block">Ketikkan Jawaban Singkat Anda:</label>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Ketikkan Jawaban Singkat Anda:</label>
                         <input
                           type="text"
                           value={(siswaJawaban[currentSoal.id]?.jawaban as string) || ''}
                           onChange={e => handleAnswerSelect(currentSoal.id, e.target.value)}
                           placeholder="Masukkan jawaban..."
-                          className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
+                          className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-900 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all placeholder:font-normal"
                         />
                       </div>
                     )}
 
                     {currentSoal.tipe === 'esai' && (
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 mb-1 block">Tuliskan Jawaban Uraian / Esai Anda secara Lengkap:</label>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Tuliskan Jawaban Uraian / Esai Anda secara Lengkap:</label>
                         <textarea
                           rows={4}
                           value={(siswaJawaban[currentSoal.id]?.jawaban as string) || ''}
                           onChange={e => handleAnswerSelect(currentSoal.id, e.target.value)}
                           placeholder="Ketikkan uraian penjelas..."
-                          className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900"
+                          className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-900 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all placeholder:font-normal leading-relaxed"
                         />
                       </div>
                     )}
 
                     {/* Bottom Question Controls */}
-                    <div className="flex items-center justify-between pt-4 border-t">
-                      <button
-                        onClick={() => toggleRaguRagu(currentSoal.id)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                          siswaJawaban[currentSoal.id]?.raguRagu
-                            ? 'bg-amber-500 text-slate-950 border-amber-600'
-                            : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-amber-50'
-                        }`}
-                      >
-                        {siswaJawaban[currentSoal.id]?.raguRagu ? '✓ Ragu-Ragu (Aktif)' : 'Tandai Ragu-Ragu'}
-                      </button>
-
+                    <div className="flex items-center justify-between pt-5 border-t border-slate-100">
                       <div className="flex items-center gap-2">
                         <button
                           disabled={soalIndex === 0}
                           onClick={() => setSoalIndex(prev => prev - 1)}
-                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-800 text-xs font-bold rounded-lg flex items-center gap-1"
+                          className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-black rounded-full flex items-center gap-1 transition-all disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
                         >
                           <ChevronLeft className="w-4 h-4" /> Sebelum
                         </button>
                         <button
-                          disabled={soalIndex === (currentExam?.daftarSoal.length || 1) - 1}
-                          onClick={() => setSoalIndex(prev => prev + 1)}
-                          className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-lg flex items-center gap-1"
+                          onClick={() => toggleRaguRagu(currentSoal.id)}
+                          className={`px-4 py-2.5 rounded-full text-xs font-bold transition-all border cursor-pointer ${
+                            siswaJawaban[currentSoal.id]?.raguRagu
+                              ? 'bg-amber-400 text-slate-950 border-amber-500'
+                              : 'bg-slate-50 hover:bg-slate-100 text-slate-500 border-slate-200'
+                          }`}
                         >
-                          Berikut <ChevronRight className="w-4 h-4" />
+                          {siswaJawaban[currentSoal.id]?.raguRagu ? '✓ Ragu (Aktif)' : 'Ragu-Ragu'}
                         </button>
                       </div>
+
+                      {soalIndex < (currentExam?.daftarSoal.length || 1) - 1 ? (
+                        <button
+                          onClick={() => setSoalIndex(prev => prev + 1)}
+                          className="px-8 py-3 bg-[#f59e0b] hover:bg-[#d97706] text-white text-xs font-black rounded-full flex items-center gap-1.5 transition-all shadow-md cursor-pointer uppercase tracking-wider"
+                        >
+                          Selanjutnya <ChevronRight className="w-4 h-4 text-white" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleFinishExam}
+                          className="px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black rounded-full flex items-center gap-1.5 transition-all shadow-md cursor-pointer uppercase tracking-wider"
+                        >
+                          Selesai <CheckCircle2 className="w-4 h-4 text-white" />
+                        </button>
+                      )}
                     </div>
 
                   </div>
@@ -1447,45 +1632,116 @@ export const CbtView: React.FC<CbtViewProps> = ({
 
               </div>
 
-              {/* Right: Question Navigation Grid & Submit */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider border-b pb-2">
-                  Navigasi Soal Ujian
-                </h4>
+              {/* Right: Countdown Panel & Question Navigation Grid (4 Cols) */}
+              <div className="lg:col-span-4 space-y-6">
+                
+                {/* Profil Peserta Card */}
+                <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                  <h4 className="font-extrabold text-slate-800 text-sm tracking-wider text-center pb-2 border-b border-slate-100">
+                    Profil Peserta
+                  </h4>
+                  <div className="flex items-center gap-4">
+                    <div className="relative shrink-0">
+                      <img
+                        src={activeSiswa.fotoUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256"}
+                        alt={activeSiswa.nama}
+                        referrerPolicy="no-referrer"
+                        className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shadow-sm"
+                      />
+                      <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full animate-pulse"></span>
+                    </div>
+                    <div className="space-y-0.5 min-w-0">
+                      <h5 className="font-bold text-slate-900 text-sm truncate" title={activeSiswa.nama}>{activeSiswa.nama}</h5>
+                      <p className="text-[11px] text-slate-500 font-medium">NISN: {activeSiswa.nisn || activeSiswa.nis || "117899483"}</p>
+                      <p className="text-[11px] text-slate-500 font-medium">Kelas: {activeSiswa.kelas || "IX - Utsman bin Affan"}</p>
+                      <span className="inline-block text-[10px] uppercase font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-md border border-emerald-100/30 mt-1">
+                        Aktif Mengikuti Ujian
+                      </span>
+                    </div>
+                  </div>
 
-                <div className="grid grid-cols-4 gap-2">
-                  {currentExam?.daftarSoal.map((s, idx) => {
-                    const hasAnswer = siswaJawaban[s.id]?.jawaban;
-                    const isRagu = siswaJawaban[s.id]?.raguRagu;
-
-                    return (
-                      <button
-                        key={s.id}
-                        onClick={() => setSoalIndex(idx)}
-                        className={`p-2.5 rounded-xl font-bold text-xs transition-all border ${
-                          soalIndex === idx
-                            ? 'border-slate-900 ring-2 ring-slate-900'
-                            : 'border-slate-200'
-                        } ${
-                          isRagu
-                            ? 'bg-amber-400 text-slate-950 font-extrabold'
-                            : hasAnswer
-                            ? 'bg-emerald-500 text-slate-950'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
+                  {/* Dropdown Pemilihan Siswa khusus untuk Admin / Guru untuk simulasi */}
+                  {currentRole !== 'siswa' && siswaList && siswaList.length > 0 && (
+                    <div className="pt-3 border-t border-slate-100 space-y-1">
+                      <label className="text-[9px] uppercase font-extrabold text-slate-400 tracking-wider block">
+                        Ganti Akun Simulasi (Mode Admin):
+                      </label>
+                      <select
+                        value={selectedSiswaId || activeSiswa.id}
+                        onChange={(e) => setSelectedSiswaId(e.target.value)}
+                        className="w-full text-xs font-bold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-1.5 px-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all cursor-pointer"
                       >
-                        {idx + 1}
-                      </button>
-                    );
-                  })}
+                        {siswaList.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.nama} ({s.kelas})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
-                <button
-                  onClick={handleFinishExam}
-                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-md mt-4"
-                >
-                  Selesaikan & Submit Ujian
-                </button>
+                {/* Waktu Tersisa Card */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm text-center space-y-4">
+                  <h4 className="font-extrabold text-slate-800 text-sm tracking-wide">Waktu Tersisa</h4>
+                  
+                  <div className="py-2 bg-amber-50/20 rounded-2xl border border-amber-100/30">
+                    <span className="text-[#f59e0b] font-black text-2xl block">
+                      {Math.floor(timeLeft / 3600)} Jam
+                    </span>
+                    <span className="text-[#f59e0b] font-black text-xl block mt-0.5">
+                      {Math.floor((timeLeft % 3600) / 60)} Menit {timeLeft % 60} Detik
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 pt-1">
+                    <p className="text-[11px] font-semibold text-slate-400">Sudah Selesai?</p>
+                    <button
+                      onClick={handleFinishExam}
+                      className="w-full py-2.5 bg-[#f59e0b] hover:bg-[#d97706] text-white font-extrabold rounded-full text-xs transition-all shadow-md tracking-wider uppercase cursor-pointer"
+                    >
+                      Selesaikan Ujian
+                    </button>
+                  </div>
+                </div>
+
+                {/* Nomor Soal Grid Card */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                  <h4 className="font-extrabold text-slate-800 text-sm tracking-wider text-center pb-2 border-b border-slate-100">
+                    Nomor Soal
+                  </h4>
+
+                  <div className="grid grid-cols-5 gap-2">
+                    {currentExam?.daftarSoal.map((s, idx) => {
+                      const hasAnswer = siswaJawaban[s.id]?.jawaban;
+                      const isRagu = siswaJawaban[s.id]?.raguRagu;
+                      const isCurrent = soalIndex === idx;
+
+                      // Exact styles inspired by mockup image: pink blocks for unanswered, orange/amber for answered
+                      let btnStyle = "bg-rose-100 text-rose-700 border-rose-200 hover:bg-rose-200";
+                      if (isRagu) {
+                        btnStyle = "bg-amber-400 text-slate-950 border-amber-400 font-black";
+                      } else if (hasAnswer) {
+                        btnStyle = "bg-[#f59e0b] text-white border-[#f59e0b] font-black";
+                      }
+
+                      if (isCurrent) {
+                        btnStyle += " ring-2 ring-slate-800 ring-offset-2 scale-105";
+                      }
+
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => setSoalIndex(idx)}
+                          className={`aspect-square w-full rounded-xl text-xs font-black transition-all border cursor-pointer flex items-center justify-center ${btnStyle}`}
+                        >
+                          {idx + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
               </div>
 
             </div>
@@ -1647,10 +1903,20 @@ export const CbtView: React.FC<CbtViewProps> = ({
       {/* MODAL ADD MANUAL QUESTION */}
       {showAddSoalModal && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-slate-200">
-            <h3 className="font-extrabold text-slate-900 text-lg border-b border-slate-200 pb-3">Input Soal Baru Manual</h3>
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-black text-slate-900 text-base">Input Soal Baru Manual</h3>
+              <button 
+                type="button" 
+                onClick={() => setShowAddSoalModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold p-1.5 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer text-xs"
+              >
+                ✕
+              </button>
+            </div>
 
-            <form onSubmit={handleAddSoal} className="space-y-4">
+            <form onSubmit={handleAddSoal} className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
               <div>
                 <label className="text-xs font-extrabold text-slate-800 mb-1 block">Tipe Soal</label>
                 <select
@@ -1715,14 +1981,119 @@ export const CbtView: React.FC<CbtViewProps> = ({
                 </div>
               )}
 
+              {/* Media Upload Area (Image & Video) */}
+              <div className="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <span className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                  <Image className="w-4 h-4 text-emerald-600" /> Media Pendukung (Gambar / Video)
+                </span>
+                
+                <div className="grid grid-cols-2 gap-2.5">
+                  {/* Image input/upload */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Gambar Soal</label>
+                    {newImageUrl ? (
+                      <div className="relative group rounded-lg overflow-hidden border border-slate-200 bg-white h-20 flex items-center justify-center">
+                        <img src={newImageUrl} alt="Pratinjau Gambar" className="h-full object-cover w-full" />
+                        <button 
+                          type="button" 
+                          onClick={() => setNewImageUrl('')} 
+                          className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition-opacity"
+                        >
+                          Hapus Gambar
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        <label className="border border-dashed border-slate-300 hover:border-slate-400 bg-white text-center p-2 rounded-lg cursor-pointer flex flex-col items-center justify-center h-20 transition-all">
+                          <Image className="w-5 h-5 text-slate-400" />
+                          <span className="text-[9px] font-bold text-slate-600 mt-1">Unggah Gambar</span>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setNewImageUrl(reader.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }} 
+                          />
+                        </label>
+                        <input 
+                          type="text" 
+                          placeholder="Atau URL gambar..." 
+                          value={newImageUrl} 
+                          onChange={(e) => setNewImageUrl(e.target.value)} 
+                          className="w-full p-1.5 bg-white border border-slate-300 rounded-lg text-[9px] font-medium text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500" 
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Video input/upload */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Video Soal</label>
+                    {newVideoUrl ? (
+                      <div className="relative group rounded-lg overflow-hidden border border-slate-200 bg-white h-20 flex items-center justify-center">
+                        <div className="text-[10px] text-slate-600 font-bold flex flex-col items-center gap-1">
+                          <Film className="w-5 h-5 text-emerald-600" />
+                          <span>Video Terpasang</span>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={() => setNewVideoUrl('')} 
+                          className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition-opacity"
+                        >
+                          Hapus Video
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        <label className="border border-dashed border-slate-300 hover:border-slate-400 bg-white text-center p-2 rounded-lg cursor-pointer flex flex-col items-center justify-center h-20 transition-all">
+                          <Film className="w-5 h-5 text-slate-400" />
+                          <span className="text-[9px] font-bold text-slate-600 mt-1">Unggah Video</span>
+                          <input 
+                            type="file" 
+                            accept="video/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setNewVideoUrl(reader.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }} 
+                          />
+                        </label>
+                        <input 
+                          type="text" 
+                          placeholder="Atau URL video..." 
+                          value={newVideoUrl} 
+                          onChange={(e) => setNewVideoUrl(e.target.value)} 
+                          className="w-full p-1.5 bg-white border border-slate-300 rounded-lg text-[9px] font-medium text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500" 
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="text-xs font-extrabold text-slate-800 mb-1 block">Bobot Poin Soal</label>
                 <input type="number" value={newBobot} onChange={e => setNewBobot(Number(e.target.value))} className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
               </div>
+              </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
-                <button type="button" onClick={() => setShowAddSoalModal(false)} className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">Batal</button>
-                <button type="submit" className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/30 transition-all">Simpan Soal</button>
+              <div className="flex justify-end gap-2.5 p-4 bg-slate-50 border-t border-slate-100">
+                <button type="button" onClick={() => setShowAddSoalModal(false)} className="px-5 py-2.5 rounded-xl text-xs font-black bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors cursor-pointer">Batal</button>
+                <button type="submit" className="px-6 py-2.5 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/15 transition-all cursor-pointer">Simpan Soal</button>
               </div>
             </form>
           </div>
