@@ -1,0 +1,54 @@
+
+> react-example@0.0.0 lint
+> tsc --noEmit
+
+src/App.tsx(875,15): error TS2322: Type 'Dispatch<SetStateAction<AbsensiSubTab>>' is not assignable to type '(subTab: SubTabAbsensi) => void'.
+  Types of parameters 'value' and 'subTab' are incompatible.
+    Type 'SubTabAbsensi' is not assignable to type 'SetStateAction<AbsensiSubTab>'.
+      Type '"jurnal_guru"' is not assignable to type 'SetStateAction<AbsensiSubTab>'.
+src/components/AbsensiView.tsx(745,22): error TS2345: Argument of type '(prev: AbsensiSiswaHarian[]) => (AbsensiSiswaHarian | { id: string; siswaId: string; tanggal: string; status: "Hadir" | "Terlambat"; jamScan: string; ... 4 more ...; lokasiScan: string; })[]' is not assignable to parameter of type 'SetStateAction<AbsensiSiswaHarian[]>'.
+  Type '(prev: AbsensiSiswaHarian[]) => (AbsensiSiswaHarian | { id: string; siswaId: string; tanggal: string; status: "Hadir" | "Terlambat"; jamScan: string; ... 4 more ...; lokasiScan: string; })[]' is not assignable to type '(prevState: AbsensiSiswaHarian[]) => AbsensiSiswaHarian[]'.
+    Type '(AbsensiSiswaHarian | { id: string; siswaId: string; tanggal: string; status: "Hadir" | "Terlambat"; jamScan: string; jamMasuk: string; jamPulang: string; tipeScan: "Masuk" | "Pulang"; metodeScan: "Barcode / QR"; lokasiScan: string; })[]' is not assignable to type 'AbsensiSiswaHarian[]'.
+      Type 'AbsensiSiswaHarian | { id: string; siswaId: string; tanggal: string; status: "Hadir" | "Terlambat"; jamScan: string; jamMasuk: string; jamPulang: string; tipeScan: "Masuk" | "Pulang"; metodeScan: "Barcode / QR"; lokasiScan: string; }' is not assignable to type 'AbsensiSiswaHarian'.
+        Type '{ id: string; siswaId: string; tanggal: string; status: "Hadir" | "Terlambat"; jamScan: string; jamMasuk: string; jamPulang: string; tipeScan: "Masuk" | "Pulang"; metodeScan: "Barcode / QR"; lokasiScan: string; }' is not assignable to type 'AbsensiSiswaHarian'.
+          Types of property 'status' are incompatible.
+            Type '"Hadir" | "Terlambat"' is not assignable to type 'StatusAbsensi'.
+              Type '"Terlambat"' is not assignable to type 'StatusAbsensi'.
+src/components/AbsensiView.tsx(795,34): error TS2339: Property 'metodeOut' does not exist on type 'AbsensiGuru'.
+src/components/AbsensiView.tsx(804,32): error TS2339: Property 'koordinatGps' does not exist on type 'AbsensiGuru'.
+src/components/AbsensiView.tsx(850,34): error TS2339: Property 'metodeOut' does not exist on type 'AbsensiGuru'.
+src/components/AbsensiView.tsx(859,32): error TS2339: Property 'koordinatGps' does not exist on type 'AbsensiGuru'.
+src/components/AbsensiView.tsx(1015,32): error TS2339: Property 'koordinatGps' does not exist on type 'AbsensiGuru'.
+src/components/AbsensiView.tsx(1051,32): error TS2339: Property 'metodeOut' does not exist on type 'AbsensiGuru'.
+src/components/AbsensiView.tsx(1053,32): error TS2339: Property 'koordinatGps' does not exist on type 'AbsensiGuru'.
+src/components/CbtView.tsx(1484,35): error TS2339: Property 'mapel' does not exist on type 'BankSoal'.
+src/components/CbtView.tsx(2168,94): error TS2339: Property 'semester' does not exist on type 'SchoolSettings'.
+src/components/CbtView.tsx(2168,132): error TS2339: Property 'semester' does not exist on type 'SchoolSettings'.
+src/components/DatabaseView.tsx(3870,46): error TS2322: Type 'ScheduleSlot | { id: string; hari: string; jamMulai: string; jamSelesai: string; kelasTarget: string; ruangan: string; }' is not assignable to type 'ScheduleSlot'.
+  Type '{ id: string; hari: string; jamMulai: string; jamSelesai: string; kelasTarget: string; ruangan: string; }' is not assignable to type 'ScheduleSlot'.
+    Types of property 'hari' are incompatible.
+      Type 'string' is not assignable to type '"Senin" | "Selasa" | "Rabu" | "Kamis" | "Jumat" | "Sabtu"'.
+src/components/DatabaseView.tsx(3870,75): error TS2322: Type '{ id: string; hari: string; jamMulai: string; jamSelesai: string; kelasTarget: string; ruangan: string; }' is not assignable to type 'ScheduleSlot'.
+  Types of property 'hari' are incompatible.
+    Type 'string' is not assignable to type '"Senin" | "Selasa" | "Rabu" | "Kamis" | "Jumat" | "Sabtu"'.
+src/components/DatabaseView.tsx(3953,71): error TS2339: Property 'nuptk' does not exist on type 'Guru'.
+src/components/KeuanganView.tsx(1318,11): error TS2322: Type '{ id: string; siswaId: string; siswaNama: string; kelas: string; tipe: "other" | TipeKeuangan; namaTagihan: string; bulanTahun: string; nominal: number; terbayar: number; status: any; tanggalBayar: string; jatuhTempo: string; }[]' is not assignable to type 'TagihanKeuangan[]'.
+  Type '{ id: string; siswaId: string; siswaNama: string; kelas: string; tipe: "other" | TipeKeuangan; namaTagihan: string; bulanTahun: string; nominal: number; terbayar: number; status: any; tanggalBayar: string; jatuhTempo: string; }' is not assignable to type 'TagihanKeuangan'.
+    Types of property 'tipe' are incompatible.
+      Type '"other" | TipeKeuangan' is not assignable to type 'TipeKeuangan'.
+        Type '"other"' is not assignable to type 'TipeKeuangan'.
+src/components/KeuanganView.tsx(2413,20): error TS2345: Argument of type '(prevTagihanList: TagihanKeuangan[]) => (TagihanKeuangan | { terbayar: number; status: string; tanggalBayar: string; id: string; siswaId: string; siswaNama: string; ... 9 more ...; isDeleted?: boolean; })[]' is not assignable to parameter of type 'SetStateAction<TagihanKeuangan[]>'.
+  Type '(prevTagihanList: TagihanKeuangan[]) => (TagihanKeuangan | { terbayar: number; status: string; tanggalBayar: string; id: string; siswaId: string; siswaNama: string; ... 9 more ...; isDeleted?: boolean; })[]' is not assignable to type '(prevState: TagihanKeuangan[]) => TagihanKeuangan[]'.
+    Type '(TagihanKeuangan | { terbayar: number; status: string; tanggalBayar: string; id: string; siswaId: string; siswaNama: string; kelas: string; noWaOrangTua?: string; tipe: TipeKeuangan; ... 6 more ...; isDeleted?: boolean; })[]' is not assignable to type 'TagihanKeuangan[]'.
+      Type 'TagihanKeuangan | { terbayar: number; status: string; tanggalBayar: string; id: string; siswaId: string; siswaNama: string; kelas: string; noWaOrangTua?: string; tipe: TipeKeuangan; ... 6 more ...; isDeleted?: boolean; }' is not assignable to type 'TagihanKeuangan'.
+        Type '{ terbayar: number; status: string; tanggalBayar: string; id: string; siswaId: string; siswaNama: string; kelas: string; noWaOrangTua?: string; tipe: TipeKeuangan; namaTagihan: string; bulanTahun: string; ... 4 more ...; isDeleted?: boolean; }' is not assignable to type 'TagihanKeuangan'.
+          Types of property 'status' are incompatible.
+            Type 'string' is not assignable to type '"Lunas" | "Belum Lunas" | "Dicicil"'.
+src/components/KeuanganView.tsx(3894,73): error TS2345: Argument of type 'TagihanKeuangan | { terbayar: number; status: string; tanggalBayar: string; id: string; siswaId: string; siswaNama: string; kelas: string; noWaOrangTua?: string; tipe: TipeKeuangan; ... 6 more ...; isDeleted?: boolean; }' is not assignable to parameter of type 'SetStateAction<TagihanKeuangan>'.
+  Type '{ terbayar: number; status: string; tanggalBayar: string; id: string; siswaId: string; siswaNama: string; kelas: string; noWaOrangTua?: string; tipe: TipeKeuangan; namaTagihan: string; bulanTahun: string; ... 4 more ...; isDeleted?: boolean; }' is not assignable to type 'SetStateAction<TagihanKeuangan>'.
+    Type '{ terbayar: number; status: string; tanggalBayar: string; id: string; siswaId: string; siswaNama: string; kelas: string; noWaOrangTua?: string; tipe: TipeKeuangan; namaTagihan: string; bulanTahun: string; ... 4 more ...; isDeleted?: boolean; }' is not assignable to type 'TagihanKeuangan'.
+      Types of property 'status' are incompatible.
+        Type 'string' is not assignable to type '"Lunas" | "Belum Lunas" | "Dicicil"'.
+src/components/KeuanganView.tsx(7013,64): error TS2339: Property 'nip' does not exist on type 'Staf'.
+src/components/KeuanganView.tsx(8210,68): error TS2339: Property 'nip' does not exist on type 'Staf'.
+EXIT_CODE=2

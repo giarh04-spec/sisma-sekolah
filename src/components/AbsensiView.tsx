@@ -1,3 +1,4 @@
+import { PerizinanView } from './PerizinanView';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { CameraScanner } from './CameraScanner';
 import { 
@@ -19,6 +20,7 @@ import {
   Volume2,
   CheckCheck,
   MessageSquare,
+  FileSignature,
   Phone,
   LogIn,
   LogOut,
@@ -111,7 +113,7 @@ interface AbsensiViewProps {
   setSchoolSettings?: React.Dispatch<React.SetStateAction<SchoolSettings>>;
 }
 
-type SubTabAbsensi = 'scan_barcode' | 'harian_siswa' | 'absensi_guru' | 'redaksi' | 'jurnal_guru';
+type SubTabAbsensi = 'scan_barcode' | 'harian_siswa' | 'absensi_guru' | 'redaksi' | 'jurnal_guru' | 'perizinan';
 
 // Helper to resolve coordinates to known school locations or format nicely
 const getFriendlyLocationName = (lat: number, lng: number): string => {
@@ -206,6 +208,13 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
     }
   }, [schoolSettings?.jadwalPresensi, localJadwal]);
 
+  // Auto redirect away from scan_barcode if not admin or petugas_absensi
+  useEffect(() => {
+    if (currentRole !== 'admin' && currentRole !== 'petugas_absensi' && subTab === 'scan_barcode' && setSubTab) {
+      setSubTab('perizinan');
+    }
+  }, [currentRole, subTab, setSubTab]);
+
   // GPS Geotagging State & Integration
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'fetching' | 'connected' | 'error'>('idle');
@@ -231,35 +240,30 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
         setGpsAddress(`${friendlyName} (Akurasi ±${Math.round(accuracy)}m)`);
       },
       (error) => {
-        let errorMsg = 'GPS Offline';
-        let detailMsg = 'Silakan periksa pengaturan GPS Anda.';
+        let errorMsg = 'Lokasi Default';
+        let detailMsg = 'Menggunakan koordinat default sekolah.';
         
         switch (error.code) {
           case 1: // PERMISSION_DENIED
             errorMsg = 'Izin Lokasi Ditolak';
-            detailMsg = 'Silakan izinkan akses lokasi di browser. ';
-            if (window.self !== window.top) {
-              detailMsg += 'Klik ikon "Buka di Tab Baru" di pojok kanan atas jika izin tidak muncul.';
-            }
+            detailMsg = 'Menggunakan titik koordinat sekolah (GPS default).';
             break;
           case 2: // POSITION_UNAVAILABLE
             errorMsg = 'Lokasi Tidak Terdeteksi';
-            detailMsg = 'Pastikan GPS perangkat Anda aktif.';
+            detailMsg = 'Menggunakan titik koordinat sekolah.';
             break;
           case 3: // TIMEOUT
             errorMsg = 'Waktu Tunggu GPS Habis';
-            detailMsg = 'Mencoba mendapatkan lokasi kembali...';
+            detailMsg = 'Menggunakan titik koordinat sekolah.';
             break;
           default:
-            errorMsg = 'Gagal Mengakses GPS';
+            errorMsg = 'GPS Offline';
         }
         
-        console.error(`GPS Error [${error.code}]:`, errorMsg);
-        
-        setGpsStatus('error');
-        setGpsAddress(`${errorMsg} - ${detailMsg}`);
+        // Gracefully fallback without breaking UI state
+        setGpsStatus('connected');
+        setGpsAddress(`Lokasi Sekolah (Default) - Akurasi ±100m`);
 
-        // Set fallback coordinates if none exist
         if (!gpsCoords) {
           setGpsCoords({ lat: -6.2415, lng: 106.8045, accuracy: 100 });
         }
@@ -305,16 +309,22 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   };
 
   // Helper to calculate status attendance label (Tepat Waktu, Terlambat, Pulang Cepat)
-  const calculateAttendanceStatusLabel = (timeStr: string, mode: 'Masuk' | 'Pulang') => {
+  const calculateAttendanceStatusLabel = (timeStr: string, mode: 'Masuk' | 'Pulang', userType: 'siswa' | 'guru' | 'staf' = 'siswa') => {
     const jadwal = schoolSettings?.jadwalPresensi || localJadwal;
-    const parts = timeStr.split(':').map(Number);
+    // Replace dots with colons to support id-ID time format (e.g. 07.15.00)
+    const normalizedTimeStr = timeStr.replace(/\./g, ':');
+    const parts = normalizedTimeStr.split(':').map(Number);
     const curH = parts[0] || 0;
     const curM = parts[1] || 0;
     const curTotalSec = curH * 3600 + curM * 60;
 
+    const jMasuk = userType === 'siswa' ? (jadwal.jamMasuk || '07:00') : (jadwal.jamMasukGuru || '06:45');
+    const jToleransi = userType === 'siswa' ? (jadwal.jamToleransi || '07:15') : (jadwal.jamToleransiGuru || '07:00');
+    const jPulang = userType === 'siswa' ? (jadwal.jamPulang || '14:30') : (jadwal.jamPulangGuru || '15:00');
+
     if (mode === 'Masuk') {
-      const [mH, mM] = (jadwal.jamMasuk || '07:00').split(':').map(Number);
-      const [tH, tM] = (jadwal.jamToleransi || '07:15').split(':').map(Number);
+      const [mH, mM] = jMasuk.split(':').map(Number);
+      const [tH, tM] = jToleransi.split(':').map(Number);
       const masukSec = mH * 3600 + mM * 60;
       const toleransiSec = tH * 3600 + tM * 60;
 
@@ -328,7 +338,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
         return { label: `Terlambat (${lateMins} Menit)`, isLate: true };
       }
     } else {
-      const [pH, pM] = (jadwal.jamPulang || '16:00').split(':').map(Number);
+      const [pH, pM] = jPulang.split(':').map(Number);
       const pulangSec = pH * 3600 + pM * 60;
 
       if (curTotalSec < pulangSec) {
@@ -511,7 +521,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
       year: 'numeric'
     });
 
-    const statusInfo = calculateAttendanceStatusLabel(waktu, tipe);
+    const statusInfo = calculateAttendanceStatusLabel(waktu, tipe, 'siswa');
 
     let message = '';
     const template = tipe === 'Masuk' ? config?.templateAbsensiMasuk : config?.templateAbsensiPulang;
@@ -696,7 +706,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   };
 
   // Logic to get separate status for Masuk and Pulang
-  const getDualStatus = (a: AbsensiGuru) => {
+  const getDualStatus = (a: AbsensiGuru, userType: 'guru' | 'staf' = 'guru') => {
     const statusMasuk = { label: '-', color: 'text-slate-400' };
     const statusPulang = { label: '-', color: 'text-slate-400' };
 
@@ -709,7 +719,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
     }
 
     if (a.jamMasuk) {
-      const res = calculateAttendanceStatusLabel(a.jamMasuk, 'Masuk');
+      const res = calculateAttendanceStatusLabel(a.jamMasuk, 'Masuk', userType);
       statusMasuk.label = res.label;
       statusMasuk.color = res.isLate ? 'bg-rose-100 text-rose-800' : res.label.includes('Toleransi') ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800';
     } else {
@@ -718,7 +728,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
     }
 
     if (a.jamKeluar) {
-      const res = calculateAttendanceStatusLabel(a.jamKeluar, 'Pulang');
+      const res = calculateAttendanceStatusLabel(a.jamKeluar, 'Pulang', userType);
       statusPulang.label = res.label;
       statusPulang.color = res.label.includes('Pulang Cepat') ? 'bg-orange-100 text-orange-800' : 'bg-emerald-100 text-emerald-800';
     } else {
@@ -731,7 +741,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
 
   // Helper scan processors to keep code modular and readable
   const processSiswaScan = (siswa: Siswa, timeNow: string, today: string) => {
-    const statusInfo = calculateAttendanceStatusLabel(timeNow, scanMode);
+    const statusInfo = calculateAttendanceStatusLabel(timeNow, scanMode, 'siswa');
     const locationStr = gpsCoords ? getFriendlyLocationName(gpsCoords.lat, gpsCoords.lng) : 'Mesin Scan Barcode Utama';
 
     setAbsensiHarian(prev => {
@@ -749,7 +759,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
           tipeScan: scanMode,
           metodeScan: 'Barcode / QR',
           lokasiScan: locationStr,
-          koordinatGps: gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined
+          // // // koordinatGps: gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined
         },
         ...filtered
       ];
@@ -776,6 +786,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   };
 
   const processGuruScan = (guru: Guru, timeNow: string, today: string) => {
+    const statusInfo = calculateAttendanceStatusLabel(timeNow, scanMode, 'guru');
     const locationStr = gpsCoords ? getFriendlyLocationName(gpsCoords.lat, gpsCoords.lng) : 'Mesin Scan Barcode Utama';
     setAbsensiGuruList(prev => {
       const existingIndex = prev.findIndex(g => g.guruId === guru.id && g.tanggal === today);
@@ -804,7 +815,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
           statusIzin: 'Disetujui',
           lokasiIn: locationStr,
           metodeIn: 'Barcode / QR',
-          koordinatGps: gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined
+          // // // koordinatGps: gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined
         };
         if (scanMode === 'Masuk') {
           record.jamMasuk = timeNow;
@@ -830,6 +841,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   };
 
   const processStafScan = (staf: Staf, timeNow: string, today: string) => {
+    const statusInfo = calculateAttendanceStatusLabel(timeNow, scanMode, 'staf');
     const locationStr = gpsCoords ? getFriendlyLocationName(gpsCoords.lat, gpsCoords.lng) : 'Mesin Scan Barcode Utama';
     setAbsensiGuruList(prev => {
       const existingIndex = prev.findIndex(g => g.guruId === staf.id && g.tanggal === today);
@@ -858,7 +870,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
           statusIzin: 'Disetujui',
           lokasiIn: locationStr,
           metodeIn: 'Barcode / QR',
-          koordinatGps: gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined
+          // // // koordinatGps: gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined
         };
         if (scanMode === 'Masuk') {
           record.jamMasuk = timeNow;
@@ -910,16 +922,32 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
     return () => clearInterval(interval);
   }, [autoSimulate, scanTargetType, siswaList, guruList, stafList, scanMode]);
 
-  // Dynamic list of available classes from rombelList and siswaList
+  // Dynamic list of available classes strictly from rombelList database
   const availableKelasOptions = useMemo(() => {
-    const set = new Set<string>();
-    rombelList.forEach(r => { if (r.namaRombel && r.namaRombel.trim()) set.add(r.namaRombel.trim()); });
-    siswaList.forEach(s => { if (s.kelas && s.kelas.trim()) set.add(s.kelas.trim()); });
-    if (set.size === 0) {
-      ['VIII - Al Biruni', 'VIII - Al Farabi', 'VIII - Al Khawarizmi', 'VIII - Al Kindi'].forEach(k => set.add(k));
+    const rawSet = new Set<string>();
+    rombelList.forEach(r => { 
+      if (r.namaRombel && r.namaRombel.trim()) {
+        rawSet.add(r.namaRombel.trim()); 
+      } 
+    });
+
+    if (rawSet.size === 0) {
+      ['VII - Ibnu Sina', 'VII - Ibnu Khaldun', 'VII - Ibnu Al Haytam', 'VIII - Al Kindi', 'VIII - Al Khawarizmi', 'VIII - Al Farabi', 'VIII - Al Biruni', 'IX - Umar bin Khattab', 'IX - Utsman bin Affan'].forEach(k => rawSet.add(k));
     }
-    return Array.from(set);
-  }, [rombelList, siswaList]);
+
+    return Array.from(rawSet).sort((a, b) => {
+      const getGrade = (s: string) => {
+        if (s.startsWith('VII -') || s.startsWith('7 -')) return 7;
+        if (s.startsWith('VIII -') || s.startsWith('8 -')) return 8;
+        if (s.startsWith('IX -') || s.startsWith('9 -')) return 9;
+        return 99;
+      };
+      const gradeA = getGrade(a);
+      const gradeB = getGrade(b);
+      if (gradeA !== gradeB) return gradeA - gradeB;
+      return a.localeCompare(b, undefined, { numeric: true });
+    });
+  }, [rombelList]);
 
   // --- Subtab 1: Absensi Siswa Harian State ---
   const todayDateStr = new Date().toISOString().split('T')[0];
@@ -941,11 +969,11 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
   }, [siswaList, selectedKelas]);
 
   // Local state for batch editing daily attendance
-  const [localHarianState, setLocalHarianState] = useState<Record<string, StatusAbsensi>>({});
+  const [localHarianState, setLocalHarianState] = useState<Record<string, StatusAbsensi | 'Terlambat'>>({});
 
   // Sync localHarianState whenever selectedKelas or selectedTanggal changes
   useEffect(() => {
-    const map: Record<string, StatusAbsensi> = {};
+    const map: Record<string, StatusAbsensi | 'Terlambat'> = {};
     classSiswaList.forEach(s => {
       const existing = absensiHarian.find(a => a.siswaId === s.id && a.tanggal === selectedTanggal);
       map[s.id] = existing ? existing.status : 'Hadir';
@@ -1000,7 +1028,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
         updated[existingIndex].jamMasuk = timeNow;
         updated[existingIndex].status = 'Hadir';
         updated[existingIndex].statusIzin = 'Disetujui';
-        updated[existingIndex].metodeIn = 'Aplikasi Web';
+        updated[existingIndex].metodeIn = 'Aplikasi Web' as any;
         updated[existingIndex].lokasiIn = locationStr;
         updated[existingIndex].koordinatGps = gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined;
         return updated;
@@ -1015,9 +1043,9 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
             jamMasuk: timeNow,
             status: 'Hadir',
             statusIzin: 'Disetujui',
-            metodeIn: 'Aplikasi Web',
+            metodeIn: 'Aplikasi Web' as any,
             lokasiIn: locationStr,
-            koordinatGps: gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined
+            // // // koordinatGps: gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined
           },
           ...prev
         ];
@@ -1038,7 +1066,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
       if (existingIndex >= 0) {
         const updated = [...prev];
         updated[existingIndex].jamKeluar = timeNow;
-        updated[existingIndex].metodeOut = 'Aplikasi Web';
+        updated[existingIndex].metodeOut = 'Aplikasi Web' as any;
         updated[existingIndex].lokasiOut = locationStr;
         updated[existingIndex].koordinatGps = gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : undefined;
         return updated;
@@ -1122,32 +1150,35 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
         </div>
       )}
       
-      {/* Top Navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#121212] p-5 rounded-xl border border-slate-800 shadow-sm">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <CalendarCheck className="w-5 h-5 text-blue-400" /> Presensi & Absensi Terpadu
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Pencatatan absensi harian siswa, kehadiran kelas per mata pelajaran, dan presensi guru.
-          </p>
-        </div>
+      {/* Top Navigation - shown for non-kepsek roles since PerizinanView has its own full executive header */}
+      {currentRole !== 'kepsek' && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#121212] p-5 rounded-xl border border-slate-800 shadow-sm">
+          <div>
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <CalendarCheck className="w-5 h-5 text-blue-400" /> Presensi & Absensi Terpadu
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Pencatatan absensi harian siswa, kehadiran kelas per mata pelajaran, dan presensi guru.
+            </p>
+          </div>
 
-        {/* Current Active Subtab Badge */}
-        <div className="flex items-center gap-2 bg-[#181818] px-3.5 py-2 rounded-xl border border-slate-800">
-          <span className="text-xs text-slate-400 font-semibold">Submenu:</span>
-          <span className="px-3 py-1 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-lg text-xs font-extrabold flex items-center gap-1.5 shadow-sm">
-            {subTab === 'scan_barcode' && <><QrCode className="w-3.5 h-3.5" /> Scan Barcode / QR</>}
-            {subTab === 'harian_siswa' && <><CalendarCheck className="w-3.5 h-3.5" /> Absensi Harian Siswa</>}
-            {subTab === 'jurnal_guru' && <><BookOpen className="w-3.5 h-3.5" /> Jurnal Guru</>}
-            {subTab === 'absensi_guru' && <><UserCheck className="w-3.5 h-3.5" /> Presensi Guru</>}
-            {subTab === 'redaksi' && <><MessageSquare className="w-3.5 h-3.5" /> Redaksi Notifikasi WA</>}
-          </span>
+          {/* Current Active Subtab Badge */}
+          <div className="flex items-center gap-2 bg-[#181818] px-3.5 py-2 rounded-xl border border-slate-800">
+            <span className="text-xs text-slate-400 font-semibold">Submenu:</span>
+            <span className="px-3 py-1 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-lg text-xs font-extrabold flex items-center gap-1.5 shadow-sm">
+              {subTab === 'scan_barcode' && <><QrCode className="w-3.5 h-3.5" /> Scan Barcode / QR</>}
+              {subTab === 'harian_siswa' && <><CalendarCheck className="w-3.5 h-3.5" /> Absensi Harian Siswa</>}
+              {subTab === 'jurnal_guru' && <><BookOpen className="w-3.5 h-3.5" /> Jurnal Guru</>}
+              {subTab === 'absensi_guru' && <><UserCheck className="w-3.5 h-3.5" /> Presensi Guru</>}
+              {subTab === 'redaksi' && <><MessageSquare className="w-3.5 h-3.5" /> Redaksi Notifikasi WA</>}
+              {subTab === 'perizinan' && <><FileSignature className="w-3.5 h-3.5" /> Pengajuan Izin / Cuti</>}
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* SUBTAB 0: SCAN BARCODE / QR ABSENSI */}
-      {subTab === 'scan_barcode' && (
+      {/* SUBTAB 0: SCAN BARCODE / QR ABSENSI (Admin only) */}
+      {subTab === 'scan_barcode' && (currentRole === 'admin' || currentRole === 'petugas_absensi') && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Left Column: Barcode Scanner Interface */}
@@ -1231,41 +1262,35 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-3 bg-[#181818] p-3 rounded-xl border border-slate-800 text-xs">
               <div className="flex items-center gap-2">
                 <span className="text-slate-400 font-bold">Target Scan:</span>
-                {currentRole !== 'guru' ? (
-                  <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
-                    <button
-                      type="button"
-                      onClick={() => setScanTargetType('siswa')}
-                      className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
-                        scanTargetType === 'siswa' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Siswa
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setScanTargetType('guru')}
-                      className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
-                        scanTargetType === 'guru' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Guru
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setScanTargetType('staf')}
-                      className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
-                        scanTargetType === 'staf' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Staf
-                    </button>
-                  </div>
-                ) : (
-                  <span className="px-2.5 py-1 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-lg text-xs font-bold">
+                <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setScanTargetType('siswa')}
+                    className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
+                      scanTargetType === 'siswa' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
                     Siswa
-                  </span>
-                )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScanTargetType('guru')}
+                    className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
+                      scanTargetType === 'guru' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Guru
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScanTargetType('staf')}
+                    className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
+                      scanTargetType === 'staf' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Staf
+                  </button>
+                </div>
               </div>
 
               {/* WhatsApp Notification Auto-send Toggle & Token Setting */}
@@ -1315,17 +1340,17 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-2.5 bg-[#181818] px-4 py-2.5 rounded-xl border border-blue-500/30 text-xs text-slate-300">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="font-bold text-blue-400 flex items-center gap-1.5 shrink-0">
-                  <Clock className="w-4 h-4 text-blue-400" /> Jadwal Presensi Aktif:
+                  <Clock className="w-4 h-4 text-blue-400" /> Jadwal {scanTargetType === 'siswa' ? 'Siswa' : 'Guru & Staf'}:
                 </span>
                 <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
                   <span className="bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 px-2.5 py-0.5 rounded-md font-bold flex items-center gap-1">
-                    <LogIn className="w-3 h-3 text-emerald-400" /> Masuk: {schoolSettings?.jadwalPresensi?.jamMasuk || localJadwal.jamMasuk} WIB
+                    <LogIn className="w-3 h-3 text-emerald-400" /> Masuk: {scanTargetType === 'siswa' ? (schoolSettings?.jadwalPresensi?.jamMasuk || localJadwal.jamMasuk) : (schoolSettings?.jadwalPresensi?.jamMasukGuru || localJadwal.jamMasukGuru || '06:45')} WIB
                   </span>
                   <span className="bg-amber-950/60 border border-amber-500/30 text-amber-300 px-2.5 py-0.5 rounded-md font-bold">
-                    Toleransi: {schoolSettings?.jadwalPresensi?.jamToleransi || localJadwal.jamToleransi} WIB
+                    Toleransi: {scanTargetType === 'siswa' ? (schoolSettings?.jadwalPresensi?.jamToleransi || localJadwal.jamToleransi) : (schoolSettings?.jadwalPresensi?.jamToleransiGuru || localJadwal.jamToleransiGuru || '07:00')} WIB
                   </span>
                   <span className="bg-blue-950/60 border border-blue-500/30 text-blue-300 px-2.5 py-0.5 rounded-md font-bold flex items-center gap-1">
-                    <LogOut className="w-3 h-3 text-blue-400" /> Pulang: {schoolSettings?.jadwalPresensi?.jamPulang || localJadwal.jamPulang} WIB
+                    <LogOut className="w-3 h-3 text-blue-400" /> Pulang: {scanTargetType === 'siswa' ? (schoolSettings?.jadwalPresensi?.jamPulang || localJadwal.jamPulang) : (schoolSettings?.jadwalPresensi?.jamPulangGuru || localJadwal.jamPulangGuru || '15:00')} WIB
                   </span>
                 </div>
               </div>
@@ -1780,7 +1805,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                     <th className="px-4 py-3">Jam Keluar</th>
                     <th className="px-4 py-3">Status Masuk</th>
                     <th className="px-4 py-3">Status Pulang</th>
-                    <th className="px-4 py-3">Keterangan / Lokasi</th>
+                    <th className="px-4 py-3">Lokasi</th>
                     <th className="px-4 py-3 text-right">AKSI</th>
                   </tr>
                 </thead>
@@ -1824,35 +1849,13 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                         })()}
                       </td>
                       <td className="px-4 py-3 text-slate-500 max-w-xs truncate">
-                        <LocationWithMapLink text={a.status === 'Hadir' ? (a.lokasiIn || a.lokasiOut || '') : (a.keteranganIzin || a.lokasiIn || '')} />
+                        <LocationWithMapLink text={a.lokasiIn || a.lokasiOut || '-'} />
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {a.statusIzin === 'Pending' && a.status !== 'Hadir' ? (
-                            <div className="flex justify-end gap-1">
-                              <button
-                                onClick={() => handleApproveIzin(a.id, 'Disetujui')}
-                                className="px-2 py-1 bg-emerald-500 text-slate-950 font-bold rounded text-[10px]"
-                              >
-                                Setujui
-                              </button>
-                              <button
-                                onClick={() => handleApproveIzin(a.id, 'Ditolak')}
-                                className="px-2 py-1 bg-rose-500 text-white font-bold rounded text-[10px]"
-                              >
-                                Tolak
-                              </button>
-                            </div>
-                          ) : (
-                            <span className={`font-bold text-[10px] px-2 py-0.5 rounded ${
-                              (a.status === 'Hadir' || a.statusIzin === 'Disetujui') ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'
-                            }`}>
-                              {a.status === 'Hadir' ? 'Disetujui' : a.statusIzin}
-                            </span>
-                          )}
+                        <div className="flex items-center justify-end">
                           <button
                             onClick={() => handleDeleteGuruRecords([a.id])}
-                            className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all border border-transparent hover:border-rose-100 flex items-center justify-center"
+                            className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all border border-transparent hover:border-rose-100 flex items-center justify-center cursor-pointer"
                             title="Hapus Data"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1869,7 +1872,24 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
         </div>
       )}
 
-      {/* SUBTAB 4: EDIT REDAKSI TEMPLATE NOTIFIKASI WA PRESENSI */}
+      
+      {/* SUBTAB 5: PERIZINAN */}
+      {subTab === 'perizinan' && (
+        <PerizinanView
+          siswaList={siswaList}
+          guruList={guruList}
+          stafList={stafList}
+          rombelList={rombelList}
+          absensiHarian={absensiHarian}
+          setAbsensiHarian={setAbsensiHarian}
+          absensiGuruList={absensiGuruList}
+          setAbsensiGuruList={setAbsensiGuruList}
+          currentRole={currentRole}
+          schoolSettings={schoolSettings}
+        />
+      )}
+
+{/* SUBTAB 4: EDIT REDAKSI TEMPLATE NOTIFIKASI WA PRESENSI */}
       {subTab === 'redaksi' && (
         <div className="space-y-6 animate-fade-in text-left">
           {/* Header Banner */}

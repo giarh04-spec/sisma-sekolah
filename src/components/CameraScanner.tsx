@@ -175,15 +175,14 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
           }
         }
       } catch (err: unknown) {
-        console.error('Failed to start scanner:', err);
         if (isMounted) {
           const errMsg = err instanceof Error ? err.message : String(err);
           if (errMsg.toLowerCase().includes('permission') || errMsg.toLowerCase().includes('notallowed')) {
-            setCameraError('Izin akses kamera ditolak. Silakan berikan izin kamera pada browser Anda.');
+            setCameraError('Izin akses kamera diblokir browser. Silakan gunakan fitur Upload File Foto QR atau pindai manual.');
           } else if (errMsg.toLowerCase().includes('notfound') || errMsg.toLowerCase().includes('readable')) {
-            setCameraError('Kamera tidak dapat diakses atau sedang digunakan oleh aplikasi lain.');
+            setCameraError('Kamera tidak terdeteksi atau sedang digunakan aplikasi lain. Silakan gunakan Upload File.');
           } else {
-            setCameraError(`Gagal membuka kamera: ${errMsg}`);
+            setCameraError('Kamera tidak aktif di preview iframe. Silakan gunakan Upload File Foto QR.');
           }
         }
       }

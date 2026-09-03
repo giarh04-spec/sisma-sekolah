@@ -66,20 +66,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Sparkles className="w-3.5 h-3.5" /> Portal SIM Sekolah 2026
             </span>
             <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full uppercase border ${
+              currentRole === 'kepsek' ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40' :
               currentRole === 'admin' ? 'bg-blue-500/20 text-blue-300 border-blue-500/40' :
               currentRole === 'guru' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' :
+              currentRole === 'petugas_absensi' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' :
               currentRole === 'staf' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
               'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
             }`}>
-              Akses: {currentRole}
+              Akses: {currentRole === 'kepsek' ? 'Kepala Sekolah' : currentRole === 'petugas_absensi' ? 'Petugas Absensi' : currentRole}
             </span>
           </div>
           <h2 className="text-2xl font-black tracking-tight text-white">
-            Selamat Datang, {currentRole === 'admin' ? 'Administrator Sekolah' : currentRole === 'guru' ? 'Bapak/Ibu Guru Pendidik' : currentRole === 'staf' ? 'Staf Tata Usaha & Keuangan' : 'Siswa / Wali Murid'}
+            Selamat Datang, {currentRole === 'kepsek' ? 'Bapak/Ibu Kepala Sekolah' : currentRole === 'admin' ? 'Administrator Sekolah' : currentRole === 'guru' ? 'Bapak/Ibu Guru Pendidik' : currentRole === 'petugas_absensi' ? 'Petugas Absensi & Kehadiran' : currentRole === 'staf' ? 'Staf Tata Usaha & Keuangan' : 'Siswa / Wali Murid'}
           </h2>
           <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
+            {currentRole === 'kepsek' && 'Akses Eksekutif Kepala Sekolah: Pemantauan kehadiran terpadu, persetujuan dan disposisi izin siswa & guru, monitoring bank soal & hasil ujian CBT, serta supervisi administrasi kurikulum dan keuangan.'}
             {currentRole === 'admin' && 'Akses penuh seluruh modul sistem: Manajemen Database Siswa/Guru/Staf, Absensi QR, Ujian CBT, Modul Ajar, serta Laporan Keuangan SPP terintegrasi Google Workspace.'}
             {currentRole === 'guru' && 'Akses khusus Pendidik: Presensi Harian/Kelas, Bank Soal & Ujian Online CBT Anti-Cheat, Administrasi Guru (Modul Ajar, CP, ATP & Jurnal).'}
+            {currentRole === 'petugas_absensi' && 'Akses Petugas Absensi: Pengelolaan Presensi Harian Siswa & Guru, Scanner Barcode / QR Code Kehadiran, serta Rekapitulasi Perizinan dan Cuti.'}
             {currentRole === 'staf' && 'Akses Tata Usaha & Administrasi: Pengelolaan Data Master Sekolah, Rekapitulasi Absensi Pegawai/Siswa, dan Pembayaran SPP Keuangan.'}
             {currentRole === 'siswa' && 'Akses Portal Siswa/Wali: Informasi Jadwal Ujian CBT, Kartu Digital QR Presensi, Rekap Kehadiran dan Tagihan SPP Bulanan.'}
           </p>

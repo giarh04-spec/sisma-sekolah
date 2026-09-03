@@ -37,7 +37,9 @@ import {
   Layers,
   Sparkle,
   CheckSquare,
-  Square
+  Square,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { 
   BankSoal, 
@@ -109,34 +111,32 @@ export const CbtView: React.FC<CbtViewProps> = ({
   // Compute dynamic lists of available classes, subjects, and teachers
   // Hanya masukkan kelas/rombel yang benar-benar memiliki siswa terdaftar
   const availableKelasList = useMemo(() => {
-    const classCountMap = new Map<string, number>();
+    const rawSet = new Set<string>();
 
-    siswaList.forEach(s => {
-      if (s.kelas && s.kelas.trim()) {
-        const k = s.kelas.trim();
-        classCountMap.set(k, (classCountMap.get(k) || 0) + 1);
+    rombelList.forEach(r => {
+      const name = r.namaRombel || (r as any).nama;
+      if (name && typeof name === 'string' && name.trim()) {
+        rawSet.add(name.trim());
       }
     });
 
-    // Hanya ambil kelas yang memiliki jumlah siswa > 0
-    const classesWithStudents = Array.from(classCountMap.entries())
-      .filter(([_, count]) => count > 0)
-      .map(([className]) => className);
-
-    // Fallback jika belum ada data siswa sama sekali
-    if (classesWithStudents.length === 0) {
-      rombelList.forEach(r => {
-        const name = r.namaRombel || (r as any).nama;
-        if (name && typeof name === 'string' && name.trim()) {
-          classesWithStudents.push(name.trim());
-        }
-      });
+    if (rawSet.size === 0) {
+      ['VII - Ibnu Sina', 'VII - Ibnu Khaldun', 'VII - Ibnu Al Haytam', 'VIII - Al Kindi', 'VIII - Al Khawarizmi', 'VIII - Al Farabi', 'VIII - Al Biruni', 'IX - Umar bin Khattab', 'IX - Utsman bin Affan'].forEach(k => rawSet.add(k));
     }
 
-    return Array.from(new Set(classesWithStudents)).sort((a, b) => 
-      a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
-    );
-  }, [siswaList, rombelList]);
+    return Array.from(rawSet).sort((a, b) => {
+      const getGrade = (s: string) => {
+        if (s.startsWith('VII -') || s.startsWith('7 -')) return 7;
+        if (s.startsWith('VIII -') || s.startsWith('8 -')) return 8;
+        if (s.startsWith('IX -') || s.startsWith('9 -')) return 9;
+        return 99;
+      };
+      const gradeA = getGrade(a);
+      const gradeB = getGrade(b);
+      if (gradeA !== gradeB) return gradeA - gradeB;
+      return a.localeCompare(b, undefined, { numeric: true });
+    });
+  }, [rombelList]);
 
   const availableMapelList = useMemo(() => {
     const set = new Set<string>();
@@ -883,10 +883,69 @@ export const CbtView: React.FC<CbtViewProps> = ({
     return `${h} Jam ${m} Menit ${s} Detik`;
   };
 
-  // --- Anti-Cheat Monitoring State ---
+  // --- Anti-Cheat Monitoring & Audio Alarm State ---
   const [cheatCount, setCheatCount] = useState(0);
   const [showCheatAlert, setShowCheatAlert] = useState(false);
   const [cheatLogs, setCheatLogs] = useState<string[]>([]);
+
+  // Synthesizer Web Audio API for Warning Alarm (Bip Bip Bip)
+  const playViolationBeepSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+
+      const now = ctx.currentTime;
+      
+      // Play 3 loud, high-pitched alarm beeps in quick succession: "Bip... Bip... Bip!"
+      const beeps = [
+        { time: now + 0.05, freq: 900, dur: 0.12 },
+        { time: now + 0.22, freq: 900, dur: 0.12 },
+        { time: now + 0.39, freq: 1150, dur: 0.22 }
+      ];
+
+      beeps.forEach(({ time, freq, dur }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sawtooth'; // Piercing, clear warning alarm tone
+        osc.frequency.setValueAtTime(freq, time);
+
+        // Envelope: instant attack, punchy decay
+        gain.gain.setValueAtTime(0.0001, time);
+        gain.gain.linearRampToValueAtTime(0.45, time + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(time);
+        osc.stop(time + dur + 0.05);
+      });
+    } catch (e) {
+      console.error('Audio warning beep error:', e);
+    }
+  };
+
+  // Continuous sound alarm loop while the violation popup (showCheatAlert) is visible
+  useEffect(() => {
+    if (!showCheatAlert) return;
+
+    // Play initial beep burst immediately
+    playViolationBeepSound();
+
+    // Repeat alarm beep "bip bip bip" every 1.4s until dismissed
+    const alarmInterval = setInterval(() => {
+      playViolationBeepSound();
+    }, 1400);
+
+    return () => {
+      clearInterval(alarmInterval);
+    };
+  }, [showCheatAlert]);
 
   // Window Focus / Tab Switch Detection Effect
   useEffect(() => {
@@ -1460,7 +1519,23 @@ export const CbtView: React.FC<CbtViewProps> = ({
               </div>
 
               <div className="flex items-center gap-2">
-                <span className={`px-3 py-1 rounded-lg font-mono font-bold text-xs ${
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCheatCount(prev => {
+                      const next = prev + 1;
+                      const timeLog = new Date().toLocaleTimeString('id-ID');
+                      setCheatLogs(logs => [`[${timeLog}] Simulasi Pelanggaran Ujian (Pelanggaran ke-${next})`, ...logs]);
+                      setShowCheatAlert(true);
+                      return next;
+                    });
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-rose-600/90 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-rose-950/40 cursor-pointer active:scale-95"
+                  title="Klik untuk menguji bunyi alarm bip bip bip dan simulasi pelanggaran"
+                >
+                  <Volume2 className="w-3.5 h-3.5 animate-pulse" /> Uji Alarm Bip
+                </button>
+                <span className={`px-3 py-1.5 rounded-xl font-mono font-bold text-xs ${
                   cheatCount === 0 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
                   cheatCount === 1 ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
                   'bg-rose-500/20 text-rose-400 border border-rose-500/30'
@@ -2100,25 +2175,49 @@ export const CbtView: React.FC<CbtViewProps> = ({
         </div>
       )}
 
-      {/* POPUP CHEAT ALERT MODAL */}
+      {/* POPUP CHEAT ALERT MODAL (DENGAN ALARM SUARA BIP BIP BIP) */}
       {showCheatAlert && (
-        <div className="fixed inset-0 bg-rose-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-[#121212] border-2 border-rose-500 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
-            <div className="w-14 h-14 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center mx-auto text-rose-400 animate-bounce">
-              <ShieldAlert className="w-8 h-8" />
+        <div className="fixed inset-0 bg-[#3b050d]/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[#100a0d] border border-rose-500/70 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl shadow-rose-950/70 animate-in fade-in zoom-in-95 duration-200">
+            
+            {/* Pulsing Icon */}
+            <div className="w-14 h-14 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center mx-auto text-rose-400 relative">
+              <ShieldAlert className="w-7 h-7 animate-pulse" />
+              <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-500"></span>
+              </span>
             </div>
+
             <div>
-              <h3 className="text-lg font-extrabold text-white">PERINGATAN KECURANGAN CBT!</h3>
-              <p className="text-xs text-rose-300 mt-1">
+              <h3 className="text-base font-extrabold text-white tracking-wide uppercase">
+                PERINGATAN KECURANGAN CBT!
+              </h3>
+              <p className="text-[11px] text-rose-200/90 mt-1 leading-relaxed px-2">
                 Sistem mendeteksi Anda mencoba membuka aplikasi/tab lain atau keluar dari fokus layar ujian.
               </p>
             </div>
 
-            <div className="p-3 bg-rose-950/60 rounded-xl border border-rose-800 text-rose-200 font-mono text-xs font-bold">
+            {/* Violation Counter Box */}
+            <div className="p-3 bg-[#1e0a11] rounded-xl border border-rose-900/80 text-rose-200 font-mono text-xs font-bold tracking-wider">
               Status Pelanggaran: {cheatCount} / 3
             </div>
 
-            <p className="text-[11px] text-slate-400">
+            {/* Sound Alarm Active Badge */}
+            <div className="flex items-center justify-center gap-2 text-[11px] font-semibold text-rose-300 bg-rose-950/40 border border-rose-800/60 rounded-xl py-1.5 px-3">
+              <Volume2 className="w-4 h-4 text-rose-400 animate-bounce" />
+              <span>Alarm Pelanggaran Aktif: <strong>Bip Bip Bip</strong></span>
+              <button
+                type="button"
+                onClick={() => playViolationBeepSound()}
+                className="text-[10px] bg-rose-600/30 hover:bg-rose-600/50 text-rose-200 border border-rose-500/40 px-2 py-0.5 rounded ml-1 transition-all cursor-pointer font-bold"
+                title="Bunyikan Ulang"
+              >
+                Ulangi
+              </button>
+            </div>
+
+            <p className="text-[10px] text-slate-400 px-1 leading-relaxed">
               {cheatCount >= 3 
                 ? 'Batas maksimal pelanggaran telah terlampaui. Ujian telah di-submit secara otomatis!' 
                 : 'Peringatan: Apabila mencapai 3 kali pelanggaran, sistem akan otomatis mengunci dan me-submit ujian Anda!'}
@@ -2126,7 +2225,7 @@ export const CbtView: React.FC<CbtViewProps> = ({
 
             <button
               onClick={() => setShowCheatAlert(false)}
-              className="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg"
+              className="w-full py-2.5 bg-rose-600 hover:bg-rose-500 active:scale-98 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-rose-900/50 cursor-pointer"
             >
               Saya Mengerti & Kembali ke Ujian
             </button>

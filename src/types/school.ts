@@ -13,9 +13,9 @@ export interface RombelKelas {
   catatan?: string;
 }
 
-export type Role = 'admin' | 'guru' | 'siswa' | 'staf';
+export type Role = 'admin' | 'guru' | 'siswa' | 'staf' | 'kepsek' | 'petugas_absensi';
 export type SubTab = 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel' | 'ekskul';
-export type AbsensiSubTab = 'scan_barcode' | 'harian_siswa' | 'absensi_guru' | 'redaksi';
+export type AbsensiSubTab = 'scan_barcode' | 'harian_siswa' | 'absensi_guru' | 'redaksi' | 'perizinan' | 'jurnal_guru';
 export type CbtSubTab = 'bank_soal' | 'jadwal_kartu' | 'ai_generator' | 'simulasi_ujian' | 'hasil_ujian';
 export type KeuanganSubTab = 'pembayaran' | 'pengaturan_biaya' | 'rekap' | 'redaksi' | 'gaji';
 export type AdministrasiSubTab = 'modul_ajar' | 'cp' | 'atp' | 'kktp' | 'prota' | 'prosem' | 'jadwal' | 'kalender' | 'jurnal_guru';
@@ -48,6 +48,14 @@ export interface Siswa {
   agama?: string;
   alamat: string;
   alamatLengkap?: string;
+  rtRw?: string;
+  rt?: string;
+  rw?: string;
+  kelurahan?: string;
+  kecamatan?: string;
+  kota?: string;
+  provinsi?: string;
+  kodePos?: string;
   namaWali: string;
   teleponWali: string;
   status: 'Aktif' | 'Alumni' | 'Pindah';
@@ -63,7 +71,23 @@ export interface Siswa {
   beratBadan?: number;
   tinggiBadan?: number;
   namaAyah?: string;
+  nikAyah?: string;
+  tempatLahirAyah?: string;
+  tanggalLahirAyah?: string;
+  pendidikanAyah?: string;
+  pekerjaanAyah?: string;
+  penghasilanAyah?: string;
+  teleponAyah?: string;
+
   namaIbu?: string;
+  nikIbu?: string;
+  tempatLahirIbu?: string;
+  tanggalLahirIbu?: string;
+  pendidikanIbu?: string;
+  pekerjaanIbu?: string;
+  penghasilanIbu?: string;
+  teleponIbu?: string;
+
   tempatLahirOrtu?: string;
   tanggalLahirOrtu?: string;
   pendidikanOrtu?: string;
@@ -74,6 +98,7 @@ export interface Siswa {
 export interface Guru {
   id: string;
   nip: string;
+  nuptk?: string;
   nik?: string;
   nama: string;
   gelarDepan?: string;
@@ -99,6 +124,7 @@ export interface Guru {
 export interface Staf {
   id: string;
   nik: string;
+  nip?: string;
   nama: string;
   bagian: string; // TUK, Perpus, Keuangan, Kebersihan, IT
   email: string;
@@ -118,7 +144,7 @@ export interface Staf {
 
 export interface ScheduleSlot {
   id: string;
-  hari: 'Senin' | 'Selasa' | 'Rabu' | 'Kamis' | 'Jumat' | 'Sabtu';
+  hari: 'Senin' | 'Selasa' | 'Rabu' | 'Kamis' | 'Jumat' | 'Sabtu' | string;
   jamMulai: string; // e.g. "07:30"
   jamSelesai: string; // e.g. "09:00"
   kelasTarget: string; // e.g. "X-IPA-1"
@@ -166,13 +192,21 @@ export interface AbsensiSiswaHarian {
   id: string;
   siswaId: string;
   tanggal: string; // YYYY-MM-DD
-  status: StatusAbsensi;
+  status: StatusAbsensi | 'Terlambat';
   keterangan?: string;
   jamScan?: string;
   jamMasuk?: string;
   jamPulang?: string;
   tipeScan?: 'Masuk' | 'Pulang';
   metodeScan?: 'Manual' | 'Barcode / QR';
+  lokasiScan?: string;
+  statusIzin?: 'Disetujui' | 'Pending' | 'Ditolak';
+  disetujuiOleh?: string;
+  tanggalPersetujuan?: string;
+  alasanPenolakan?: string;
+  buktiUrl?: string;
+  kategoriIzin?: 'Sakit' | 'Izin Pribadi' | 'Cuti' | 'Dispensasi Lomba' | 'Lainnya' | string;
+  sampaiTanggal?: string;
 }
 
 export interface AbsensiSiswaKelas {
@@ -202,9 +236,17 @@ export interface AbsensiGuru {
   status: 'Hadir' | 'Izin' | 'Sakit' | 'Dinas Outer';
   keteranganIzin?: string;
   statusIzin: 'Disetujui' | 'Pending' | 'Ditolak';
+  disetujuiOleh?: string;
+  tanggalPersetujuan?: string;
+  alasanPenolakan?: string;
+  buktiUrl?: string;
+  kategoriIzin?: 'Sakit' | 'Cuti Tahunan' | 'Cuti Melahirkan' | 'Dinas Luar' | 'Izin Keperluan Mendesak' | 'Lainnya' | string;
+  sampaiTanggal?: string;
   lokasiIn?: string;
   lokasiOut?: string;
   metodeIn?: 'Manual' | 'Barcode / QR';
+  metodeOut?: 'Manual' | 'Barcode / QR';
+  koordinatGps?: string;
 }
 
 export type TipeSoal = 'pg' | 'multiple_choice' | 'isian' | 'esai';
@@ -231,6 +273,7 @@ export interface BankSoal {
   judul: string;
   kode: string;
   mataPelajaran: string;
+  mapel?: string;
   kelas: string;
   durasiMenit: number;
   jumlahSoal: number;
@@ -397,7 +440,7 @@ export interface AdministrasiGuru {
   fileType?: 'template_kemendikdasmen' | 'custom_excel' | 'custom_word' | 'custom_pdf';
 }
 
-export type TipeKeuangan = 'spp' | 'ukt' | 'ekskul';
+export type TipeKeuangan = 'spp' | 'ukt' | 'ekskul' | 'other' | string;
 
 export interface TagihanKeuangan {
   id: string;
@@ -442,6 +485,7 @@ export interface FonnteConfig {
   enabled: boolean;
   autoSendAbsensi?: boolean;
   autoSendKeuangan?: boolean;
+  autoSendPerizinan?: boolean;
 }
 
 export interface GoogleDriveExportResult {
@@ -452,9 +496,16 @@ export interface GoogleDriveExportResult {
 }
 
 export interface JadwalPresensi {
+  // Jadwal Siswa
   jamMasuk: string; // HH:mm format, e.g. "07:00"
   jamToleransi: string; // HH:mm format, e.g. "07:15"
   jamPulang: string; // HH:mm format, e.g. "14:30"
+  
+  // Jadwal Guru & Staf
+  jamMasukGuru?: string;
+  jamToleransiGuru?: string;
+  jamPulangGuru?: string;
+
   hariKerja: string[]; // e.g. ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
   autoSwitchScanMode?: boolean; // Otomatis berpindah mode Masuk/Pulang berdasarkan jam realtime
 }
@@ -477,7 +528,9 @@ export interface SchoolSettings {
   website: string;
   kepalaSekolah: string;
   nipKepalaSekolah: string;
+  teleponKepsek: string;
   tahunAjaran: string;
+  semester?: string;
   semesterAktif: string;
   logoUrl: string;
   namaKasir?: string;

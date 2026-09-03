@@ -96,41 +96,20 @@ export const JurnalGuru: React.FC<JurnalGuruProps> = ({
     '9 - 10 (14:00 - 15:30)'
   ];
 
-  // Dynamic list of available classes from rombelList and siswaList
+  // Dynamic list of available classes strictly from rombelList database
   const availableKelasOptions = useMemo(() => {
     const rawSet = new Set<string>();
-    
     rombelList.forEach(r => { if (r.namaRombel && r.namaRombel.trim()) rawSet.add(r.namaRombel.trim()); });
-    siswaList.forEach(s => { if (s.kelas && s.kelas.trim()) rawSet.add(s.kelas.trim()); });
     
     if (rawSet.size === 0) {
       SCHEDULE_CLASSES.forEach(c => rawSet.add(c.name));
     }
-    
-    // Normalize and filter duplicates
-    const allRaw = Array.from(rawSet);
-    const filtered = allRaw.filter(name => {
-      // Filter out legacy "VII-A", "VIII-A", "IX-A" format if modern format exists
-      const isLegacy = /^(VII|VIII|IX)-[A-Z]$/.test(name);
-      if (isLegacy) {
-        const hasModern = allRaw.some(n => n.includes(' - ') && !/^(VII|VIII|IX)-[A-Z]$/.test(n));
-        if (hasModern) return false;
-      }
 
-      // If this is a plain name like "Ibnu Sina" and there's a prefixed version, skip plain one
-      const prefixes = ['VII - ', 'VIII - ', 'IX - '];
-      const hasPrefixed = prefixes.some(p => allRaw.includes(p + name));
-      if (hasPrefixed) return false;
-
-      return true;
-    });
-
-    return filtered.sort((a, b) => {
-      // Custom sort: VII -> VIII -> IX
+    return Array.from(rawSet).sort((a, b) => {
       const getGrade = (s: string) => {
-        if (s.startsWith('VII -')) return 7;
-        if (s.startsWith('VIII -')) return 8;
-        if (s.startsWith('IX -')) return 9;
+        if (s.startsWith('VII -') || s.startsWith('7 -')) return 7;
+        if (s.startsWith('VIII -') || s.startsWith('8 -')) return 8;
+        if (s.startsWith('IX -') || s.startsWith('9 -')) return 9;
         return 99;
       };
       const gradeA = getGrade(a);
@@ -138,7 +117,7 @@ export const JurnalGuru: React.FC<JurnalGuruProps> = ({
       if (gradeA !== gradeB) return gradeA - gradeB;
       return a.localeCompare(b, undefined, { numeric: true });
     });
-  }, [rombelList, siswaList]);
+  }, [rombelList]);
 
   const [mapelKelas, setMapelKelas] = useState(() => availableKelasOptions.includes('IX - Utsman bin Affan') ? 'IX - Utsman bin Affan' : (availableKelasOptions[0] || 'IX - Utsman bin Affan'));
   const [mapelNama, setMapelNama] = useState(subjectsOptions[0] || 'Informatika');

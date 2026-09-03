@@ -23,7 +23,10 @@ import {
   FileDown,
   GraduationCap,
   Trash2,
-  FolderOpen
+  FolderOpen,
+  RefreshCw,
+  RotateCcw,
+  Copy
 } from 'lucide-react';
 import { AdministrasiGuru, TipeAdministrasi, Role, Guru, MataPelajaranItem, RombelKelas, AdministrasiSubTab, Siswa, AbsensiSiswaKelas, SchoolSettings, ModulAjarContent } from '../types/school';
 import { dbSaveCollection, dbDeleteItem, dbClearCollection } from '../lib/firebaseSync';
@@ -277,7 +280,7 @@ export const AdministrasiGuruView: React.FC<AdministrasiGuruViewProps> = ({
 }) => {
   const [filterTipe, setFilterTipe] = useState<string>('Semua');
   const [search, setSearch] = useState('');
-  const [localSubTab, setLocalSubTab] = useState<AdministrasiSubTab>('perangkat');
+  const [localSubTab, setLocalSubTab] = useState<AdministrasiSubTab>('perangkat' as any);
   
   const activeSubTab = subTab || localSubTab;
   const setActiveSubTab = (t: AdministrasiSubTab) => {
@@ -353,6 +356,23 @@ export const AdministrasiGuruView: React.FC<AdministrasiGuruViewProps> = ({
   const [workspaceKelas, setWorkspaceKelas] = useState<string>('Kelas VII (SMP)');
   const [workspaceFase, setWorkspaceFase] = useState<string>('Fase D (Kelas 7-9 SMP)');
   const [workspaceText, setWorkspaceText] = useState<string>('');
+  const [activeWorkspaceDocId, setActiveWorkspaceDocId] = useState<string | null>(null);
+  const [lastSavedText, setLastSavedText] = useState<string>('');
+  const [isSavingWorkspace, setIsSavingWorkspace] = useState<boolean>(false);
+  const [saveSuccessNotification, setSaveSuccessNotification] = useState<string | null>(null);
+  const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
+  const [customDocTitle, setCustomDocTitle] = useState<string>('');
+  const [isSaveAsNew, setIsSaveAsNew] = useState<boolean>(false);
+
+  // Auto-dismiss save notification after 3.5s
+  useEffect(() => {
+    if (saveSuccessNotification) {
+      const timer = setTimeout(() => {
+        setSaveSuccessNotification(null);
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [saveSuccessNotification]);
 
   // Sync workspaceMapel with selectedMapelFilter when it changes and is not 'Semua'
   useEffect(() => {
@@ -524,15 +544,43 @@ NIP: ${principalNipVal.padEnd(37, ' ')}NIP: ${teacherNip}`;
     return `DOKUMEN: ${mapel} Kelas ${kelas}`;
   };
 
-  const loadStandardWorkspaceText = () => {
-    const rawClass = workspaceKelas.includes('VII') ? 'VII' : workspaceKelas.includes('VIII') ? 'VIII' : 'IX';
-    const txt = getWorkspaceTemplateText(workspaceTipe, workspaceMapel, rawClass, workspaceFase);
-    setWorkspaceText(txt);
+  // Helper to find matching document in archive
+  const findMatchingArchivedDoc = (tipe: TipeAdministrasi, mapel: string, kelasStr: string) => {
+    const rawClass = kelasStr.includes('VII') ? 'VII' : kelasStr.includes('VIII') ? 'VIII' : 'IX';
+    const normMapel = mapel.toLowerCase().trim();
+    return administrasiList.find(d => {
+      const dMapel = d.mataPelajaran.toLowerCase().trim();
+      const matchTipe = d.tipe === tipe;
+      const matchMapel = dMapel === normMapel || dMapel.includes(normMapel) || normMapel.includes(dMapel);
+      const matchClass = d.kelas.includes(rawClass) || rawClass.includes(d.kelas);
+      return matchTipe && matchMapel && matchClass;
+    });
   };
 
+  const loadStandardWorkspaceText = () => {
+    const rawClass = workspaceKelas.includes('VII') ? 'VII' : workspaceKelas.includes('VIII') ? 'VIII' : 'IX';
+    const existingDoc = findMatchingArchivedDoc(workspaceTipe, workspaceMapel, workspaceKelas);
+
+    if (existingDoc && (existingDoc.content || existingDoc.deskripsi)) {
+      const docContent = existingDoc.content || existingDoc.deskripsi;
+      setWorkspaceText(docContent);
+      setActiveWorkspaceDocId(existingDoc.id);
+      setLastSavedText(docContent);
+    } else {
+      const txt = getWorkspaceTemplateText(workspaceTipe, workspaceMapel, rawClass, workspaceFase);
+      setWorkspaceText(txt);
+      setActiveWorkspaceDocId(null);
+      setLastSavedText(txt);
+    }
+  };
+
+  // Auto-sync workspace text when user changes selection filters
   useEffect(() => {
     loadStandardWorkspaceText();
   }, [workspaceMapel, workspaceTipe, workspaceKelas, workspaceFase]);
+
+  // Check if workspace has unsaved changes relative to last saved state
+  const hasUnsavedChanges = workspaceText !== lastSavedText && workspaceText.trim().length > 0;
 
   const handleDownloadWorkspaceDoc = () => {
     const html = `
@@ -608,143 +656,180 @@ NIP: ${principalNipVal.padEnd(37, ' ')}NIP: ${teacherNip}`;
     printWindow.document.close();
   };
 
-  const handleSaveWorkspaceToArsip = async () => {
-    const rawClass = workspaceKelas.includes('VII') ? 'VII' : workspaceKelas.includes('VIII') ? 'VIII' : 'IX';
-    const teacherInfo = getTemplateTeacherInfo(workspaceMapel);
-    const teacherName = teacherInfo.nama || activeTeacher?.nama || 'Guru Pengampu Mapel';
-    const docTitle = prompt('Masukkan Judul Dokumen untuk disimpan ke arsip sekolah:', `${workspaceTipe.toUpperCase().replace('_', ' ')}: ${workspaceMapel} - Kelas ${rawClass}`);
-    if (!docTitle) return;
+  const handleSaveWorkspaceToArsip = async (overrideTitle?: string, forceNew: boolean = false) => {
+    setIsSavingWorkspace(true);
+    try {
+      const rawClass = workspaceKelas.includes('VII') ? 'VII' : workspaceKelas.includes('VIII') ? 'VIII' : 'IX';
+      const teacherInfo = getTemplateTeacherInfo(workspaceMapel);
+      const teacherName = teacherInfo.nama || activeTeacher?.nama || 'Guru Pengampu Mapel';
+      const defaultDocTitle = `${workspaceTipe.toUpperCase().replace('_', ' ')}: ${workspaceMapel} - Kelas ${rawClass}`;
+      const docTitle = (overrideTitle && overrideTitle.trim()) ? overrideTitle.trim() : defaultDocTitle;
 
-    let kontenJsonObj: any = undefined;
-    if (workspaceTipe === 'modul_ajar') {
-      try {
-        // Parse the raw text to structured JSON to maintain compatibility with "Buat Manual" view & edit flows
-        const sections: { [key: string]: string } = {};
-        const lines = workspaceText.split('\n');
-        let currentLetter = '';
-        let currentLines: string[] = [];
-        
-        for (const line of lines) {
-          const match = line.match(/^([A-Q])\.\s+(.+)$/);
-          if (match) {
-            if (currentLetter) {
-              sections[currentLetter] = currentLines.join('\n').trim();
+      let kontenJsonObj: any = undefined;
+      if (workspaceTipe === 'modul_ajar') {
+        try {
+          // Parse the raw text to structured JSON to maintain compatibility with "Buat Manual" view & edit flows
+          const sections: { [key: string]: string } = {};
+          const lines = workspaceText.split('\n');
+          let currentLetter = '';
+          let currentLines: string[] = [];
+          
+          for (const line of lines) {
+            const match = line.match(/^([A-Q])\.\s+(.+)$/);
+            if (match) {
+              if (currentLetter) {
+                sections[currentLetter] = currentLines.join('\n').trim();
+              }
+              currentLetter = match[1];
+              currentLines = [];
+            } else {
+              currentLines.push(line);
             }
-            currentLetter = match[1];
-            currentLines = [];
-          } else {
-            currentLines.push(line);
           }
+          if (currentLetter) {
+            sections[currentLetter] = currentLines.join('\n').trim();
+          }
+
+          const parseLines = (secText: string) => secText ? secText.split('\n').map(l => l.trim()).filter(Boolean) : [];
+          const infoText = sections['A'] || '';
+          const getInfoField = (label: string, fallback: string = '') => {
+            const match = infoText.match(new RegExp(`${label}\\s*:\\s*(.+)`, 'i'));
+            return match ? match[1].trim() : fallback;
+          };
+
+          const informasiUmum = {
+            namaPenyusun: getInfoField('Nama Penyusun', teacherName),
+            namaSekolah: getInfoField('Nama Sekolah', 'SMP Islam Modern Al Fakhir'),
+            mataPelajaran: getInfoField('Mata Pelajaran', workspaceMapel),
+            fase: getInfoField('Fase/Kelas', 'D / ' + rawClass).split('/')[0]?.trim() || 'D',
+            kelas: getInfoField('Fase/Kelas', 'D / ' + rawClass).split('/')[1]?.trim() || rawClass,
+            semester: getInfoField('Semester', 'I (Ganjil)'),
+            tahunAjaran: getInfoField('Tahun Ajaran', '2026/2027'),
+            alokasiWaktu: getInfoField('Alokasi Waktu', '2 x 40 Menit'),
+            materi: getInfoField('Materi Pokok', docTitle),
+          };
+
+          const getKegiatanSection = (prefix: string) => {
+            const regex = new RegExp(`(?:\\d+)\\.\\s*(${prefix}[^\\n]*)\\n([\\s\\S]*?)(?=(?:\\d+)\\.\\s*|$)`, 'i');
+            const match = (sections['J'] || '').match(regex);
+            if (match) {
+              const fullMatch = match[0];
+              const durMatch = fullMatch.match(/\((\d+)\s*Menit\)/i);
+              const duration = durMatch ? `${durMatch[1]} Menit` : '10 Menit';
+              const desc = match[2].trim();
+              return { deskripsi: desc, durasi: duration };
+            }
+            return { deskripsi: '', durasi: '10 Menit' };
+          };
+
+          const lampiranText = sections['Q'] || '';
+          const getLampiranField = (num: string, fallback: string = '') => {
+            const regex = new RegExp(`(?:${num})\\.\\s*([^\\n]+)`, 'i');
+            const match = lampiranText.match(regex);
+            return match ? match[1].trim() : fallback;
+          };
+
+          kontenJsonObj = {
+            informasiUmum,
+            kompetensiAwal: sections['B'] || '',
+            profilPelajarPancasila: parseLines(sections['C']),
+            saranaPrasarana: parseLines(sections['D']),
+            targetPesertaDidik: 'Reguler',
+            modelPembelajaran: sections['F'] || 'Problem Based Learning (PBL)',
+            tujuanPembelajaran: parseLines(sections['G']),
+            pemahamanBermakna: sections['H'] || '',
+            pertanyaanPemantik: parseLines(sections['I']),
+            kegiatanPembelajaran: {
+              pendahuluan: getKegiatanSection('Pendahuluan'),
+              inti: getKegiatanSection('Inti'),
+              penutup: getKegiatanSection('Penutup')
+            },
+            asesmen: {
+              diagnostik: 'Kuesioner kesiapan awal',
+              formatif: 'Observasi keaktifan diskusi',
+              sumatif: 'Penilaian produk hasil karya',
+              teknik: 'Observasi dan Tes Tertulis',
+              instrumen: 'Lembar Pengamatan & Soal Esai Evaluatif',
+              rubrik: sections['K'] || 'Kriteria Penilaian Baku',
+              kriteriaPenilaian: 'Ketepatan & Nilai Islami'
+            },
+            diferensiasi: {
+              konten: 'Bahan bacaan tingkat kerumitan bervariasi',
+              proses: 'Scaffolding dan tutor sebaya',
+              produk: 'Penyajian karya dalam tulisan, poster, atau presentasi'
+            },
+            remedial: sections['M'] || '',
+            pengayaan: sections['N'] || '',
+            refleksiGuru: sections['O'] || '',
+            refleksiPesertaDidik: sections['P'] || '',
+            lampiran: {
+              lkpd: getLampiranField('1', 'Lembar Kerja Peserta Didik (LKPD) mandiri & kelompok.'),
+              bahanBacaan: getLampiranField('3', 'Bahan Bacaan Guru & Peserta Didik terkait materi pokok.'),
+              rubrik: getLampiranField('2', 'Rubrik Penilaian Portofolio/Performa Hasil Karya.'),
+              instrumenAsesmen: getLampiranField('4', 'Integrasi Nilai Islami'),
+              daftarPustaka: getLampiranField('5', 'Daftar Pustaka Pendikulum Merdeka.')
+            }
+          };
+        } catch (parseErr) {
+          console.error('Failed to parse workspace text to JSON structured content:', parseErr);
         }
-        if (currentLetter) {
-          sections[currentLetter] = currentLines.join('\n').trim();
-        }
-
-        const parseLines = (secText: string) => secText ? secText.split('\n').map(l => l.trim()).filter(Boolean) : [];
-        const infoText = sections['A'] || '';
-        const getInfoField = (label: string, fallback: string = '') => {
-          const match = infoText.match(new RegExp(`${label}\\s*:\\s*(.+)`, 'i'));
-          return match ? match[1].trim() : fallback;
-        };
-
-        const informasiUmum = {
-          namaPenyusun: getInfoField('Nama Penyusun', teacherName),
-          namaSekolah: getInfoField('Nama Sekolah', 'SMP Islam Modern Al Fakhir'),
-          mataPelajaran: getInfoField('Mata Pelajaran', workspaceMapel),
-          fase: getInfoField('Fase/Kelas', 'D / ' + rawClass).split('/')[0]?.trim() || 'D',
-          kelas: getInfoField('Fase/Kelas', 'D / ' + rawClass).split('/')[1]?.trim() || rawClass,
-          semester: getInfoField('Semester', 'I (Ganjil)'),
-          tahunAjaran: getInfoField('Tahun Ajaran', '2026/2027'),
-          alokasiWaktu: getInfoField('Alokasi Waktu', '2 x 40 Menit'),
-          materi: getInfoField('Materi Pokok', docTitle),
-        };
-
-        const getKegiatanSection = (prefix: string) => {
-          const regex = new RegExp(`(?:\\d+)\\.\\s*(${prefix}[^\\n]*)\\n([\\s\\S]*?)(?=(?:\\d+)\\.\\s*|$)`, 'i');
-          const match = (sections['J'] || '').match(regex);
-          if (match) {
-            const fullMatch = match[0];
-            const durMatch = fullMatch.match(/\((\d+)\s*Menit\)/i);
-            const duration = durMatch ? `${durMatch[1]} Menit` : '10 Menit';
-            const desc = match[2].trim();
-            return { deskripsi: desc, durasi: duration };
-          }
-          return { deskripsi: '', durasi: '10 Menit' };
-        };
-
-        const lampiranText = sections['Q'] || '';
-        const getLampiranField = (num: string, fallback: string = '') => {
-          const regex = new RegExp(`(?:${num})\\.\\s*([^\\n]+)`, 'i');
-          const match = lampiranText.match(regex);
-          return match ? match[1].trim() : fallback;
-        };
-
-        kontenJsonObj = {
-          informasiUmum,
-          kompetensiAwal: sections['B'] || '',
-          profilPelajarPancasila: parseLines(sections['C']),
-          saranaPrasarana: parseLines(sections['D']),
-          targetPesertaDidik: 'Reguler',
-          modelPembelajaran: sections['F'] || 'Problem Based Learning (PBL)',
-          tujuanPembelajaran: parseLines(sections['G']),
-          pemahamanBermakna: sections['H'] || '',
-          pertanyaanPemantik: parseLines(sections['I']),
-          kegiatanPembelajaran: {
-            pendahuluan: getKegiatanSection('Pendahuluan'),
-            inti: getKegiatanSection('Inti'),
-            penutup: getKegiatanSection('Penutup')
-          },
-          asesmen: {
-            diagnostik: 'Kuesioner kesiapan awal',
-            formatif: 'Observasi keaktifan diskusi',
-            sumatif: 'Penilaian produk hasil karya',
-            teknik: 'Observasi dan Tes Tertulis',
-            instrumen: 'Lembar Pengamatan & Soal Esai Evaluatif',
-            rubrik: sections['K'] || 'Kriteria Penilaian Baku',
-            kriteriaPenilaian: 'Ketepatan & Nilai Islami'
-          },
-          diferensiasi: {
-            konten: 'Bahan bacaan tingkat kerumitan bervariasi',
-            proses: 'Scaffolding dan tutor sebaya',
-            produk: 'Penyajian karya dalam tulisan, poster, atau presentasi'
-          },
-          remedial: sections['M'] || '',
-          pengayaan: sections['N'] || '',
-          refleksiGuru: sections['O'] || '',
-          refleksiPesertaDidik: sections['P'] || '',
-          lampiran: {
-            lkpd: getLampiranField('1', 'Lembar Kerja Peserta Didik (LKPD) mandiri & kelompok.'),
-            bahanBacaan: getLampiranField('3', 'Bahan Bacaan Guru & Peserta Didik terkait materi pokok.'),
-            rubrik: getLampiranField('2', 'Rubrik Penilaian Portofolio/Performa Hasil Karya.'),
-            instrumenAsesmen: getLampiranField('4', 'Integrasi Nilai Islami'),
-            daftarPustaka: getLampiranField('5', 'Daftar Pustaka Pendikulum Merdeka.')
-          }
-        };
-      } catch (parseErr) {
-        console.error('Failed to parse workspace text to JSON structured content:', parseErr);
       }
+
+      // Find existing document in archive if updating
+      const existingDoc = (!forceNew && activeWorkspaceDocId)
+        ? administrasiList.find(d => d.id === activeWorkspaceDocId)
+        : (!forceNew ? findMatchingArchivedDoc(workspaceTipe, workspaceMapel, workspaceKelas) : null);
+
+      if (existingDoc) {
+        // Update existing document in archive
+        const updatedDoc: AdministrasiGuru = {
+          ...existingDoc,
+          judul: overrideTitle ? docTitle : (existingDoc.judul || docTitle),
+          deskripsi: workspaceText.length > 150 ? workspaceText.substring(0, 150) + '...' : workspaceText,
+          content: workspaceText,
+          kontenJson: kontenJsonObj || existingDoc.kontenJson,
+          tanggalInput: new Date().toISOString().split('T')[0],
+          status: 'Final'
+        };
+
+        const updatedList = administrasiList.map(d => d.id === existingDoc.id ? updatedDoc : d);
+        setAdministrasiList(updatedList);
+        await dbSaveCollection('edu_administrasiList', updatedList);
+        setActiveWorkspaceDocId(existingDoc.id);
+        setLastSavedText(workspaceText);
+        setSaveSuccessNotification(`Perubahan dokumen "${updatedDoc.judul}" berhasil disimpan ke Arsip!`);
+      } else {
+        // Create new document in archive
+        const newDoc: AdministrasiGuru = {
+          id: `adm-${Date.now()}`,
+          tipe: workspaceTipe,
+          guruNama: teacherName,
+          mataPelajaran: workspaceMapel,
+          kelas: rawClass,
+          tahunAjaran: '2026/2027',
+          semester: 'Ganjil',
+          judul: docTitle,
+          deskripsi: workspaceText.length > 150 ? workspaceText.substring(0, 150) + '...' : workspaceText,
+          content: workspaceText,
+          kontenJson: kontenJsonObj,
+          tanggalInput: new Date().toISOString().split('T')[0],
+          status: 'Final'
+        };
+
+        const newList = [newDoc, ...administrasiList];
+        setAdministrasiList(newList);
+        await dbSaveCollection('edu_administrasiList', newList);
+        setActiveWorkspaceDocId(newDoc.id);
+        setLastSavedText(workspaceText);
+        setSaveSuccessNotification(`Dokumen "${newDoc.judul}" berhasil disimpan ke Arsip Sekolah!`);
+      }
+    } catch (err) {
+      console.error('Error saving workspace to archive:', err);
+      alert('Gagal menyimpan dokumen ke arsip. Silakan coba lagi.');
+    } finally {
+      setIsSavingWorkspace(false);
+      setShowSaveModal(false);
     }
-
-    const newDoc: AdministrasiGuru = {
-      id: `adm-${Date.now()}`,
-      tipe: workspaceTipe,
-      guruNama: teacherName,
-      mataPelajaran: workspaceMapel,
-      kelas: rawClass,
-      tahunAjaran: '2026/2027',
-      semester: 'Ganjil',
-      judul: docTitle,
-      deskripsi: workspaceText.substring(0, 150) + '...',
-      content: workspaceText,
-      kontenJson: kontenJsonObj,
-      tanggalInput: new Date().toISOString().split('T')[0],
-      status: 'Final'
-    };
-
-    const newList = [newDoc, ...administrasiList];
-    setAdministrasiList(newList);
-    await dbSaveCollection('edu_administrasiList', newList);
-    alert('Dokumen dari Workspace berhasil disimpan ke Arsip Sekolah!');
   };
 
   // View Document Modal State
@@ -761,27 +846,29 @@ NIP: ${principalNipVal.padEnd(37, ' ')}NIP: ${teacherNip}`;
     setIsEditingActiveDoc(false);
   };
 
-  const handleSaveActiveDoc = () => {
+  const handleSaveActiveDoc = async () => {
     if (!activeDoc) return;
-    setAdministrasiList(prev => prev.map(d => {
-      if (d.id === activeDoc.id) {
-        return {
-          ...d,
-          content: editedContent,
-          deskripsi: editedContent.length > 180 ? editedContent.substring(0, 180) + '...' : editedContent
-        };
-      }
-      return d;
-    }));
-
-    setActiveDoc(prev => prev ? {
-      ...prev,
+    const updatedDoc: AdministrasiGuru = {
+      ...activeDoc,
       content: editedContent,
-      deskripsi: editedContent.length > 180 ? editedContent.substring(0, 180) + '...' : editedContent
-    } : null);
+      deskripsi: editedContent.length > 180 ? editedContent.substring(0, 180) + '...' : editedContent,
+      tanggalInput: new Date().toISOString().split('T')[0]
+    };
+
+    const updatedList = administrasiList.map(d => d.id === activeDoc.id ? updatedDoc : d);
+    setAdministrasiList(updatedList);
+    await dbSaveCollection('edu_administrasiList', updatedList);
+
+    setActiveDoc(updatedDoc);
+
+    // If currently editing the same document in workspace, sync it
+    if (activeWorkspaceDocId === activeDoc.id) {
+      setWorkspaceText(editedContent);
+      setLastSavedText(editedContent);
+    }
 
     setIsEditingActiveDoc(false);
-    alert('Perubahan dokumen Modul Ajar berhasil disimpan!');
+    setSaveSuccessNotification(`Perubahan dokumen "${updatedDoc.judul}" berhasil disimpan ke Arsip!`);
   };
 
   const handleDownloadDocx = () => {
@@ -1591,7 +1678,7 @@ ${intiDeskripsi}
 
       {/* Content Area */}
       {activeSubTab === 'jadwal' && (
-        <JadwalMengajar guruList={guruList} mapelList={mapelList} rombelList={rombelList} />
+        <JadwalMengajar guruList={guruList} mapelList={mapelList} rombelList={rombelList} currentRole={currentRole} />
       )}
 
       {activeSubTab === 'kalender' && (
@@ -1613,7 +1700,7 @@ ${intiDeskripsi}
         />
       )}
 
-      {activeSubTab === 'rekap_jurnal' && (
+      {activeSubTab === 'rekap_jurnal' as any && (
         <RekapJurnal 
           absensiKelasList={absensiKelasList}
           siswaList={siswaList}
@@ -1703,16 +1790,33 @@ ${intiDeskripsi}
                   <Edit3 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2">
-                    Workspace Editor & Kustomisasi Sekolah
-                  </h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-bold text-slate-100 text-sm">
+                      Workspace Editor & Kustomisasi Sekolah
+                    </h3>
+                    {hasUnsavedChanges ? (
+                      <span className="px-2.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full text-[10px] font-bold flex items-center gap-1 animate-pulse">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                        Ada Perubahan Belum Disimpan
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-[10px] font-bold flex items-center gap-1">
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        Tersimpan di Arsip
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-400 mt-1">
-                    Sesuaikan draf di bawah dengan kop surat, visi misi, atau format khusus sekolah Anda sebelum diunduh.
+                    {activeWorkspaceDocId ? (
+                      <span>Mengedit dokumen arsip terkait: <strong className="text-emerald-400 font-medium">{administrasiList.find(d => d.id === activeWorkspaceDocId)?.judul || `${workspaceTipe.toUpperCase()} ${workspaceMapel}`}</strong>. Setiap perubahan dapat langsung disimpan ke arsip sekolah.</span>
+                    ) : (
+                      <span>Sesuaikan draf di bawah dengan kop surat, tujuan pembelajaran, atau format khusus sekolah Anda sebelum disimpan ke arsip.</span>
+                    )}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 self-end md:self-auto">
+              <div className="flex flex-wrap items-center gap-2.5 self-end md:self-auto">
                 <span className="px-3 py-1 bg-slate-800 text-slate-300 font-mono text-[10px] rounded-lg border border-slate-700">
                   {workspaceText.length} Karakter
                 </span>
@@ -1722,12 +1826,15 @@ ${intiDeskripsi}
                 <button
                   onClick={() => {
                     if (confirm('Apakah Anda yakin ingin menyetel ulang draf ke draf standar?')) {
-                      loadStandardWorkspaceText();
+                      const rawClass = workspaceKelas.includes('VII') ? 'VII' : workspaceKelas.includes('VIII') ? 'VIII' : 'IX';
+                      const txt = getWorkspaceTemplateText(workspaceTipe, workspaceMapel, rawClass, workspaceFase);
+                      setWorkspaceText(txt);
                     }
                   }}
-                  className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg text-xs transition-all border border-rose-500/20"
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-lg text-xs transition-all border border-slate-700 flex items-center gap-1.5"
+                  title="Kembalikan ke format baku kurikulum merdeka"
                 >
-                  Reset Standar
+                  <RotateCcw className="w-3 h-3" /> Reset Standar
                 </button>
               </div>
             </div>
@@ -1740,17 +1847,47 @@ ${intiDeskripsi}
                 className="w-full h-[450px] p-6 bg-slate-950 font-mono text-slate-200 text-xs focus:outline-none focus:ring-0 leading-relaxed resize-none scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent"
                 style={{ fontFamily: "Consolas, Monaco, 'Courier New', Courier, monospace" }}
                 spellCheck={false}
+                placeholder="Tulis atau edit konten administrasi di sini..."
               />
             </div>
 
             {/* Workspace Footer Actions */}
             <div className="bg-slate-950/80 p-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={handleSaveWorkspaceToArsip}
-                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/10 transition-all"
+                  onClick={() => handleSaveWorkspaceToArsip()}
+                  disabled={isSavingWorkspace}
+                  className={`px-4 py-2 font-bold rounded-xl text-xs flex items-center gap-2 transition-all shadow-lg ${
+                    hasUnsavedChanges
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20 ring-2 ring-emerald-400/50'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/10'
+                  }`}
                 >
-                  <Save className="w-3.5 h-3.5" /> Simpan ke Arsip
+                  {isSavingWorkspace ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Menyimpan Perubahan...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5" />
+                      {hasUnsavedChanges ? 'Simpan Perubahan ke Arsip' : 'Simpan ke Arsip'}
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => {
+                    const rawClass = workspaceKelas.includes('VII') ? 'VII' : workspaceKelas.includes('VIII') ? 'VIII' : 'IX';
+                    setCustomDocTitle(`${workspaceTipe.toUpperCase().replace('_', ' ')}: ${workspaceMapel} - Kelas ${rawClass} (Revisi)`);
+                    setIsSaveAsNew(true);
+                    setShowSaveModal(true);
+                  }}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all border border-slate-700"
+                  title="Simpan sebagai dokumen baru di arsip tanpa menimpa yang sudah ada"
+                >
+                  <Copy className="w-3.5 h-3.5 text-emerald-400" />
+                  Simpan Draf Baru
                 </button>
               </div>
 
@@ -2263,6 +2400,78 @@ ${intiDeskripsi}
                 Ya, Hapus
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* CUSTOM SAVE MODAL */}
+      {showSaveModal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+                <Save className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">
+                  {isSaveAsNew ? 'Simpan sebagai Dokumen Baru' : 'Simpan Perubahan ke Arsip'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {isSaveAsNew 
+                    ? 'Buat salinan baru di arsip administrasi sekolah' 
+                    : 'Perbarui dokumen arsip dengan konten draf workspace terkini'}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Judul Dokumen di Arsip</label>
+              <input
+                type="text"
+                value={customDocTitle}
+                onChange={e => setCustomDocTitle(e.target.value)}
+                placeholder="Contoh: Modul Ajar: Matematika - Kelas VII (Revisi)"
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setShowSaveModal(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => handleSaveWorkspaceToArsip(customDocTitle, isSaveAsNew)}
+                disabled={isSavingWorkspace || !customDocTitle.trim()}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-emerald-600/10 flex items-center justify-center gap-1.5"
+              >
+                {isSavingWorkspace ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                {isSavingWorkspace ? 'Menyimpan...' : 'Simpan Sekarang'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TOAST NOTIFICATION */}
+      {saveSuccessNotification && (
+        <div className="fixed bottom-6 right-6 z-[100] max-w-md animate-in slide-in-from-bottom-5 fade-in duration-300">
+          <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-2xl border border-slate-800 flex items-center gap-3">
+            <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+              <Check className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-slate-100">Berhasil Disimpan</p>
+              <p className="text-[11px] text-slate-300 truncate">{saveSuccessNotification}</p>
+            </div>
+            <button
+              onClick={() => setSaveSuccessNotification(null)}
+              className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white"
+            >
+              &times;
+            </button>
           </div>
         </div>
       )}

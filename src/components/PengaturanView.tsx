@@ -261,7 +261,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   <input
                     type="text"
                     required
-                    value={formData.namaSekolah}
+                    value={formData.namaSekolah || ''}
                     onChange={e => handleInputChange('namaSekolah', e.target.value)}
                     placeholder="Contoh: SMA PERMATA BANGSA"
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-bold text-white focus:border-blue-500 focus:outline-none"
@@ -273,7 +273,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   <input
                     type="text"
                     required
-                    value={formData.npsn}
+                    value={formData.npsn || ''}
                     onChange={e => handleInputChange('npsn', e.target.value)}
                     placeholder="Contoh: 20109876"
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-mono font-bold text-white focus:border-blue-500 focus:outline-none"
@@ -283,7 +283,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                 <div>
                   <label className="text-xs font-bold text-slate-300 block mb-1">Bentuk Pendidikan</label>
                   <select
-                    value={formData.bentukPendidikan}
+                    value={formData.bentukPendidikan || 'SMA'}
                     onChange={e => handleInputChange('bentukPendidikan', e.target.value)}
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-bold text-white focus:border-blue-500 focus:outline-none"
                   >
@@ -299,7 +299,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                 <div>
                   <label className="text-xs font-bold text-slate-300 block mb-1">Status Sekolah</label>
                   <select
-                    value={formData.statusSekolah}
+                    value={formData.statusSekolah || 'Swasta'}
                     onChange={e => handleInputChange('statusSekolah', e.target.value)}
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-bold text-white focus:border-blue-500 focus:outline-none"
                   >
@@ -312,7 +312,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   <label className="text-xs font-bold text-slate-300 block mb-1">Status Akreditasi</label>
                   <input
                     type="text"
-                    value={formData.akreditasi}
+                    value={formData.akreditasi || ''}
                     onChange={e => handleInputChange('akreditasi', e.target.value)}
                     placeholder="A (Unggul)"
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-bold text-white focus:border-blue-500 focus:outline-none"
@@ -333,7 +333,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   <input
                     type="text"
                     required
-                    value={formData.alamat}
+                    value={formData.alamat || ''}
                     onChange={e => handleInputChange('alamat', e.target.value)}
                     placeholder="Jl. Education No. 123"
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-semibold text-white focus:border-blue-500 focus:outline-none"
@@ -344,7 +344,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   <label className="text-xs font-bold text-slate-300 block mb-1">RT / RW</label>
                   <input
                     type="text"
-                    value={formData.rtRw}
+                    value={formData.rtRw || ''}
                     onChange={e => handleInputChange('rtRw', e.target.value)}
                     placeholder="005 / 002"
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-semibold text-white focus:border-blue-500 focus:outline-none"
@@ -355,7 +355,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   <label className="text-xs font-bold text-slate-300 block mb-1">Kelurahan / Desa</label>
                   <input
                     type="text"
-                    value={formData.kelurahan}
+                    value={formData.kelurahan || ''}
                     onChange={e => handleInputChange('kelurahan', e.target.value)}
                     placeholder="Kebayoran Baru"
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-semibold text-white focus:border-blue-500 focus:outline-none"
@@ -366,7 +366,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   <label className="text-xs font-bold text-slate-300 block mb-1">Kecamatan</label>
                   <input
                     type="text"
-                    value={formData.kecamatan}
+                    value={formData.kecamatan || ''}
                     onChange={e => handleInputChange('kecamatan', e.target.value)}
                     placeholder="Kebayoran Baru"
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-semibold text-white focus:border-blue-500 focus:outline-none"
@@ -377,7 +377,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   <label className="text-xs font-bold text-slate-300 block mb-1">Kota / Kabupaten</label>
                   <input
                     type="text"
-                    value={formData.kotaKabupaten}
+                    value={formData.kotaKabupaten || ''}
                     onChange={e => handleInputChange('kotaKabupaten', e.target.value)}
                     placeholder="Kota Jakarta Selatan"
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-semibold text-white focus:border-blue-500 focus:outline-none"
@@ -388,7 +388,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   <label className="text-xs font-bold text-slate-300 block mb-1">Provinsi</label>
                   <input
                     type="text"
-                    value={formData.provinsi}
+                    value={formData.provinsi || ''}
                     onChange={e => handleInputChange('provinsi', e.target.value)}
                     placeholder="DKI Jakarta"
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-semibold text-white focus:border-blue-500 focus:outline-none"
@@ -399,7 +399,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   <label className="text-xs font-bold text-slate-300 block mb-1">Kode Pos</label>
                   <input
                     type="text"
-                    value={formData.kodePos}
+                    value={formData.kodePos || ''}
                     onChange={e => handleInputChange('kodePos', e.target.value)}
                     placeholder="12110"
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-mono font-semibold text-white focus:border-blue-500 focus:outline-none"
@@ -410,7 +410,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   <label className="text-xs font-bold text-slate-300 block mb-1">Nomor Telepon / WA Center</label>
                   <input
                     type="text"
-                    value={formData.telepon}
+                    value={formData.telepon || ''}
                     onChange={e => handleInputChange('telepon', e.target.value)}
                     placeholder="(021) 555-0199"
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-mono font-semibold text-white focus:border-blue-500 focus:outline-none"
@@ -421,7 +421,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   <label className="text-xs font-bold text-slate-300 block mb-1">Email Resmi Sekolah</label>
                   <input
                     type="email"
-                    value={formData.email}
+                    value={formData.email || ''}
                     onChange={e => handleInputChange('email', e.target.value)}
                     placeholder="info@permatabangsa.sch.id"
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-semibold text-white focus:border-blue-500 focus:outline-none"
@@ -432,7 +432,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   <label className="text-xs font-bold text-slate-300 block mb-1">Website Sekolah</label>
                   <input
                     type="text"
-                    value={formData.website}
+                    value={formData.website || ''}
                     onChange={e => handleInputChange('website', e.target.value)}
                     placeholder="https://permatabangsa.sch.id"
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-semibold text-white focus:border-blue-500 focus:outline-none"
@@ -452,7 +452,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   <label className="text-xs font-bold text-slate-300 block mb-1">Nama Kepala Sekolah (Lengkap Gelar)</label>
                   <input
                     type="text"
-                    value={formData.kepalaSekolah}
+                    value={formData.kepalaSekolah || ''}
                     onChange={e => handleInputChange('kepalaSekolah', e.target.value)}
                     placeholder="Dr. H. Ahmad Dahlan, M.Pd."
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-bold text-white focus:border-blue-500 focus:outline-none"
@@ -463,7 +463,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   <label className="text-xs font-bold text-slate-300 block mb-1">NUPTK Kepala Sekolah</label>
                   <input
                     type="text"
-                    value={formData.nipKepalaSekolah}
+                    value={formData.nipKepalaSekolah || ''}
                     onChange={e => handleInputChange('nipKepalaSekolah', e.target.value)}
                     placeholder="197501152000031001"
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-mono font-bold text-white focus:border-blue-500 focus:outline-none"
@@ -471,10 +471,21 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                 </div>
 
                 <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">No. WhatsApp Kepala Sekolah</label>
+                  <input
+                    type="text"
+                    value={formData.teleponKepsek || ''}
+                    onChange={e => handleInputChange('teleponKepsek', e.target.value)}
+                    placeholder="081298765432"
+                    className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-bold text-white focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
                   <label className="text-xs font-bold text-slate-300 block mb-1">Tahun Ajaran Aktif</label>
                   <input
                     type="text"
-                    value={formData.tahunAjaran}
+                    value={formData.tahunAjaran || ''}
                     onChange={e => handleInputChange('tahunAjaran', e.target.value)}
                     placeholder="2026/2027"
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-bold text-white focus:border-blue-500 focus:outline-none"
@@ -484,7 +495,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                 <div>
                   <label className="text-xs font-bold text-slate-300 block mb-1">Semester Aktif</label>
                   <select
-                    value={formData.semesterAktif}
+                    value={formData.semesterAktif || 'Ganjil'}
                     onChange={e => handleInputChange('semesterAktif', e.target.value)}
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-bold text-white focus:border-blue-500 focus:outline-none"
                   >
@@ -1099,6 +1110,37 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                       }`} />
                     </button>
                   </div>
+
+                  <div className="flex items-center justify-between p-3 bg-[#121212] rounded-xl border border-slate-800">
+                    <div>
+                      <h5 className="text-xs font-bold text-white">Auto-Send WA Perizinan ke Kepala Sekolah</h5>
+                      <p className="text-[10px] text-slate-500">Kirim notifikasi & link persetujuan izin otomatis ke nomor Kepala Sekolah.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cur = formData.fonnteConfig?.autoSendPerizinan ?? true;
+                        const nextCfg: FonnteConfig = {
+                          ...(formData.fonnteConfig || {
+                            apiKey: formData.fonnteToken || '',
+                            senderName: formData.namaSekolah,
+                            templateReminder: '',
+                            templateReceipt: '',
+                            enabled: true
+                          }),
+                          autoSendPerizinan: !cur
+                        };
+                        setFormData(prev => ({ ...prev, fonnteConfig: nextCfg }));
+                      }}
+                      className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none ${
+                        (formData.fonnteConfig?.autoSendPerizinan ?? true) ? 'bg-emerald-600' : 'bg-slate-700 opacity-60'
+                      }`}
+                    >
+                      <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ${
+                        (formData.fonnteConfig?.autoSendPerizinan ?? true) ? 'translate-x-5' : 'translate-x-0'
+                      }`} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="pt-2 flex justify-end">
@@ -1321,109 +1363,216 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                 <Timer className="w-3.5 h-3.5" /> Berlaku untuk Presensi Barcode & Online
               </span>
             </div>
-
-            {/* Main Form Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
-              {/* Card 1: Jam Masuk Utama */}
-              <div className="bg-[#181818] border border-slate-800 rounded-2xl p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <LogIn className="w-4 h-4 text-emerald-400" /> Jam Masuk Utama
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
-                    Target Masuk
-                  </span>
+            {/* Jadwal Siswa */}
+            <div className="pt-2">
+              <h4 className="text-sm font-bold text-white mb-3">Jadwal Siswa</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* Card 1: Jam Masuk Utama */}
+                <div className="bg-[#181818] border border-slate-800 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <LogIn className="w-4 h-4 text-emerald-400" /> Jam Masuk Utama
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
+                      Target Masuk
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">Target Jam Masuk (WIB) *</label>
+                    <input
+                      type="time"
+                      value={formData.jadwalPresensi?.jamMasuk || '07:00'}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({
+                          ...prev,
+                          jadwalPresensi: {
+                            ...(prev.jadwalPresensi || { jamMasuk: '07:00', jamToleransi: '07:15', jamPulang: '14:30', hariKerja: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'] }),
+                            jamMasuk: val
+                          }
+                        }));
+                      }}
+                      className="w-full p-2.5 bg-[#121212] border border-slate-700 rounded-xl text-sm font-mono font-bold text-white focus:border-blue-500 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Siswa yang scan sebelum jam ini dicatat sebagai <span className="text-emerald-400 font-bold">Hadir Tepat Waktu</span>.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Target Jam Masuk (WIB) *</label>
-                  <input
-                    type="time"
-                    value={formData.jadwalPresensi?.jamMasuk || '07:00'}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setFormData(prev => ({
-                        ...prev,
-                        jadwalPresensi: {
-                          ...(prev.jadwalPresensi || { jamMasuk: '07:00', jamToleransi: '07:15', jamPulang: '14:30', hariKerja: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'] }),
-                          jamMasuk: val
-                        }
-                      }));
-                    }}
-                    className="w-full p-2.5 bg-[#121212] border border-slate-700 rounded-xl text-sm font-mono font-bold text-white focus:border-blue-500 focus:outline-none"
-                  />
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Siswa yang scan sebelum jam ini dicatat sebagai <span className="text-emerald-400 font-bold">Hadir Tepat Waktu</span>.
-                  </p>
+
+                {/* Card 2: Batas Toleransi Terlambat */}
+                <div className="bg-[#181818] border border-slate-800 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Timer className="w-4 h-4 text-amber-400" /> Batas Toleransi
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">
+                      Batas Maksimal
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">Jam Batas Toleransi (WIB) *</label>
+                    <input
+                      type="time"
+                      value={formData.jadwalPresensi?.jamToleransi || '07:15'}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({
+                          ...prev,
+                          jadwalPresensi: {
+                            ...(prev.jadwalPresensi || { jamMasuk: '07:00', jamToleransi: '07:15', jamPulang: '14:30', hariKerja: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'] }),
+                            jamToleransi: val
+                          }
+                        }));
+                      }}
+                      className="w-full p-2.5 bg-[#121212] border border-slate-700 rounded-xl text-sm font-mono font-bold text-amber-300 focus:border-amber-500 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Scan setelah jam ini dicatat sebagai <span className="text-rose-400 font-bold">Terlambat</span>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Card 3: Jam Pulang Sekolah */}
+                <div className="bg-[#181818] border border-slate-800 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-blue-400" /> Jam Pulang Sekolah
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-bold">
+                      Target Pulang
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">Jam Pulang Resmi (WIB) *</label>
+                    <input
+                      type="time"
+                      value={formData.jadwalPresensi?.jamPulang || '14:30'}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({
+                          ...prev,
+                          jadwalPresensi: {
+                            ...(prev.jadwalPresensi || { jamMasuk: '07:00', jamToleransi: '07:15', jamPulang: '14:30', hariKerja: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'] }),
+                            jamPulang: val
+                          }
+                        }));
+                      }}
+                      className="w-full p-2.5 bg-[#121212] border border-slate-700 rounded-xl text-sm font-mono font-bold text-blue-300 focus:border-blue-500 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Scan sebelum jam ini dicatat <span className="text-amber-300 font-bold">Pulang Cepat</span>.
+                    </p>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              {/* Card 2: Batas Toleransi Terlambat */}
-              <div className="bg-[#181818] border border-slate-800 rounded-2xl p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Timer className="w-4 h-4 text-amber-400" /> Batas Toleransi
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">
-                    Batas Maksimal
-                  </span>
+            {/* Jadwal Guru & Staf */}
+            <div className="pt-2">
+              <h4 className="text-sm font-bold text-white mb-3">Jadwal Guru & Staf</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* Card 1: Jam Masuk Utama */}
+                <div className="bg-[#181818] border border-slate-800 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <LogIn className="w-4 h-4 text-emerald-400" /> Jam Masuk Utama
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
+                      Target Masuk
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">Target Jam Masuk (WIB) *</label>
+                    <input
+                      type="time"
+                      value={formData.jadwalPresensi?.jamMasukGuru || '06:45'}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({
+                          ...prev,
+                          jadwalPresensi: {
+                            ...(prev.jadwalPresensi || { jamMasuk: '07:00', jamToleransi: '07:15', jamPulang: '14:30', jamMasukGuru: '06:45', jamToleransiGuru: '07:00', jamPulangGuru: '15:00', hariKerja: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'] }),
+                            jamMasukGuru: val
+                          }
+                        }));
+                      }}
+                      className="w-full p-2.5 bg-[#121212] border border-slate-700 rounded-xl text-sm font-mono font-bold text-white focus:border-blue-500 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Guru/Staf yang scan sebelum jam ini dicatat sebagai <span className="text-emerald-400 font-bold">Hadir Tepat Waktu</span>.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Jam Batas Toleransi (WIB) *</label>
-                  <input
-                    type="time"
-                    value={formData.jadwalPresensi?.jamToleransi || '07:15'}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setFormData(prev => ({
-                        ...prev,
-                        jadwalPresensi: {
-                          ...(prev.jadwalPresensi || { jamMasuk: '07:00', jamToleransi: '07:15', jamPulang: '14:30', hariKerja: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'] }),
-                          jamToleransi: val
-                        }
-                      }));
-                    }}
-                    className="w-full p-2.5 bg-[#121212] border border-slate-700 rounded-xl text-sm font-mono font-bold text-amber-300 focus:border-amber-500 focus:outline-none"
-                  />
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Scan setelah jam ini dicatat sebagai <span className="text-rose-400 font-bold">Terlambat</span>.
-                  </p>
+
+                {/* Card 2: Batas Toleransi Terlambat */}
+                <div className="bg-[#181818] border border-slate-800 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Timer className="w-4 h-4 text-amber-400" /> Batas Toleransi
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">
+                      Batas Maksimal
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">Jam Batas Toleransi (WIB) *</label>
+                    <input
+                      type="time"
+                      value={formData.jadwalPresensi?.jamToleransiGuru || '07:00'}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({
+                          ...prev,
+                          jadwalPresensi: {
+                            ...(prev.jadwalPresensi || { jamMasuk: '07:00', jamToleransi: '07:15', jamPulang: '14:30', jamMasukGuru: '06:45', jamToleransiGuru: '07:00', jamPulangGuru: '15:00', hariKerja: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'] }),
+                            jamToleransiGuru: val
+                          }
+                        }));
+                      }}
+                      className="w-full p-2.5 bg-[#121212] border border-slate-700 rounded-xl text-sm font-mono font-bold text-amber-300 focus:border-amber-500 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Scan setelah jam ini dicatat sebagai <span className="text-rose-400 font-bold">Terlambat</span>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Card 3: Jam Pulang Sekolah */}
+                <div className="bg-[#181818] border border-slate-800 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-blue-400" /> Jam Pulang
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-bold">
+                      Target Pulang
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">Jam Pulang Resmi (WIB) *</label>
+                    <input
+                      type="time"
+                      value={formData.jadwalPresensi?.jamPulangGuru || '15:00'}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({
+                          ...prev,
+                          jadwalPresensi: {
+                            ...(prev.jadwalPresensi || { jamMasuk: '07:00', jamToleransi: '07:15', jamPulang: '14:30', jamMasukGuru: '06:45', jamToleransiGuru: '07:00', jamPulangGuru: '15:00', hariKerja: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'] }),
+                            jamPulangGuru: val
+                          }
+                        }));
+                      }}
+                      className="w-full p-2.5 bg-[#121212] border border-slate-700 rounded-xl text-sm font-mono font-bold text-blue-300 focus:border-blue-500 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Scan sebelum jam ini dicatat <span className="text-amber-300 font-bold">Pulang Cepat</span>.
+                    </p>
+                  </div>
                 </div>
               </div>
-
-              {/* Card 3: Jam Pulang Sekolah */}
-              <div className="bg-[#181818] border border-slate-800 rounded-2xl p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Clock className="w-4 h-4 text-blue-400" /> Jam Pulang Sekolah
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-bold">
-                    Target Pulang
-                  </span>
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Jam Pulang Resmi (WIB) *</label>
-                  <input
-                    type="time"
-                    value={formData.jadwalPresensi?.jamPulang || '14:30'}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setFormData(prev => ({
-                        ...prev,
-                        jadwalPresensi: {
-                          ...(prev.jadwalPresensi || { jamMasuk: '07:00', jamToleransi: '07:15', jamPulang: '14:30', hariKerja: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'] }),
-                          jamPulang: val
-                        }
-                      }));
-                    }}
-                    className="w-full p-2.5 bg-[#121212] border border-slate-700 rounded-xl text-sm font-mono font-bold text-blue-300 focus:border-blue-500 focus:outline-none"
-                  />
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Scan sebelum jam ini dicatat <span className="text-amber-300 font-bold">Pulang Cepat</span>.
-                  </p>
-                </div>
-              </div>
-
             </div>
 
             {/* Hari Kerja Operasional & Auto Switch */}

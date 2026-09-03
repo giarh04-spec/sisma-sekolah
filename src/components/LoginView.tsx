@@ -55,18 +55,27 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const demoSiswaUser = activeSiswa?.username || 'bayu';
   const demoSiswaPass = activeSiswa?.password || 'password123';
 
+  const demoKepsekUser = 'kepsek';
+  const demoKepsekPass = 'kepsek123';
+
   // Quick fill demo accounts helper
   const handleFillDemo = (role: Role) => {
     setSelectedRole(role);
     if (role === 'admin') {
       setEmailInput('admin');
       setPasswordInput('admin');
+    } else if (role === 'kepsek') {
+      setEmailInput(demoKepsekUser);
+      setPasswordInput(demoKepsekPass);
     } else if (role === 'guru') {
       setEmailInput(demoGuruUser);
       setPasswordInput(demoGuruPass);
     } else if (role === 'staf') {
       setEmailInput(demoStafUser);
       setPasswordInput(demoStafPass);
+    } else if (role === 'petugas_absensi') {
+      setEmailInput('petugas');
+      setPasswordInput('petugas123');
     } else if (role === 'siswa') {
       setEmailInput(demoSiswaUser);
       setPasswordInput(demoSiswaPass);
@@ -74,7 +83,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     setErrorMessage(null);
   };
 
-  // Handle Gmail Login Form Submit
+  // Handle Manual Login Form Submit
   const handleManualLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const inputIdOrEmail = emailInput.trim().toLowerCase();
@@ -93,7 +102,39 @@ export const LoginView: React.FC<LoginViewProps> = ({
     setErrorMessage(null);
 
     setTimeout(() => {
-      // A. Check Admin
+      // A. Check Kepala Sekolah
+      const isKepsekUser = 
+        inputIdOrEmail === 'kepsek' ||
+        inputIdOrEmail === 'kepala.sekolah' ||
+        inputIdOrEmail === 'kepala_sekolah' ||
+        inputIdOrEmail === 'ahmad.dahlan' ||
+        inputIdOrEmail === '197501152000031001' ||
+        inputIdOrEmail === 'kepsek@sekolah.sch.id' ||
+        inputIdOrEmail === 'kepala.sekolah@sekolah.sch.id' ||
+        (schoolSettings.nipKepalaSekolah && inputIdOrEmail === schoolSettings.nipKepalaSekolah.toLowerCase().trim()) ||
+        (schoolSettings.kepalaSekolah && inputIdOrEmail === schoolSettings.kepalaSekolah.toLowerCase().trim());
+
+      if (isKepsekUser) {
+        const isValidKepsekPassword = 
+          password === 'kepsek' ||
+          password === 'kepsek123' ||
+          password === 'password' || 
+          password === 'password123' || 
+          password === 'admin123' ||
+          password === '123456';
+
+        if (!isValidKepsekPassword) {
+          setErrorMessage('Kata sandi salah untuk akun Kepala Sekolah ini.');
+          setLoading(false);
+          return;
+        }
+
+        onLoginSuccess('kepala.sekolah@sekolah.sch.id', 'gmail_oauth_token_active', 'kepsek');
+        setLoading(false);
+        return;
+      }
+
+      // B. Check Admin
       const adminEmails = (schoolSettings.adminEmails || []).map(e => e.toLowerCase());
       const isAdminUser = 
         inputIdOrEmail === 'admin' ||
@@ -102,19 +143,19 @@ export const LoginView: React.FC<LoginViewProps> = ({
         adminEmails.includes(inputIdOrEmail) ||
         inputIdOrEmail.includes('giarh0410');
 
-      // B. Check Staf
+      // C. Check Staf
       const foundStaf = stafList.find(st => 
         (st.username && st.username.toLowerCase() === inputIdOrEmail) ||
         (st.email && st.email.toLowerCase() === inputIdOrEmail)
       );
 
-      // C. Check Guru
+      // D. Check Guru
       const foundGuru = guruList.find(g => 
         (g.username && g.username.toLowerCase() === inputIdOrEmail) ||
         (g.email && g.email.toLowerCase() === inputIdOrEmail)
       );
 
-      // D. Check Siswa
+      // E. Check Siswa
       const foundSiswa = siswaList.find(s => 
         (s.username && s.username.toLowerCase() === inputIdOrEmail) ||
         (s.email && s.email.toLowerCase() === inputIdOrEmail) ||
@@ -127,7 +168,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
           password === 'admin' ||
           password === 'admin123' || 
           password === 'password' || 
-          password === 'password123' ||
+          password === 'password123' || 
           password === '123456';
 
         if (!isValidAdminPassword) {
@@ -173,6 +214,33 @@ export const LoginView: React.FC<LoginViewProps> = ({
           return;
         }
         onLoginSuccess(foundSiswa.email || `${foundSiswa.nis || foundSiswa.id}@siswa.sch.id`, 'gmail_oauth_token_active', 'siswa');
+        setLoading(false);
+        return;
+      }
+
+      // Check Petugas Absensi
+      const isPetugasAbsensi = 
+        inputIdOrEmail === 'petugas' ||
+        inputIdOrEmail === 'petugas_absensi' ||
+        inputIdOrEmail === 'petugas.absensi' ||
+        inputIdOrEmail === 'petugas@sekolah.sch.id' ||
+        inputIdOrEmail === 'petugas.absensi@sekolah.sch.id';
+
+      if (isPetugasAbsensi) {
+        const isValidPetugasPassword = 
+          password === 'petugas' ||
+          password === 'petugas123' ||
+          password === 'password' ||
+          password === 'password123' ||
+          password === '123456';
+
+        if (!isValidPetugasPassword) {
+          setErrorMessage('Kata sandi salah untuk akun Petugas Absensi ini.');
+          setLoading(false);
+          return;
+        }
+
+        onLoginSuccess('petugas.absensi@sekolah.sch.id', 'gmail_oauth_token_active', 'petugas_absensi');
         setLoading(false);
         return;
       }
@@ -229,6 +297,111 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
 
 
+        {/* Quick Role Selection Helper */}
+        <div className="space-y-2">
+          <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+            <span>Pilih Akun Demo / Akses Cepat</span>
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+            <button
+              type="button"
+              onClick={() => handleFillDemo('kepsek')}
+              className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
+                selectedRole === 'kepsek'
+                  ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-200 ring-1 ring-indigo-500/30'
+                  : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+              }`}
+            >
+              <div className="text-[11px] font-bold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                <span>Kepala Sekolah</span>
+              </div>
+              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">kepsek / kepsek123</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleFillDemo('admin')}
+              className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
+                selectedRole === 'admin'
+                  ? 'bg-blue-600/20 border-blue-500/50 text-blue-200 ring-1 ring-blue-500/30'
+                  : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+              }`}
+            >
+              <div className="text-[11px] font-bold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                <span>Administrator</span>
+              </div>
+              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">admin / admin</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleFillDemo('guru')}
+              className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
+                selectedRole === 'guru'
+                  ? 'bg-purple-600/20 border-purple-500/50 text-purple-200 ring-1 ring-purple-500/30'
+                  : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+              }`}
+            >
+              <div className="text-[11px] font-bold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                <span>Guru / Mapel</span>
+              </div>
+              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{demoGuruUser}</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleFillDemo('staf')}
+              className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
+                selectedRole === 'staf'
+                  ? 'bg-amber-600/20 border-amber-500/50 text-amber-200 ring-1 ring-amber-500/30'
+                  : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+              }`}
+            >
+              <div className="text-[11px] font-bold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                <span>Staf / Keuangan</span>
+              </div>
+              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{demoStafUser}</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleFillDemo('petugas_absensi')}
+              className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
+                selectedRole === 'petugas_absensi'
+                  ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-200 ring-1 ring-cyan-500/30'
+                  : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+              }`}
+            >
+              <div className="text-[11px] font-bold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                <span>Petugas Absensi</span>
+              </div>
+              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">petugas / petugas123</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleFillDemo('siswa')}
+              className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer col-span-2 sm:col-span-1 ${
+                selectedRole === 'siswa'
+                  ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-200 ring-1 ring-emerald-500/30'
+                  : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+              }`}
+            >
+              <div className="text-[11px] font-bold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span>Siswa / Wali</span>
+              </div>
+              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{demoSiswaUser}</div>
+            </button>
+          </div>
+        </div>
+
         {/* Error Alert */}
         {errorMessage && (
           <div className="p-3 bg-red-950/60 border border-red-500/40 rounded-xl text-red-200 text-xs font-medium flex items-center gap-2">
@@ -273,6 +446,61 @@ export const LoginView: React.FC<LoginViewProps> = ({
             {!loading && <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />}
           </button>
         </form>
+
+        {/* Divider */}
+        <div className="relative flex py-1 items-center">
+          <div className="flex-grow border-t border-zinc-800"></div>
+          <span className="flex-shrink mx-3 text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Atau</span>
+          <div className="flex-grow border-t border-zinc-800"></div>
+        </div>
+
+        {/* Google Gmail Sign-In for Students & Users */}
+        <button
+          type="button"
+          onClick={async () => {
+            setLoading(true);
+            setErrorMessage(null);
+            try {
+              const res = await googleSignIn();
+              if (res && res.user) {
+                const gEmail = (res.user.email || '').toLowerCase();
+                const gToken = res.accessToken || 'gmail_oauth_token_active';
+
+                const matchedSiswa = siswaList.find(s => s.email && s.email.toLowerCase() === gEmail);
+                const matchedGuru = guruList.find(g => g.email && g.email.toLowerCase() === gEmail);
+                const matchedStaf = stafList.find(st => st.email && st.email.toLowerCase() === gEmail);
+
+                if (matchedSiswa) {
+                  onLoginSuccess(matchedSiswa.email || gEmail, gToken, 'siswa');
+                } else if (matchedGuru) {
+                  onLoginSuccess(matchedGuru.email || gEmail, gToken, 'guru');
+                } else if (matchedStaf) {
+                  onLoginSuccess(matchedStaf.email || gEmail, gToken, 'staf');
+                } else if (gEmail.includes('admin') || gEmail.includes('giar')) {
+                  onLoginSuccess(gEmail, gToken, 'admin');
+                } else {
+                  onLoginSuccess(gEmail, gToken, 'siswa');
+                }
+              } else {
+                setErrorMessage('Gagal masuk dengan Google. Silakan coba lagi.');
+              }
+            } catch (err: any) {
+              setErrorMessage(err?.message || 'Terjadi kesalahan saat otentikasi Google.');
+            } finally {
+              setLoading(false);
+            }
+          }}
+          disabled={loading}
+          className="w-full py-3 px-4 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold rounded-xl text-xs border border-zinc-700/80 transition-all shadow-md active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2.5 cursor-pointer"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.19v3.15C3.17 21.32 7.23 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.19C.43 8.1 0 9.81 0 12s.43 3.9 1.19 5.42l4.09-3.15z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.23 0 3.17 2.68 1.19 6.58l4.09 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+          </svg>
+          <span>{loading ? 'Menghubungkan ke Google...' : 'Masuk dengan Akun Gmail Siswa (Google Sign-In)'}</span>
+        </button>
 
 
 

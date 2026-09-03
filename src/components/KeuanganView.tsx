@@ -228,7 +228,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       const s = stafList.find(item => item.id === gajiPenerimaId);
       if (s) {
         name = s.nama;
-        nipNik = s.nik || s.nip || '';
+        nipNik = s.nik || s.nik || '';
         jab = s.bagian || 'Staf';
       }
     }
@@ -855,7 +855,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       `Terbilang: _${terbilang(rekapGajiTotals.totalNet)} Rupiah_\n` +
       `─────────────────────────\n` +
       `Bendahara: ${bendaharaNama}\n` +
-      `Kepala Sekolah: ${schoolSettings?.namaKepalaSekolah || schoolSettings?.kepalaSekolah || 'H. Ahmad Fakhri, M.Pd'}`;
+      `Kepala Sekolah: ${schoolSettings?.kepalaSekolah || schoolSettings?.kepalaSekolah || 'H. Ahmad Fakhri, M.Pd'}`;
 
     navigator.clipboard.writeText(text);
     showToast('📋 Ringkasan Rekap Gaji Bulanan berhasil disalin ke Clipboard!');
@@ -1130,14 +1130,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     type?: 'spp' | 'bebas';
   } | null>(null);
 
-  const [studentTransactions, setStudentTransactions] = useState<Array<{
-    id: string;
-    pembayaran?: string;
-    tagihan: number;
-    tanggal: string;
-    itemId?: string;
-    type?: 'spp' | 'bebas';
-  }>>(() => {
+  const [studentTransactions, setStudentTransactions] = useState<any[]>(() => {
     try {
       const saved = localStorage.getItem(`edu_student_tx_${studentKey}`);
       if (saved !== null) return JSON.parse(saved);
@@ -1164,7 +1157,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         if (!tx) return false;
         
         // Match by ID
-        if (tx.siswaId && sId && tx.siswaId === sId) return true;
+        if ((tx as any).siswaId && sId && (tx as any).siswaId === sId) return true;
         
         // Match by Name
         if (tx.siswaNama) {
@@ -1299,12 +1292,16 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       const totalPaid = txsForThisBill.reduce((sum, tx) => sum + (tx.nominal || 0), 0);
       const displayTerbayar = Math.max(t.terbayar || 0, totalPaid);
       
-      return {
+      const isLunas = displayTerbayar >= t.nominal;
+      const computedStatus: 'Lunas' | 'Belum Lunas' | 'Dicicil' = isLunas ? 'Lunas' : (displayTerbayar > 0 ? 'Dicicil' : 'Belum Lunas');
+      
+      const res: TagihanKeuangan = {
         ...t,
         terbayar: displayTerbayar,
-        status: displayTerbayar >= t.nominal ? 'Lunas' : (displayTerbayar > 0 ? 'Dicicil' : 'Belum Lunas'),
+        status: computedStatus,
         tanggalBayar: t.tanggalBayar || (txsForThisBill.length > 0 ? txsForThisBill[0].tanggal : undefined)
       };
+      return res;
     });
 
     // 2. Identify "orphan" transactions (transactions without a corresponding bill in tagihanList)
@@ -1314,7 +1311,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       const normName = selectedSiswa.nama.trim().toLowerCase().replace(/\s+/g, ' ');
       
       const txStudent = (tx.siswaNama || '').trim().toLowerCase().replace(/\s+/g, ' ');
-      const isThisStudent = txStudent === normName || (tx.siswaId && tx.siswaId === sId);
+      const isThisStudent = txStudent === normName || ((tx as any).siswaId && (tx as any).siswaId === sId);
       if (!isThisStudent) return false;
       
       const hasMatchingBill = explicitBills.some(b => b.id === tx.tagihanId || b.namaTagihan === tx.pembayaran);
@@ -1332,7 +1329,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       bulanTahun: tahunAjaran,
       nominal: tx.nominal,
       terbayar: tx.nominal,
-      status: 'Lunas',
+      status: 'Lunas' as any,
       tanggalBayar: tx.tanggal,
       jatuhTempo: tx.tanggal
     }));
@@ -1754,8 +1751,33 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     dibayar: number;
     kembalian?: number;
     tanggal: string;
+    tanggalTagihan?: string;
+    tanggalPembayaran?: string;
     penerima: string;
   } | null>(null);
+
+  // Helper function to format dates consistently (e.g. "01 September 2026")
+  const formatReceiptDate = (dateStr?: string) => {
+    if (!dateStr || dateStr.trim() === '' || dateStr.trim() === '-') return '-';
+    const cleanStr = dateStr.trim();
+    if (cleanStr.includes('-')) {
+      const datePart = cleanStr.split('T')[0];
+      const parts = datePart.split('-');
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+          return new Date(year, month, day).toLocaleDateString('id-ID', {
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric'
+          });
+        }
+      }
+    }
+    return cleanStr;
+  };
 
   // Helper functions to manage receipt items dynamically
   const handleAddReceiptItem = () => {
@@ -1937,7 +1959,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       <div class="row"><span class="label">Tahun Ajaran</span><span class="value">${printReceiptData.tahunAjaran}</span></div>
       <div class="row"><span class="label">NISN & Nama Siswa</span><span class="value">${printReceiptData.nis} - ${printReceiptData.nama}</span></div>
       <div class="row"><span class="label">Kelas</span><span class="value">${printReceiptData.kelas}</span></div>
-      <div class="row"><span class="label">Tanggal Pembayaran</span><span class="value">${printReceiptData.tanggal}</span></div>
+      <div class="row"><span class="label">Tanggal Tagihan</span><span class="value">${formatReceiptDate(printReceiptData.tanggalTagihan || printReceiptData.tanggal)}</span></div>
+      <div class="row"><span class="label">Tanggal Pembayaran</span><span class="value">${formatReceiptDate(printReceiptData.tanggalPembayaran || printReceiptData.tanggal)}</span></div>
     </div>
     <table>
       <thead>
@@ -2058,7 +2081,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       drawRow('Tahun Ajaran', printReceiptData.tahunAjaran);
       drawRow('NISN & Nama Siswa', `${printReceiptData.nis} - ${printReceiptData.nama}`);
       drawRow('Kelas', `${printReceiptData.kelas}`);
-      drawRow('Tanggal Pembayaran', printReceiptData.tanggal);
+      drawRow('Tanggal Tagihan', formatReceiptDate(printReceiptData.tanggalTagihan || printReceiptData.tanggal));
+      drawRow('Tanggal Pembayaran', formatReceiptDate(printReceiptData.tanggalPembayaran || printReceiptData.tanggal));
 
       y += 8;
 
@@ -2167,7 +2191,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   };
 
   // Re-open receipt modal for any previous transaction
-  const handleReprintTransaction = (tx: { id: string; pembayaran: string; tagihan: number; tanggal: string }) => {
+  const handleReprintTransaction = (tx: any) => {
+    const isPaid = (tx.terbayar && tx.terbayar > 0) || tx.isLunas || tx.isDicicil || (tx.tanggalBayar && tx.tanggalBayar !== '-' && tx.tanggalBayar.trim() !== '');
     const receipt = {
       noNota: generateInvoiceNumber(),
       tahunAjaran,
@@ -2184,9 +2209,11 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       ],
       pembayaranTitle: tx.pembayaran,
       nominal: tx.tagihan,
-      dibayar: tx.tagihan,
+      dibayar: isPaid ? (tx.terbayar || tx.tagihan) : 0,
       kembalian: 0,
       tanggal: tx.tanggal,
+      tanggalTagihan: tx.tanggalTagihan || tx.tanggal,
+      tanggalPembayaran: isPaid ? (tx.tanggalBayar || tx.tanggal) : '-',
       penerima: 'Bendahara Sekolah'
     };
     setPrintReceiptData(receipt);
@@ -2389,13 +2416,13 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   useEffect(() => {
     setTagihanList(prevTagihanList => {
       let hasChanged = false;
-      const newList = prevTagihanList.map(tagihan => {
+      const newList: TagihanKeuangan[] = prevTagihanList.map(tagihan => {
         if (!tagihan || tagihan.isDeleted) return tagihan;
         const txsForTagihan = transaksiList.filter(tx => tx && tx.tagihanId === tagihan.id);
         if (txsForTagihan.length > 0) {
           const terbayarFromTx = txsForTagihan.reduce((sum, tx) => sum + (tx.nominal || 0), 0);
           const sisa = tagihan.nominal - terbayarFromTx;
-          const status = sisa <= 0 ? 'Lunas' : (terbayarFromTx > 0 ? 'Dicicil' : 'Belum Lunas');
+          const status: 'Lunas' | 'Belum Lunas' | 'Dicicil' = sisa <= 0 ? 'Lunas' : (terbayarFromTx > 0 ? 'Dicicil' : 'Belum Lunas');
           const latestTx = txsForTagihan[txsForTagihan.length - 1];
           const latestTanggalBayar = latestTx ? latestTx.tanggal : tagihan.tanggalBayar;
           
@@ -2407,7 +2434,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
           // If all transactions were deleted for this bill, revert back to Belum Lunas
           if (!tagihan.id.startsWith('syn-')) {
             hasChanged = true;
-            return { ...tagihan, terbayar: 0, status: 'Belum Lunas', tanggalBayar: '' };
+            return { ...tagihan, terbayar: 0, status: 'Belum Lunas' as const, tanggalBayar: '' };
           }
         }
         return tagihan;
@@ -2632,7 +2659,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             tipe: quickPayType,
             nominal: inputDibayar,
             tanggal: dateNumeric,
-            metodePembayaran: selectedMetodePembayaran,
+            metodePembayaran: selectedMetodePembayaran as "Cash / Kasir" | "Transfer Bank" | "QRIS",
             penerima: 'Kasir / Bendahara Sekolah'
           };
           setTransaksiList(prev => [globalTrx, ...prev]);
@@ -2651,6 +2678,8 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
           dibayar: inputDibayar,
           kembalian: Math.max(0, inputDibayar - totalToPay),
           tanggal: todayFormatted,
+          tanggalTagihan: inputTanggalTagihan || todayFormatted,
+          tanggalPembayaran: todayFormatted,
           penerima: 'Bendahara Sekolah'
         };
 
@@ -2723,7 +2752,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             tipe: quickPayType,
             nominal: inputDibayar,
             tanggal: dateNumeric,
-            metodePembayaran: selectedMetodePembayaran,
+            metodePembayaran: selectedMetodePembayaran as "Cash / Kasir" | "Transfer Bank" | "QRIS",
             penerima: 'Kasir / Bendahara Sekolah'
           };
           setTransaksiList(prev => [globalTrx, ...prev]);
@@ -2819,7 +2848,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
         tipe: 'ukt',
         nominal: payNominal,
         tanggal: dateNumeric,
-        metodePembayaran: selectedMetodePembayaran,
+        metodePembayaran: selectedMetodePembayaran as "Cash / Kasir" | "Transfer Bank" | "QRIS",
         penerima: 'Kasir / Bendahara Sekolah'
       };
       setTransaksiList(prev => [globalTrx, ...prev]);
@@ -3183,7 +3212,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     const rows = tagihanList.map(t => {
       const txs = transaksiList.filter(tx => tx.tagihanId === t.id);
       const latestTx = txs.length > 0 ? txs[txs.length - 1] : null;
-      const isLunas = t.status === 'Lunas' || t.status === 'LUNAS';
+      const isLunas = t.status === 'Lunas';
       const tglBayar = isLunas ? (t.tanggalBayar || (latestTx ? latestTx.tanggal : new Date().toLocaleDateString('id-ID'))) : '-';
       const invoiceNo = getStableInvoiceNumber(t);
       return [
@@ -3210,7 +3239,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     const rows = tagihanList.map(t => {
       const txs = transaksiList.filter(tx => tx.tagihanId === t.id);
       const latestTx = txs.length > 0 ? txs[txs.length - 1] : null;
-      const isLunas = t.status === 'Lunas' || t.status === 'LUNAS';
+      const isLunas = t.status === 'Lunas';
       const tglBayar = isLunas ? (t.tanggalBayar || (latestTx ? latestTx.tanggal : new Date().toLocaleDateString('id-ID'))) : '-';
       const invoiceNo = getStableInvoiceNumber(t);
       return [
@@ -3827,29 +3856,40 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                                 </span>
                               )}
                             </td>
-                            <td className="px-1 py-2.5 text-center">
+                             <td className="px-1 py-2.5 text-center">
                               <div className="flex items-center justify-center gap-1.5">
                                 <button
                                   type="button"
-                                  disabled={t.terbayar === 0 && !isLunas}
                                   onClick={() => {
                                     const matchingTx = studentTransactions.find(tx => 
                                       (tx.itemId && tx.itemId === t.id) || 
                                       (tx.pembayaran && t.namaTagihan && tx.pembayaran === t.namaTagihan)
                                     );
                                     if (matchingTx) {
-                                      handleReprintTransaction(matchingTx);
+                                      handleReprintTransaction({
+                                        ...matchingTx,
+                                        terbayar: t.terbayar,
+                                        isLunas,
+                                        isDicicil,
+                                        tanggalTagihan: t.tanggalTagihan || t.jatuhTempo || matchingTx.tanggalTagihan,
+                                        tanggalBayar: (isLunas || isDicicil || ((t.terbayar || 0) > 0)) ? (t.tanggalBayar || matchingTx.tanggal) : '-'
+                                      });
                                     } else {
                                       handleReprintTransaction({
                                         id: t.id,
                                         pembayaran: t.namaTagihan,
-                                        tagihan: t.terbayar || t.nominal,
-                                        tanggal: t.tanggalBayar || new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
+                                        tagihan: t.nominal || t.terbayar,
+                                        terbayar: t.terbayar || 0,
+                                        isLunas,
+                                        isDicicil,
+                                        tanggal: t.tanggalTagihan || new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }),
+                                        tanggalTagihan: t.tanggalTagihan || t.jatuhTempo,
+                                        tanggalBayar: (isLunas || isDicicil || ((t.terbayar || 0) > 0)) ? t.tanggalBayar : '-'
                                       });
                                     }
                                   }}
-                                  className="p-1 hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent text-slate-400 hover:text-emerald-400 rounded transition-colors"
-                                  title="Cetak ulang kwitansi"
+                                  className="p-1 hover:bg-slate-800 text-slate-400 hover:text-emerald-400 rounded transition-colors cursor-pointer"
+                                  title="Cetak kwitansi / rincian tagihan"
                                 >
                                   <Printer className="w-3.5 h-3.5" />
                                 </button>
@@ -4434,7 +4474,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                           <td className="px-4 py-3 whitespace-nowrap">
                             {isLunas || isDicicil ? (
                               <span className="text-[10px] bg-slate-800 text-slate-300 font-semibold px-2 py-1 rounded-md inline-block border border-slate-700/60">
-                                {latestTx?.metodePembayaran || t.metodePembayaran || 'Cash / Kasir'}
+                                {latestTx?.metodePembayaran || (t as any).metodePembayaran || 'Cash / Kasir'}
                               </span>
                             ) : (
                               <span className="text-xs text-slate-500">-</span>
@@ -4787,19 +4827,27 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
       {/* PRINTABLE RECEIPT MODAL */}
       {showPrintModal && printReceiptData && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white text-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 font-sans border border-slate-300">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white text-slate-900 rounded-2xl max-w-lg w-full p-4 sm:p-5 shadow-2xl space-y-3 font-sans border border-slate-300 max-h-[92vh] flex flex-col my-auto">
             {/* Modal Header Actions */}
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3 print:hidden">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2.5 print:hidden shrink-0">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-emerald-600" /> Struk Kwitansi Pembayaran Resmi
               </h3>
+              <button
+                type="button"
+                onClick={() => setShowPrintModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                title="Tutup Modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
             {/* Print Envelope Area */}
-            <div id="printable-receipt" className="space-y-4 p-2">
+            <div id="printable-receipt" className="space-y-3 p-1.5 overflow-y-auto flex-1 pr-1 custom-scrollbar">
               {/* School Header */}
-              <div className="text-center border-b-2 border-slate-900 pb-3 space-y-1">
+              <div className="text-center border-b-2 border-slate-900 pb-2 space-y-0.5">
                 {schoolSettings?.logoUrl && (
                   <div className="flex justify-center mb-1">
                     <img src={schoolSettings.logoUrl} alt="Logo" className="w-10 h-10 object-contain" />
@@ -4811,13 +4859,13 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 <p className="text-[10px] text-slate-600">
                   NPSN: {schoolSettings?.npsn || '-'} • Akreditasi: {schoolSettings?.akreditasi || '-'} • {schoolSettings?.alamat || 'Jl. Pendidikan No. 45'} • Telp: {schoolSettings?.telepon || '-'}
                 </p>
-                <div className="text-[11px] font-bold text-slate-800 uppercase tracking-widest pt-1">
+                <div className="text-[11px] font-bold text-slate-800 uppercase tracking-widest pt-0.5">
                   KWITANSI BUKTI PEMBAYARAN RESMI
                 </div>
               </div>
 
               {/* Receipt Details */}
-              <div className="text-xs space-y-1.5 py-1 text-slate-800">
+              <div className="text-xs space-y-1 py-1 text-slate-800">
                 <div className="flex justify-between">
                   <span className="text-slate-500 font-medium">No. Nota / Kwitansi</span>
                   <span className="font-mono font-bold text-slate-900">{printReceiptData.noNota}</span>
@@ -4835,13 +4883,17 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                   <span className="font-bold">{printReceiptData.kelas}</span>
                 </div>
                 <div className="flex justify-between">
+                  <span className="text-slate-500 font-medium">Tanggal Tagihan</span>
+                  <span className="font-bold">{formatReceiptDate(printReceiptData.tanggalTagihan || printReceiptData.tanggal)}</span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-slate-500 font-medium">Tanggal Pembayaran</span>
-                  <span className="font-bold">{printReceiptData.tanggal}</span>
+                  <span className="font-bold">{formatReceiptDate(printReceiptData.tanggalPembayaran || printReceiptData.tanggal)}</span>
                 </div>
               </div>
 
               {/* Items Table */}
-              <div className="border border-slate-300 rounded-lg overflow-hidden my-2">
+              <div className="border border-slate-300 rounded-lg overflow-hidden my-1.5">
                 <table className="w-full text-xs text-left">
                   <thead className="bg-slate-100 border-b border-slate-300 font-bold text-slate-700">
                     <tr>
@@ -4900,7 +4952,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 <button
                   type="button"
                   onClick={handleAddReceiptItem}
-                  className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300/80 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm"
+                  className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300/80 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5 text-emerald-600" />
                   + Tambah Uraian Pembayaran
@@ -4940,35 +4992,44 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               </div>
 
               {/* Signature block */}
-              <div className="pt-4 flex justify-between text-[11px] text-slate-700 text-center">
+              <div className="pt-3 flex justify-between text-[11px] text-slate-700 text-center">
                 <div>
                   <p>Siswa / Penyetor,</p>
-                  <div className="h-10"></div>
+                  <div className="h-8"></div>
                   <p className="font-bold underline">({printReceiptData.nama})</p>
                 </div>
                 <div>
                   <p>Depok, {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
                   <p>Kasir Keuangan,</p>
-                  <div className="h-10"></div>
+                  <div className="h-8"></div>
                   <p className="font-bold underline">({printReceiptData.penerima === 'Bendahara Sekolah' ? (schoolSettings?.namaKasir || 'Bendahara Sekolah') : printReceiptData.penerima})</p>
                 </div>
               </div>
             </div>
 
             {/* Modal Bottom Actions */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 print:hidden flex-wrap">
+            <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-slate-200 print:hidden flex-wrap shrink-0">
               <button
                 type="button"
                 onClick={() => setShowPrintModal(false)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl text-xs transition-colors"
+                className="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl text-xs transition-colors cursor-pointer"
               >
                 Tutup
               </button>
 
               <button
                 type="button"
+                onClick={handlePrint}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md shadow-emerald-600/30 cursor-pointer"
+                title="Cetak Kwitansi Langsung ke Printer atau PDF"
+              >
+                <Printer className="w-3.5 h-3.5" /> Cetak Kwitansi (Print / PDF)
+              </button>
+
+              <button
+                type="button"
                 onClick={handleDownloadReceiptAsImage}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md shadow-blue-600/30 cursor-pointer"
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md shadow-blue-600/30 cursor-pointer"
                 title="Download Kwitansi sebagai Gambar (PNG)"
               >
                 <Download className="w-3.5 h-3.5" /> Download Gambar (PNG)
@@ -4977,7 +5038,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               <button
                 type="button"
                 onClick={handleDownloadReceipt}
-                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md shadow-amber-600/30 cursor-pointer"
+                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md shadow-amber-600/30 cursor-pointer"
                 title="Download Kwitansi sebagai File HTML / PDF"
               >
                 <FileText className="w-3.5 h-3.5" /> Download File (HTML)
@@ -5595,7 +5656,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                             tipe: editingTagihan.tipe || 'spp',
                             nominal: updatedTerbayar,
                             tanggal: finalTanggalBayar || new Date().toLocaleDateString('id-ID'),
-                            metodePembayaran: editTagihanForm.metodePembayaran || 'Cash / Kasir',
+                            metodePembayaran: (editTagihanForm.metodePembayaran || 'Cash / Kasir') as "Cash / Kasir" | "Transfer Bank" | "QRIS",
                             penerima: 'Kasir / Bendahara Sekolah'
                           };
                           return [newTx, ...baseTx];

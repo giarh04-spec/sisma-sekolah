@@ -681,11 +681,18 @@ export default function App() {
     setUserGoogleToken(token);
     setCurrentRole(role);
     setIsLoggedIn(true);
-    // Guru default tab is 'absensi'
-    if (role === 'guru') {
+    // Role-based initial tab routing
+    if (role === 'kepsek') {
       setActiveTab('absensi');
+      setAbsensiSubTab('perizinan');
+    } else if (role === 'guru') {
+      setActiveTab('absensi');
+      setAbsensiSubTab('perizinan');
+    } else if (role === 'petugas_absensi') {
+      setActiveTab('absensi');
+      setAbsensiSubTab('scan_barcode');
     } else if (role === 'staf') {
-      setActiveTab('keuangan');
+      setActiveTab('database');
     } else if (role === 'siswa') {
       setActiveTab('cbt');
       setCbtSubTab('simulasi_ujian');
@@ -696,13 +703,27 @@ export default function App() {
 
   // Auto switch tab if current activeTab is not allowed for current role
   useEffect(() => {
-    if (currentRole === 'guru') {
+    if (currentRole === 'kepsek') {
+      if (activeTab !== 'absensi') {
+        setActiveTab('absensi');
+      }
+      if (absensiSubTab !== 'perizinan') {
+        setAbsensiSubTab('perizinan');
+      }
+    } else if (currentRole === 'guru') {
       if (activeTab !== 'absensi' && activeTab !== 'administrasi' && activeTab !== 'cbt') {
         setActiveTab('absensi');
       }
+      if (absensiSubTab === 'scan_barcode') {
+        setAbsensiSubTab('perizinan');
+      }
+    } else if (currentRole === 'petugas_absensi') {
+      if (activeTab !== 'absensi') {
+        setActiveTab('absensi');
+      }
     } else if (currentRole === 'staf') {
-      if (activeTab !== 'keuangan') {
-        setActiveTab('keuangan');
+      if (activeTab !== 'database' && activeTab !== 'keuangan') {
+        setActiveTab('database');
       }
     } else if (currentRole === 'siswa') {
       if (activeTab !== 'cbt') {
@@ -872,7 +893,7 @@ export default function App() {
               mapelList={mapelList}
               stafList={stafList}
               subTab={absensiSubTab}
-              setSubTab={setAbsensiSubTab}
+              setSubTab={setAbsensiSubTab as any}
               schoolSettings={schoolSettings}
               setSchoolSettings={setSchoolSettings}
             />

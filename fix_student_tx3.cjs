@@ -1,0 +1,13 @@
+const fs = require('fs');
+let code = fs.readFileSync('src/components/KeuanganView.tsx', 'utf-8');
+const search = `  const [studentTransactions, setStudentTransactions] = useState<any[]>([]);
+    id: string;
+    pembayaran?: string;
+    tagihan: number;
+    tanggal: string;
+    itemId?: string;
+    type?: 'spp' | 'bebas';
+  }>>(() => {`;
+const replace = `  const [studentTransactions, setStudentTransactions] = useState<any[]>(() => {`;
+code = code.replace(search, replace);
+fs.writeFileSync('src/components/KeuanganView.tsx', code);

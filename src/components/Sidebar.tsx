@@ -24,6 +24,7 @@ import {
   Image,
   Cloud,
   MessageSquare,
+  FileSignature,
   Clock,
   Building,
   Trophy,
@@ -137,12 +138,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Filter menu items based on role
   const menuItems = allMenuItems.filter((item) => {
+    if (currentRole === 'kepsek') {
+      // Kepala Sekolah ONLY gets: Persetujuan Izin Siswa & Guru
+      return item.id === 'absensi';
+    }
     if (currentRole === 'guru') {
       // Guru ONLY gets: absensi kelas, administrasi guru, cbt ujian (bank soal)
       return item.id === 'absensi' || item.id === 'administrasi' || item.id === 'cbt';
     }
+    if (currentRole === 'petugas_absensi') {
+      return item.id === 'absensi';
+    }
     if (currentRole === 'staf') {
-      return item.id === 'keuangan';
+      return item.id === 'database' || item.id === 'keuangan';
     }
     if (currentRole === 'siswa') {
       return item.id === 'cbt';
@@ -156,20 +164,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="space-y-3">
         {/* Active Role Indicator Box */}
         <div className={`p-3 rounded-xl border flex items-center justify-between ${
+          currentRole === 'kepsek' ? 'bg-indigo-950/50 border-indigo-700/60 text-indigo-300' :
           currentRole === 'guru' ? 'bg-purple-950/40 border-purple-800/60 text-purple-300' :
+          currentRole === 'petugas_absensi' ? 'bg-cyan-950/40 border-cyan-800/60 text-cyan-300' :
           currentRole === 'admin' ? 'bg-blue-950/40 border-blue-800/60 text-blue-300' :
           currentRole === 'staf' ? 'bg-amber-950/40 border-amber-800/60 text-amber-300' :
           'bg-emerald-950/40 border-emerald-800/60 text-emerald-300'
         }`}>
           <div className="flex items-center gap-2">
+            {currentRole === 'kepsek' && <Building className="w-4 h-4 text-indigo-400" />}
             {currentRole === 'guru' && <GraduationCap className="w-4 h-4 text-purple-400" />}
+            {currentRole === 'petugas_absensi' && <CalendarCheck className="w-4 h-4 text-cyan-400" />}
             {currentRole === 'admin' && <ShieldCheck className="w-4 h-4 text-blue-400" />}
             {currentRole === 'staf' && <UserCheck className="w-4 h-4 text-amber-400" />}
             {currentRole === 'siswa' && <Users className="w-4 h-4 text-emerald-400" />}
             <div>
               <div className="text-[10px] uppercase font-bold text-slate-400 leading-tight">Akses Peran</div>
               <div className="text-xs font-black uppercase tracking-wide">
-                {currentRole === 'guru' ? 'Guru / Pendidik' : currentRole === 'staf' ? 'Staf / Tata Usaha' : currentRole === 'siswa' ? 'Siswa / Wali' : 'Administrator'}
+                {currentRole === 'kepsek' ? 'Kepala Sekolah' : currentRole === 'guru' ? 'Guru / Pendidik' : currentRole === 'petugas_absensi' ? 'Petugas Absensi' : currentRole === 'staf' ? 'Staf / Tata Usaha' : currentRole === 'siswa' ? 'Siswa / Wali' : 'Administrator'}
               </div>
             </div>
           </div>
@@ -265,56 +277,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </span>
                       </button>
 
-                      <button
-                        onClick={() => setDatabaseSubTab('rombel')}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
-                          databaseSubTab === 'rombel'
-                            ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-sm'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Layers className="w-3.5 h-3.5 text-indigo-400" />
-                          <span>Rombel & Kelas</span>
-                        </div>
-                        <span className="text-[9px] bg-slate-800/80 text-slate-400 px-1.5 py-0.5 rounded font-mono">
-                          {rombelCount}
-                        </span>
-                      </button>
 
-                      <button
-                        onClick={() => setDatabaseSubTab('mapel')}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
-                          databaseSubTab === 'mapel'
-                            ? 'bg-amber-600/10 text-amber-400 border border-amber-500/20 shadow-sm'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <BookOpen className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Mata Pelajaran</span>
-                        </div>
-                        <span className="text-[9px] bg-slate-800/80 text-slate-400 px-1.5 py-0.5 rounded font-mono">
-                          {mapelCount}
-                        </span>
-                      </button>
 
-                      <button
-                        onClick={() => setDatabaseSubTab('ekskul')}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
-                          databaseSubTab === 'ekskul'
-                            ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Trophy className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Kelas Ekstrakurikuler</span>
-                        </div>
-                        <span className="text-[9px] bg-slate-800/80 text-slate-400 px-1.5 py-0.5 rounded font-mono">
-                          {ekskulCount}
-                        </span>
-                      </button>
+
                     </div>
                   )}
                 </div>
@@ -322,6 +287,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
             }
 
             if (item.id === 'absensi') {
+              if (currentRole === 'kepsek') {
+                const isKepsekActive = activeTab === 'absensi' && absensiSubTab === 'perizinan';
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab('absensi');
+                      if (setAbsensiSubTab) setAbsensiSubTab('perizinan');
+                    }}
+                    className={`w-full text-left px-3.5 py-3 rounded-xl transition-all flex items-center justify-between group cursor-pointer ${
+                      isKepsekActive
+                        ? 'bg-slate-800/90 text-orange-400 font-bold border border-slate-700/80 shadow-md ring-1 ring-orange-500/20'
+                        : 'hover:bg-slate-800/50 hover:text-white text-slate-400'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`${isKepsekActive ? 'text-orange-400' : 'text-slate-500 group-hover:text-slate-300'}`}>
+                        <FileSignature className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold leading-none">Persetujuan Izin</div>
+                        <div className={`text-[10px] mt-1 ${isKepsekActive ? 'text-slate-300' : 'text-slate-500'}`}>
+                          Izin Siswa & Guru
+                        </div>
+                      </div>
+                    </div>
+
+                    <span className="text-[9px] bg-orange-500/20 text-orange-300 border border-orange-500/30 px-1.5 py-0.5 rounded font-bold">
+                      Kepsek
+                    </span>
+                  </button>
+                );
+              }
+
               return (
                 <div key={item.id} className="space-y-1">
                   <button
@@ -352,29 +351,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {/* Dropdown nested items for Absensi */}
                   {isActive && (
                     <div className="pl-3 pr-1 py-1 space-y-1 border-l border-slate-800 ml-6 mt-1 transition-all">
-                      {/* 1. Scan Barcode / QR */}
-                      <button
-                        onClick={() => {
-                          setActiveTab('absensi');
-                          if (setAbsensiSubTab) setAbsensiSubTab('scan_barcode');
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
-                          absensiSubTab === 'scan_barcode'
-                            ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-sm'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <QrCode className="w-3.5 h-3.5 text-blue-400" />
-                          <span>Scan Barcode / QR</span>
-                        </div>
-                        <span className="text-[9px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1 py-0.5 rounded font-bold">
-                          Kamera
-                        </span>
-                      </button>
+                      {/* 1. Scan Barcode / QR (Admin or Petugas Absensi) */}
+                      {(currentRole === 'admin' || currentRole === 'petugas_absensi') && (
+                        <button
+                          onClick={() => {
+                            setActiveTab('absensi');
+                            if (setAbsensiSubTab) setAbsensiSubTab('scan_barcode');
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
+                            absensiSubTab === 'scan_barcode'
+                              ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-sm'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <QrCode className="w-3.5 h-3.5 text-blue-400" />
+                            <span>Scan Barcode / QR</span>
+                          </div>
+                          <span className="text-[9px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1 py-0.5 rounded font-bold">
+                            Kamera
+                          </span>
+                        </button>
+                      )}
 
                       {/* 2. Absensi Harian Siswa */}
-                      {currentRole !== 'guru' && (
+                      {currentRole !== 'guru' && currentRole !== 'petugas_absensi' && (
                         <button
                           onClick={() => {
                             setActiveTab('absensi');
@@ -395,7 +396,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
 
                       {/* 4. Presensi Guru */}
-                      {currentRole !== 'guru' && (
+                      {currentRole !== 'guru' && currentRole !== 'petugas_absensi' && (
                         <button
                           onClick={() => {
                             setActiveTab('absensi');
@@ -414,8 +415,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </button>
                       )}
 
+                      
+                      {/* Perizinan / Persetujuan Kepala Sekolah */}
+                      {currentRole !== 'petugas_absensi' && (
+                        <button
+                          onClick={() => {
+                            setActiveTab('absensi');
+                            if (setAbsensiSubTab) setAbsensiSubTab('perizinan');
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
+                            absensiSubTab === 'perizinan'
+                              ? 'bg-orange-600/10 text-orange-400 border border-orange-500/20 shadow-sm'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <FileSignature className="w-3.5 h-3.5 text-orange-400" />
+                            <span>
+                              {currentRole === 'admin'
+                                ? 'Persetujuan Izin Siswa & Guru'
+                                : 'Pengajuan Izin & Cuti'}
+                            </span>
+                          </div>
+                          {currentRole === 'admin' && (
+                            <span className="text-[9px] bg-orange-500/20 text-orange-300 border border-orange-500/30 px-1 py-0.5 rounded font-bold">
+                              Admin
+                            </span>
+                          )}
+                        </button>
+                      )}
+
                       {/* 5. Redaksi Notifikasi WA */}
-                      {currentRole !== 'guru' && (
+                      {currentRole !== 'guru' && currentRole !== 'petugas_absensi' && (
                         <button
                           onClick={() => {
                             setActiveTab('absensi');

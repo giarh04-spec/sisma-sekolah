@@ -145,7 +145,7 @@ export const PublicSlipGajiView: React.FC<PublicSlipGajiViewProps> = ({
 
   const bendaharaNama = bendaharaStaf?.nama || schoolSettings?.namaKasir || 'Nurhidayati, S.Pd';
   const bendaharaNik = bendaharaStaf?.nik || '-';
-  const kepalaSekolahNama = schoolSettings?.namaKepalaSekolah || schoolSettings?.kepalaSekolah || 'Dr. H. Ahmad Fauzi, M.Pd';
+  const kepalaSekolahNama = schoolSettings?.kepalaSekolah || schoolSettings?.kepalaSekolah || 'Dr. H. Ahmad Fauzi, M.Pd';
   const kepalaSekolahNip = schoolSettings?.nipKepalaSekolah || '19750814 200212 1 003';
 
   // Handle PNG Download

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Plus, AlertCircle, Save, Trash2, Grid, List, Settings, Pencil } from 'lucide-react';
-import { Guru, MataPelajaranItem, RombelKelas } from '../../types/school';
+import { Guru, MataPelajaranItem, RombelKelas, Role } from '../../types/school';
 import { JadwalReview } from './JadwalReview';
 import { JadwalSettings } from './JadwalSettings';
 import { TIME_SLOTS, TEACHER_MAPPINGS, MASTER_SCHEDULE, SCHEDULE_CLASSES } from '../../types/scheduleData';
@@ -21,6 +21,7 @@ interface JadwalMengajarProps {
   guruList: Guru[];
   mapelList: MataPelajaranItem[];
   rombelList: RombelKelas[];
+  currentRole?: Role;
 }
 
 export interface JadwalMengajarItem {
@@ -36,13 +37,20 @@ export interface JadwalMengajarItem {
   isKegiatan?: boolean;
 }
 
-export const JadwalMengajar: React.FC<JadwalMengajarProps> = ({ guruList, mapelList, rombelList }) => {
+export const JadwalMengajar: React.FC<JadwalMengajarProps> = ({ guruList, mapelList, rombelList, currentRole = 'admin' }) => {
   const [activeTab, setActiveTab] = useState<'manage' | 'review' | 'settings'>('review');
   const [jadwalList, setJadwalList] = useState<JadwalMengajarItem[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>(TIME_SLOTS);
   const [teacherMappings, setTeacherMappings] = useState(TEACHER_MAPPINGS);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Auto redirect to review if non-admin tries to access manage or settings
+  useEffect(() => {
+    if (currentRole !== 'admin' && activeTab !== 'review') {
+      setActiveTab('review');
+    }
+  }, [currentRole, activeTab]);
 
   // Firestore Listeners
   useEffect(() => {
@@ -243,41 +251,43 @@ export const JadwalMengajar: React.FC<JadwalMengajarProps> = ({ guruList, mapelL
 
   return (
     <div className="space-y-6">
-      {/* Tab Switcher */}
-      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-        <button
-          onClick={() => setActiveTab('review')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-            activeTab === 'review' 
-              ? 'bg-white text-blue-600 shadow-sm' 
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <Grid className="w-4 h-4" /> Review Jadwal
-        </button>
-        <button
-          onClick={() => setActiveTab('manage')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-            activeTab === 'manage' 
-              ? 'bg-white text-blue-600 shadow-sm' 
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <List className="w-4 h-4" /> Kelola Data
-        </button>
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-            activeTab === 'settings' 
-              ? 'bg-white text-blue-600 shadow-sm' 
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <Settings className="w-4 h-4" /> Pengaturan
-        </button>
-      </div>
+      {/* Tab Switcher - Only visible for admin role */}
+      {currentRole === 'admin' && (
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+          <button
+            onClick={() => setActiveTab('review')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+              activeTab === 'review' 
+                ? 'bg-white text-blue-600 shadow-sm' 
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Grid className="w-4 h-4" /> Review Jadwal
+          </button>
+          <button
+            onClick={() => setActiveTab('manage')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+              activeTab === 'manage' 
+                ? 'bg-white text-blue-600 shadow-sm' 
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <List className="w-4 h-4" /> Kelola Data
+          </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+              activeTab === 'settings' 
+                ? 'bg-white text-blue-600 shadow-sm' 
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Settings className="w-4 h-4" /> Pengaturan
+          </button>
+        </div>
+      )}
 
-      {activeTab === 'review' ? (
+      {activeTab === 'review' || currentRole !== 'admin' ? (
         <JadwalReview 
           timeSlots={timeSlots}
           teacherMappings={teacherMappings}

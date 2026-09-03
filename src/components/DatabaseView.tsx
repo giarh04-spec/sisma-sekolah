@@ -186,7 +186,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     nipGuru: guruList[0]?.nip || '198501152010011002',
     alokasiJamPerMinggu: 4,
     kkm: 75,
-    kurikulum: 'Kurikulum Merdeka',
+    kurikulum: 'Kurikulum Merdeka' as any,
     catatan: '',
     jadwalMengajar: [
       { id: 'js-new-1', hari: 'Senin', jamMulai: '07:30', jamSelesai: '09:00', kelasTarget: 'VIII - Al Biruni', ruangan: 'Ruang R.101 (Gedung A)' }
@@ -214,7 +214,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     jurusanPeminatan: 'MIPA / Umum',
     waliKelasNama: guruList[0]?.nama || 'Drs. Hendra Kusuma, M.Pd.',
     ruangan: 'Ruang R.101 (Gedung A)',
-    kurikulum: 'Kurikulum Merdeka',
+    kurikulum: 'Kurikulum Merdeka' as any,
     tahunAjaran: '2026/2027',
     semester: 'Ganjil',
     ketuaKelasNama: '',
@@ -236,6 +236,17 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     id: string;
     nama: string;
     targetType: 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel' | 'ekskul';
+  } | null>(null);
+
+  // Multi-Selection & Bulk Delete State
+  const [selectedSiswaIds, setSelectedSiswaIds] = useState<string[]>([]);
+  const [selectedGuruIds, setSelectedGuruIds] = useState<string[]>([]);
+  const [selectedStafIds, setSelectedStafIds] = useState<string[]>([]);
+  const [bulkDeleteModal, setBulkDeleteModal] = useState<{
+    targetType: 'siswa' | 'guru' | 'staf';
+    mode: 'selected' | 'all' | 'filtered';
+    count: number;
+    targetName: string;
   } | null>(null);
 
   // Ekskul specific state & filters
@@ -268,7 +279,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     deskripsi: ''
   });
 
-  // Digital ID Card Modal State
+  // Custom Mapel Input State for Guru Form
+  const [customMapelInput, setCustomMapelInput] = useState<string>('');
   const [cardModalData, setCardModalData] = useState<{
     type: 'siswa' | 'guru' | 'staf';
     data: Siswa | Guru | Staf;
@@ -468,10 +480,10 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     let filename = '';
 
     if (type === 'siswa') {
-      headers = 'NISN;NIS;NIK;Nama;Rombel;JenisKelamin;TempatLahir;TanggalLahir;Agama;Alamat;NamaOrang tua/Wali;TeleponWali;AsalSekolah;Anak Ke-;JumlahSaudara;BeratBadan;TinggiBadan\n';
-      sampleRows = '81234567;1001;3171010101080001;Budi Santoso;VIII - Al Biruni;L;Jakarta;12/05/2008;Islam;Jl. Merdeka No 10;Ahmad Santoso;81234567890;;;;;\n' +
-                   '81234568;1002;3171010202080002;Siti Rahma;VIII - Al Biruni;P;Bandung;18/06/2008;Islam;Jl. Mawar No 5;Bambang;81298765432;;;;;\n';
-      filename = 'Template_Import_Data_Siswa_2026.csv';
+      headers = 'No\tNama\tL/P\tNISN\tNIS\tNIK\tTempatLahir\tTanggalLahir\tAgama\tAlamat\tRT\tRW\tKelurahan\tKecamatan\tKota\tProvinsi\tNamaAyah\tTempatLahirAyah\tTanggalLahirAyah\tJenjangPendidikanAyah\tPekerjaanAyah\tPenghasilanAyah\tNIKAyah\tNamaIbu\tTempatLahirIbu\tTanggalLahirIbu\tJenjangPendidikanIbu\tPekerjaanIbu\tPenghasilanIbu\tNIKIbu\tNamaWali\tTeleponWali\tKelas/Rombel\tAsalSekolah\tAnakKe\tJumlahSaudara\tBeratBadan\tTinggiBadan\n';
+      sampleRows = '1\tAbidzar Hamzi Syarif\tL\t136085723\t24250001\t3276011110130000\tDepok\t2013-11-11\tIslam\tPerum Taman Melati Premiere Boulevard\t01\t02\tKel. Pengasinan\tKec. Sawangan\tKota Depok\tJawa Barat\tSyarif Hermansyah\tJakarta\t1961-01-15\tD3\tKaryawan Swasta\t10,000,000\t3276010101610000\tAnita Kurniawan\tBogor\t1984-04-06\tS1\tIRT\t\t3276046408840000\tAbidzar Hamzi\t81311855987\tVIII - Al Biruni\tAI Learning Center / PKBM HIAIMA\t3\t3\t45\t147\n' +
+                   '2\tAdisty Alfatha\tP\t26270002\t3179511118\t3276044208130000\tBogor\t2013-08-02\tIslam\tJl. Permata Kp. Pulo\t03\t04\tKel. Pasir Putih\tKec. Sawangan\tKota Depok\tJawa Barat\tAgi Prayatna\tJakarta\t1987-05-26\tS1\tKaryawan Swasta\t10,000,000\t3276012605870000\tDewi Dahimahsyah\tBogor\t1996-12-06\tD3\t5,000,000\t3276014612960000\tAgi Prayatna\t87604104652\tVIII - Al Khawarizmi\tMIS Attaqwa\t1\t1\t40\t145\n';
+      filename = 'Template_Data_Peserta_Didik_Al_Fakhir.xls';
     } else if (type === 'guru') {
       headers = 'NIP,NIK,Nama,GelarDepan,GelarBelakang,MataPelajaran,Jabatan,Email,Telepon,JenisKelamin,TempatLahir,TanggalLahir,Agama,Pendidikan,Status\n';
       sampleRows = '198501152010011002,3171011501850002,Ahmad Dahlan,Drs.,M.Pd.,Matematika Tingkat Lanjut,Guru Utama,ahmad@sekolah.sch.id,081122334455,L,Bandung,1985-01-15,Islam,S2 Pendidikan,PNS\n' +
@@ -491,6 +503,28 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  // Helper to clean NIK from scientific notation (e.g. 3.27604E+15 or 3,27604E+15) or non-digit characters
+  const cleanNik = (val: any): string => {
+    if (!val) return '';
+    let str = String(val).trim();
+    str = str.replace(',', '.');
+    if (str.includes('E') || str.includes('e')) {
+      const num = Number(str);
+      if (!isNaN(num)) return num.toFixed(0);
+    }
+    return str;
+  };
+
+  const handleFixAllNik = () => {
+    setSiswaList(prev => prev.map(s => ({
+      ...s,
+      nik: cleanNik(s.nik),
+      nikAyah: cleanNik(s.nikAyah),
+      nikIbu: cleanNik(s.nikIbu)
+    })));
+    alert("✓ Berhasil memperbaiki seluruh format NIK siswa (menghilangkan notasi ilmiah/eksponensial Excel dan merapikannya menjadi 16 digit NIK normal).");
   };
 
   // Handle File Import
@@ -521,47 +555,163 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
             alert(`✓ Berhasil mengimpor ${jsonData.length} data ${importTargetType.toUpperCase()} dari file JSON!`);
           }
         } else {
-          // Parse CSV
+          // Parse CSV or Tab-separated file
           const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
           if (lines.length <= 1) {
-            alert('File CSV kosong atau hanya berisi baris header.');
+            alert('File kosong atau hanya berisi baris header.');
             return;
           }
 
           const firstLine = lines[0] || '';
-          const delimiter = firstLine.includes(';') ? ';' : ',';
+          const delimiter = firstLine.includes('\t') ? '\t' : (firstLine.includes(';') ? ';' : ',');
           const dataRows = lines.slice(1);
           let count = 0;
 
           if (importTargetType === 'siswa') {
-            const newSiswaItems: Siswa[] = dataRows.map((row, idx) => {
+            let duplicateCount = 0;
+            const validNewItems: Siswa[] = [];
+
+            dataRows.forEach((row, idx) => {
               const cols = row.split(delimiter).map(c => c.trim().replace(/^"|"$/g, ''));
-              return {
-                id: `sis-imp-${Date.now()}-${idx}`,
-                nisn: cols[0] || `008${Math.floor(1000000 + Math.random() * 9000000)}`,
-                nis: cols[1] || `${1000 + idx}`,
-                nik: cols[2] || `317100000000000${idx}`,
-                nama: cols[3] || `Siswa Impor ${idx + 1}`,
-                kelas: cols[4] || 'VIII - Al Biruni',
-                jenisKelamin: (cols[5] === 'P' || cols[5] === 'p' ? 'P' : 'L') as 'L' | 'P',
-                tempatLahir: cols[6] || 'Jakarta',
-                tanggalLahir: cols[7] || '2008-01-01',
-                agama: cols[8] || 'Islam',
-                alamat: cols[9] || 'Jl. Sekolah No. 1',
-                alamatLengkap: cols[9] || 'Jl. Sekolah No. 1',
-                namaWali: cols[10] || 'Orang Tua',
-                teleponWali: cols[11] || '08123456789',
-                asalSekolah: cols[12] || '',
-                anakKe: cols[13] ? parseInt(cols[13]) || undefined : undefined,
-                jumlahSaudara: cols[14] ? parseInt(cols[14]) || undefined : undefined,
-                beratBadan: cols[15] ? parseInt(cols[15]) || undefined : undefined,
-                tinggiBadan: cols[16] ? parseInt(cols[16]) || undefined : undefined,
-                status: 'Aktif',
-                kodeBarcode: `SIS-${cols[0] || '008'}`
-              };
+              // Headers order:
+              // 0: No
+              // 1: Nama
+              // 2: L/P
+              // 3: NISN
+              // 4: NIS
+              // 5: NIK
+              // 6: TempatLahir
+              // 7: TanggalLahir
+              // 8: Agama
+              // 9: Alamat
+              // 10: RT
+              // 11: RW
+              // 12: Kelurahan
+              // 13: Kecamatan
+              // 14: Kota
+              // 15: Provinsi
+              // 16: NamaAyah
+              // 17: TempatLahirAyah
+              // 18: TanggalLahirAyah
+              // 19: JenjangPendidikanAyah
+              // 20: PekerjaanAyah
+              // 21: PenghasilanAyah
+              // 22: NIKAyah
+              // 23: NamaIbu
+              // 24: TempatLahirIbu
+              // 25: TanggalLahirIbu
+              // 26: JenjangPendidikanIbu
+              // 27: PekerjaanIbu
+              // 28: PenghasilanIbu
+              // 29: NIKIbu
+              // 30: NamaWali
+              // 31: TeleponWali
+              // 32: Kelas/Rombel
+              // 33: AsalSekolah
+              // 34: AnakKe
+              // 35: JumlahSaudara
+              // 36: BeratBadan
+              // 37: TinggiBadan
+
+              const nama = cols[1] || `Siswa Impor ${idx + 1}`;
+              const jenisKelamin = (cols[2] === 'P' || cols[2] === 'p' ? 'P' : 'L') as 'L' | 'P';
+              const nisn = cols[3] || `008${Math.floor(1000000 + Math.random() * 9000000)}`;
+              const nis = cols[4] || `${1000 + idx}`;
+              const nik = cleanNik(cols[5]) || `317100000000000${idx}`;
+              const tempatLahir = cols[6] || 'Depok';
+              const tanggalLahir = cols[7] || '2013-01-01';
+              const agama = cols[8] || 'Islam';
+              const alamat = cols[9] || 'Jl. Sekolah No. 1';
+              const rt = cols[10] || '01';
+              const rw = cols[11] || '02';
+              const kelurahan = cols[12] || '';
+              const kecamatan = cols[13] || '';
+              const kota = cols[14] || 'Kota Depok';
+              const provinsi = cols[15] || 'Jawa Barat';
+              
+              const namaAyah = cols[16] || '';
+              const tempatLahirAyah = cols[17] || '';
+              const tanggalLahirAyah = cols[18] || '';
+              const pendidikanAyah = cols[19] || '';
+              const pekerjaanAyah = cols[20] || '';
+              const penghasilanAyah = cols[21] || '';
+              const nikAyah = cleanNik(cols[22]) || '';
+
+              const namaIbu = cols[23] || '';
+              const tempatLahirIbu = cols[24] || '';
+              const tanggalLahirIbu = cols[25] || '';
+              const pendidikanIbu = cols[26] || '';
+              const pekerjaanIbu = cols[27] || '';
+              const penghasilanIbu = cols[28] || '';
+              const nikIbu = cleanNik(cols[29]) || '';
+
+              const namaWali = cols[30] || '';
+              const teleponWali = cols[31] || '08123456789';
+              const kelas = cols[32] || 'VIII - Al Biruni';
+              const asalSekolah = cols[33] || '';
+              const anakKe = cols[34] ? parseInt(cols[34]) || undefined : undefined;
+              const jumlahSaudara = cols[35] ? parseInt(cols[35]) || undefined : undefined;
+              const beratBadan = cols[36] ? parseInt(cols[36]) || undefined : undefined;
+              const tinggiBadan = cols[37] ? parseInt(cols[37]) || undefined : undefined;
+
+              const isDuplicate = siswaList.some(s => 
+                (nisn && s.nisn && s.nisn.trim() === nisn.trim()) ||
+                (nis && s.nis && s.nis.trim() === nis.trim()) ||
+                (nik && s.nik && s.nik.trim() === nik.trim())
+              ) || validNewItems.some(s =>
+                (nisn && s.nisn && s.nisn.trim() === nisn.trim()) ||
+                (nis && s.nis && s.nis.trim() === nis.trim()) ||
+                (nik && s.nik && s.nik.trim() === nik.trim())
+              );
+
+              if (isDuplicate) {
+                duplicateCount++;
+              } else {
+                validNewItems.push({
+                  id: `sis-imp-${Date.now()}-${idx}`,
+                  nama,
+                  jenisKelamin,
+                  nisn,
+                  nis,
+                  nik,
+                  tempatLahir,
+                  tanggalLahir,
+                  agama,
+                  alamat,
+                  alamatLengkap: `${alamat}, RT ${rt}/RW ${rw}, ${kelurahan}, ${kecamatan}, ${kota}, ${provinsi}`,
+                  teleponWali,
+                  namaAyah,
+                  tempatLahirAyah,
+                  tanggalLahirAyah,
+                  pendidikanAyah,
+                  pekerjaanAyah,
+                  penghasilanAyah,
+                  nikAyah,
+                  namaIbu,
+                  tempatLahirIbu,
+                  tanggalLahirIbu,
+                  pendidikanIbu,
+                  pekerjaanIbu,
+                  penghasilanIbu,
+                  nikIbu,
+                  namaWali,
+                  asalSekolah,
+                  anakKe,
+                  jumlahSaudara,
+                  beratBadan,
+                  tinggiBadan,
+                  kelas,
+                  status: 'Aktif',
+                  kodeBarcode: `SIS-${nisn || '008'}`
+                });
+              }
             });
-            setSiswaList(prev => [...newSiswaItems, ...prev]);
-            count = newSiswaItems.length;
+
+            if (validNewItems.length > 0) {
+              setSiswaList(prev => [...validNewItems, ...prev]);
+            }
+            alert(`✓ Berhasil mengimpor ${validNewItems.length} data siswa baru.\n⚠️ ${duplicateCount} data ganda dilewati (sudah terdaftar berdasarkan NISN, NIS, atau NIK).`);
+            count = validNewItems.length;
           } else if (importTargetType === 'guru') {
             const newGuruItems: Guru[] = dataRows.map((row, idx) => {
               const cols = row.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
@@ -820,7 +970,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         jurusanPeminatan: 'MIPA / Umum',
         waliKelasNama: guruList[0]?.nama || 'Drs. Hendra Kusuma, M.Pd.',
         ruangan: 'Ruang R.101 (Gedung A)',
-        kurikulum: 'Kurikulum Merdeka',
+        kurikulum: 'Kurikulum Merdeka' as any,
         tahunAjaran: '2026/2027',
         semester: 'Ganjil',
         ketuaKelasNama: '',
@@ -838,7 +988,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         nipGuru: defaultGuru?.nip || '198501152010011002',
         alokasiJamPerMinggu: 4,
         kkm: 75,
-        kurikulum: 'Kurikulum Merdeka',
+        kurikulum: 'Kurikulum Merdeka' as any,
         catatan: '',
         jadwalMengajar: [
           { id: `js-${Date.now()}`, hari: 'Senin', jamMulai: '07:30', jamSelesai: '09:00', kelasTarget: 'VIII - Al Biruni', ruangan: 'Ruang R.101 (Gedung A)' }
@@ -873,18 +1023,102 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (subTab === 'siswa') {
+      const duplicate = siswaList.find(s => {
+        if (editingId && s.id === editingId) return false;
+        const matchNisn = formSiswa.nisn && s.nisn && s.nisn.trim() === formSiswa.nisn.trim();
+        const matchNis = formSiswa.nis && s.nis && s.nis.trim() === formSiswa.nis.trim();
+        const matchNik = formSiswa.nik && s.nik && s.nik.trim() === formSiswa.nik.trim();
+        return matchNisn || matchNis || matchNik;
+      });
+
+      if (duplicate) {
+        alert(`⚠️ Peringatan Data Ganda!\nSiswa dengan NISN "${formSiswa.nisn}", NIS "${formSiswa.nis}", atau NIK "${formSiswa.nik}" sudah terdaftar atas nama "${duplicate.nama}" (Kelas: ${duplicate.kelas}). Mohon periksa kembali data peserta didik.`);
+        return;
+      }
+
+      const cleanedForm = {
+        ...formSiswa,
+        nik: cleanNik(formSiswa.nik),
+        nikAyah: cleanNik(formSiswa.nikAyah),
+        nikIbu: cleanNik(formSiswa.nikIbu)
+      };
+
       if (modalMode === 'add') {
-        const newSiswa: Siswa = { ...formSiswa, id: `sis-${Date.now()}` };
+        const newSiswa: Siswa = { ...cleanedForm, id: `sis-${Date.now()}` };
         setSiswaList(prev => [newSiswa, ...prev]);
       } else if (editingId) {
-        setSiswaList(prev => prev.map(s => s.id === editingId ? { ...formSiswa, id: editingId } : s));
+        setSiswaList(prev => prev.map(s => s.id === editingId ? { ...cleanedForm, id: editingId } : s));
       }
+      setIsModalOpen(false);
     } else if (subTab === 'guru') {
       if (modalMode === 'add') {
         const newGuru: Guru = { ...formGuru, id: `gur-${Date.now()}` };
         setGuruList(prev => [newGuru, ...prev]);
+
+        // Auto-register mapel to activeMapelList if not already present
+        if (newGuru.mataPelajaran) {
+          const mapels = newGuru.mataPelajaran.split(',').map(m => m.trim()).filter(Boolean);
+          mapels.forEach(mName => {
+            const exists = activeMapelList.some(m => m.namaMapel.toLowerCase() === mName.toLowerCase());
+            if (!exists) {
+              const codePrefix = mName.slice(0, 3).toUpperCase();
+              const newMapelEntry: MataPelajaranItem = {
+                id: `mapel-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                kodeMapel: `MP-${codePrefix}-${Math.floor(10 + Math.random() * 90)}`,
+                namaMapel: mName,
+                kategori: mName.toLowerCase().includes('agama') ? 'Wajib Umum' : 'Wajib Umum',
+                tingkatKelas: 'Semua Tingkat',
+                guruPengampuNama: newGuru.nama,
+                nipGuru: newGuru.nip || '-',
+                alokasiJamPerMinggu: 2,
+                kkm: 75,
+                kurikulum: 'Kurikulum Merdeka',
+                catatan: `Mata pelajaran otomatis terhubung dengan guru ${newGuru.nama}`,
+                jadwalMengajar: []
+              };
+              setActiveMapelList(prev => [...prev, newMapelEntry]);
+            }
+          });
+        }
       } else if (editingId) {
+        const originalGuru = guruList.find(g => g.id === editingId);
         setGuruList(prev => prev.map(g => g.id === editingId ? { ...formGuru, id: editingId } : g));
+
+        // Sync teacher name & subjects in activeMapelList
+        if (originalGuru && (originalGuru.nama !== formGuru.nama || originalGuru.nip !== formGuru.nip)) {
+          setActiveMapelList(prev => prev.map(m => {
+            if (m.guruPengampuNama === originalGuru.nama) {
+              return { ...m, guruPengampuNama: formGuru.nama, nipGuru: formGuru.nip || m.nipGuru };
+            }
+            return m;
+          }));
+        }
+
+        // Check for newly added mapels in this teacher's subject list
+        if (formGuru.mataPelajaran) {
+          const mapels = formGuru.mataPelajaran.split(',').map(m => m.trim()).filter(Boolean);
+          mapels.forEach(mName => {
+            const exists = activeMapelList.some(m => m.namaMapel.toLowerCase() === mName.toLowerCase());
+            if (!exists) {
+              const codePrefix = mName.slice(0, 3).toUpperCase();
+              const newMapelEntry: MataPelajaranItem = {
+                id: `mapel-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                kodeMapel: `MP-${codePrefix}-${Math.floor(10 + Math.random() * 90)}`,
+                namaMapel: mName,
+                kategori: 'Wajib Umum',
+                tingkatKelas: 'Semua Tingkat',
+                guruPengampuNama: formGuru.nama,
+                nipGuru: formGuru.nip || '-',
+                alokasiJamPerMinggu: 2,
+                kkm: 75,
+                kurikulum: 'Kurikulum Merdeka',
+                catatan: `Mata pelajaran terhubung dengan guru ${formGuru.nama}`,
+                jadwalMengajar: []
+              };
+              setActiveMapelList(prev => [...prev, newMapelEntry]);
+            }
+          });
+        }
       }
     } else if (subTab === 'staf') {
       if (modalMode === 'add') {
@@ -983,6 +1217,115 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     setDeleteConfirmItem(null);
   };
 
+  // Multi-Selection Helpers for Siswa
+  const isAllSiswaSelected = filteredSiswa.length > 0 && filteredSiswa.every(s => selectedSiswaIds.includes(s.id));
+  const isSomeSiswaSelected = filteredSiswa.some(s => selectedSiswaIds.includes(s.id)) && !isAllSiswaSelected;
+
+  const handleToggleSelectAllSiswa = (checked: boolean) => {
+    if (checked) {
+      const allFilteredIds = filteredSiswa.map(s => s.id);
+      setSelectedSiswaIds(prev => Array.from(new Set([...prev, ...allFilteredIds])));
+    } else {
+      const filteredSet = new Set(filteredSiswa.map(s => s.id));
+      setSelectedSiswaIds(prev => prev.filter(id => !filteredSet.has(id)));
+    }
+  };
+
+  const handleToggleSelectSiswa = (id: string) => {
+    setSelectedSiswaIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  // Multi-Selection Helpers for Guru
+  const isAllGuruSelected = filteredGuru.length > 0 && filteredGuru.every(g => selectedGuruIds.includes(g.id));
+  const isSomeGuruSelected = filteredGuru.some(g => selectedGuruIds.includes(g.id)) && !isAllGuruSelected;
+
+  const handleToggleSelectAllGuru = (checked: boolean) => {
+    if (checked) {
+      const allFilteredIds = filteredGuru.map(g => g.id);
+      setSelectedGuruIds(prev => Array.from(new Set([...prev, ...allFilteredIds])));
+    } else {
+      const filteredSet = new Set(filteredGuru.map(g => g.id));
+      setSelectedGuruIds(prev => prev.filter(id => !filteredSet.has(id)));
+    }
+  };
+
+  const handleToggleSelectGuru = (id: string) => {
+    setSelectedGuruIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  // Multi-Selection Helpers for Staf
+  const isAllStafSelected = filteredStaf.length > 0 && filteredStaf.every(st => selectedStafIds.includes(st.id));
+  const isSomeStafSelected = filteredStaf.some(st => selectedStafIds.includes(st.id)) && !isAllStafSelected;
+
+  const handleToggleSelectAllStaf = (checked: boolean) => {
+    if (checked) {
+      const allFilteredIds = filteredStaf.map(st => st.id);
+      setSelectedStafIds(prev => Array.from(new Set([...prev, ...allFilteredIds])));
+    } else {
+      const filteredSet = new Set(filteredStaf.map(st => st.id));
+      setSelectedStafIds(prev => prev.filter(id => !filteredSet.has(id)));
+    }
+  };
+
+  const handleToggleSelectStaf = (id: string) => {
+    setSelectedStafIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  // Bulk Delete Execution
+  const executeBulkDelete = () => {
+    if (!bulkDeleteModal) return;
+    const { targetType, mode } = bulkDeleteModal;
+
+    if (targetType === 'siswa') {
+      if (mode === 'all') {
+        setSiswaList([]);
+        setSelectedSiswaIds([]);
+      } else if (mode === 'filtered') {
+        const filteredSet = new Set(filteredSiswa.map(s => s.id));
+        setSiswaList(prev => prev.filter(s => !filteredSet.has(s.id)));
+        setSelectedSiswaIds(prev => prev.filter(id => !filteredSet.has(id)));
+      } else {
+        const selectedSet = new Set(selectedSiswaIds);
+        setSiswaList(prev => prev.filter(s => !selectedSet.has(s.id)));
+        setSelectedSiswaIds([]);
+      }
+    } else if (targetType === 'guru') {
+      if (mode === 'all') {
+        setGuruList([]);
+        setSelectedGuruIds([]);
+      } else if (mode === 'filtered') {
+        const filteredSet = new Set(filteredGuru.map(g => g.id));
+        setGuruList(prev => prev.filter(g => !filteredSet.has(g.id)));
+        setSelectedGuruIds(prev => prev.filter(id => !filteredSet.has(id)));
+      } else {
+        const selectedSet = new Set(selectedGuruIds);
+        setGuruList(prev => prev.filter(g => !selectedSet.has(g.id)));
+        setSelectedGuruIds([]);
+      }
+    } else if (targetType === 'staf') {
+      if (mode === 'all') {
+        setStafList([]);
+        setSelectedStafIds([]);
+      } else if (mode === 'filtered') {
+        const filteredSet = new Set(filteredStaf.map(st => st.id));
+        setStafList(prev => prev.filter(st => !filteredSet.has(st.id)));
+        setSelectedStafIds(prev => prev.filter(id => !filteredSet.has(id)));
+      } else {
+        const selectedSet = new Set(selectedStafIds);
+        setStafList(prev => prev.filter(st => !selectedSet.has(st.id)));
+        setSelectedStafIds([]);
+      }
+    }
+
+    setBulkDeleteModal(null);
+  };
+
   return (
     <div className="space-y-6">
       
@@ -1072,7 +1415,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         type="file" 
         ref={fileInputRef} 
         onChange={handleProcessImportFile} 
-        accept=".csv,.json,.txt" 
+        accept=".xls,.xlsx,.csv,.txt" 
         className="hidden" 
       />
 
@@ -1230,7 +1573,6 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         </div>
 
         {/* Template & Add Controls */}
-        {currentRole !== 'staf' && (
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
             {subTab === 'mapel' && (
               <button
@@ -1270,11 +1612,82 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   <Upload className="w-3.5 h-3.5 text-emerald-400" /> Import File
                 </button>
 
+
+
                 <button
                   onClick={() => setShowTemplateHubModal(true)}
                   className="px-3 py-2 bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-700/50 font-bold rounded-lg text-xs transition-all flex items-center gap-1.5 shadow-sm"
                 >
                   <FolderDown className="w-3.5 h-3.5 text-purple-400" /> Pusat Template
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (subTab === 'siswa') {
+                      if (selectedSiswaIds.length > 0) {
+                        setBulkDeleteModal({
+                          targetType: 'siswa',
+                          mode: 'selected',
+                          count: selectedSiswaIds.length,
+                          targetName: `${selectedSiswaIds.length} Siswa Terpilih`
+                        });
+                      } else {
+                        setBulkDeleteModal({
+                          targetType: 'siswa',
+                          mode: 'all',
+                          count: siswaList.length,
+                          targetName: `Semua Data Siswa (${siswaList.length} Siswa)`
+                        });
+                      }
+                    } else if (subTab === 'guru') {
+                      if (selectedGuruIds.length > 0) {
+                        setBulkDeleteModal({
+                          targetType: 'guru',
+                          mode: 'selected',
+                          count: selectedGuruIds.length,
+                          targetName: `${selectedGuruIds.length} Guru Terpilih`
+                        });
+                      } else {
+                        setBulkDeleteModal({
+                          targetType: 'guru',
+                          mode: 'all',
+                          count: guruList.length,
+                          targetName: `Semua Data Guru (${guruList.length} Guru)`
+                        });
+                      }
+                    } else if (subTab === 'staf') {
+                      if (selectedStafIds.length > 0) {
+                        setBulkDeleteModal({
+                          targetType: 'staf',
+                          mode: 'selected',
+                          count: selectedStafIds.length,
+                          targetName: `${selectedStafIds.length} Staf Terpilih`
+                        });
+                      } else {
+                        setBulkDeleteModal({
+                          targetType: 'staf',
+                          mode: 'all',
+                          count: stafList.length,
+                          targetName: `Semua Data Staf (${stafList.length} Staf)`
+                        });
+                      }
+                    }
+                  }}
+                  className="px-3 py-2 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 font-bold rounded-lg text-xs transition-all flex items-center gap-1.5 shadow-sm"
+                  title={
+                    subTab === 'siswa' && selectedSiswaIds.length > 0
+                      ? `Hapus ${selectedSiswaIds.length} Siswa Terpilih`
+                      : `Pilih & Hapus Semua Data ${subTab.toUpperCase()}`
+                  }
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                  {subTab === 'siswa' && selectedSiswaIds.length > 0
+                    ? `Hapus Terpilih (${selectedSiswaIds.length})`
+                    : subTab === 'guru' && selectedGuruIds.length > 0
+                    ? `Hapus Terpilih (${selectedGuruIds.length})`
+                    : subTab === 'staf' && selectedStafIds.length > 0
+                    ? `Hapus Terpilih (${selectedStafIds.length})`
+                    : 'Hapus Semua'}
                 </button>
               </>
             )}
@@ -1295,7 +1708,6 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
               Tambah {subTab === 'siswa' ? 'Siswa' : subTab === 'guru' ? 'Guru' : subTab === 'staf' ? 'Staf' : subTab === 'mapel' ? 'Mata Pelajaran' : subTab === 'ekskul' ? 'Ekskul' : 'Rombel'} Baru
             </button>
           </div>
-        )}
       </div>
 
       {/* STATS OVERVIEW FOR ACTIVE SUBTAB */}
@@ -1542,6 +1954,71 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         </div>
       )}
 
+      {/* MULTI-SELECT ACTIVE ACTION BANNER */}
+      {subTab === 'siswa' && selectedSiswaIds.length > 0 && (
+        <div className="bg-gradient-to-r from-blue-950/90 via-slate-900 to-rose-950/60 p-3.5 px-4 rounded-xl border border-blue-500/40 flex flex-wrap items-center justify-between gap-3 shadow-xl animate-fadeIn">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400 font-black text-sm shadow-inner">
+              {selectedSiswaIds.length}
+            </div>
+            <div>
+              <p className="text-xs font-black text-white flex items-center gap-1.5">
+                <CheckSquare className="w-4 h-4 text-blue-400" />
+                <span>{selectedSiswaIds.length} Siswa Terpilih</span>
+              </p>
+              <p className="text-[11px] text-slate-400">
+                {selectedSiswaIds.length === siswaList.length 
+                  ? 'Seluruh data siswa dalam database telah dipilih.' 
+                  : `Dari ${filteredSiswa.length} data yang tampil (${siswaList.length} total siswa terdaftar).`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center flex-wrap gap-2">
+            {selectedSiswaIds.length < filteredSiswa.length ? (
+              <button
+                type="button"
+                onClick={() => handleToggleSelectAllSiswa(true)}
+                className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
+              >
+                <CheckSquare className="w-3.5 h-3.5" /> Pilih Semua Yang Tampil ({filteredSiswa.length})
+              </button>
+            ) : selectedSiswaIds.length < siswaList.length ? (
+              <button
+                type="button"
+                onClick={() => setSelectedSiswaIds(siswaList.map(s => s.id))}
+                className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" /> Pilih Seluruh Siswa Database ({siswaList.length})
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => setSelectedSiswaIds([])}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 border border-slate-700"
+            >
+              <X className="w-3.5 h-3.5" /> Batalkan Pilihan
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setBulkDeleteModal({
+                  targetType: 'siswa',
+                  mode: 'selected',
+                  count: selectedSiswaIds.length,
+                  targetName: `${selectedSiswaIds.length} Siswa Terpilih`
+                });
+              }}
+              className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-black transition-all shadow-lg shadow-rose-600/25 flex items-center gap-1.5 border border-rose-500/40"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Hapus Terpilih ({selectedSiswaIds.length})
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* TABLE DATA LIST */}
       <div className="bg-[#121212] rounded-xl border border-slate-800 shadow-sm overflow-hidden">
         
@@ -1550,6 +2027,16 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
             <table className="w-full text-left text-xs text-slate-300">
               <thead className="bg-[#181818] border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
                 <tr>
+                  <th className="px-3 py-3 w-10 text-center">
+                    <input 
+                      type="checkbox" 
+                      checked={isAllSiswaSelected} 
+                      ref={el => { if (el) el.indeterminate = isSomeSiswaSelected; }} 
+                      onChange={(e) => handleToggleSelectAllSiswa(e.target.checked)} 
+                      title={isAllSiswaSelected ? "Batalkan pilihan semua" : "Pilih semua data siswa"}
+                      className="w-4 h-4 rounded border-slate-700 bg-[#181818] text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer accent-blue-600" 
+                    />
+                  </th>
                   <th className="px-4 py-3">Foto & Nama Siswa</th>
                   <th className="px-4 py-3">NISN / NIS</th>
                   <th className="px-4 py-3">Kelas</th>
@@ -1562,13 +2049,23 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
               <tbody className="divide-y divide-slate-800/60">
                 {filteredSiswa.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                    <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                       Tidak ada data siswa yang cocok.
                     </td>
                   </tr>
                 ) : (
-                  filteredSiswa.map(s => (
-                    <tr key={s.id} className="hover:bg-slate-800/20 border-b border-slate-800/40 transition-colors">
+                  filteredSiswa.map(s => {
+                    const isSelected = selectedSiswaIds.includes(s.id);
+                    return (
+                    <tr key={s.id} className={`border-b transition-colors ${isSelected ? 'bg-blue-950/25 border-blue-500/30' : 'hover:bg-slate-800/20 border-slate-800/40'}`}>
+                      <td className="px-3 py-3 text-center">
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected} 
+                          onChange={() => handleToggleSelectSiswa(s.id)} 
+                          className="w-4 h-4 rounded border-slate-700 bg-[#181818] text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer accent-blue-600" 
+                        />
+                      </td>
                       <td className="px-4 py-3 text-xs">
                         <div className="flex items-center gap-3">
                           <div 
@@ -1622,9 +2119,9 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         )}
                       </td>
                       <td className="px-4 py-3 text-xs font-medium whitespace-nowrap">
-                        <div className="text-slate-300 font-bold">{s.namaWali}</div>
+                        <div className="text-slate-300 font-bold">{s.namaAyah || s.namaIbu || 'Orang Tua'}</div>
                         <div className="text-[10px] text-slate-500 flex items-center gap-1">
-                          <User className="w-3 h-3 text-slate-600 shrink-0" /> Orang Tua / Wali
+                          <User className="w-3 h-3 text-slate-600 shrink-0" /> Ayah / Ibu Kandung
                         </div>
                       </td>
                       <td className="px-4 py-3 text-xs font-medium whitespace-nowrap">
@@ -1636,10 +2133,11 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                                 let formattedPhone = s.teleponWali.trim().replace(/\D/g, '');
                                 if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
                                 else if (formattedPhone.startsWith('8')) formattedPhone = '62' + formattedPhone;
-                                const text = encodeURIComponent(`Halo Bapak/Ibu ${s.namaWali}, kami dari sekolah ingin menginformasikan perihal perkembangan akademik anak Anda yang bernama *${s.nama}*...`);
+                                const parentName = s.namaAyah || s.namaIbu || 'Orang Tua';
+                                const text = encodeURIComponent(`Halo Bapak/Ibu ${parentName}, kami dari sekolah ingin menginformasikan perihal perkembangan akademik anak Anda yang bernama *${s.nama}*...`);
                                 window.open(`https://wa.me/${formattedPhone}?text=${text}`, '_blank');
                               }}
-                              title="Hubungi Wali di WhatsApp"
+                              title="Hubungi Orang Tua di WhatsApp"
                               className="p-1 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20 rounded-md transition-all shrink-0"
                             >
                               <Phone className="w-3.5 h-3.5 fill-emerald-500/10" />
@@ -1666,8 +2164,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           >
                             <CreditCard className="w-4 h-4" />
                           </button>
-                          {currentRole !== 'staf' && (
-                            <>
+                           <>
                               <button 
                                 onClick={() => {
                                   setEditingId(s.id);
@@ -1704,11 +2201,11 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </>
-                          )}
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1720,42 +2217,78 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
             <table className="w-full text-left text-xs text-slate-300">
               <thead className="bg-[#181818] border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
                 <tr>
+                  <th className="px-3 py-3 w-10 text-center">
+                    <input 
+                      type="checkbox" 
+                      checked={isAllGuruSelected} 
+                      ref={el => { if (el) el.indeterminate = isSomeGuruSelected; }} 
+                      onChange={(e) => handleToggleSelectAllGuru(e.target.checked)} 
+                      title={isAllGuruSelected ? "Batalkan pilihan semua" : "Pilih semua data guru"}
+                      className="w-4 h-4 rounded border-slate-700 bg-[#181818] text-purple-600 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer accent-purple-600" 
+                    />
+                  </th>
                   <th className="px-4 py-3">Foto & Nama Guru</th>
-                  <th className="px-4 py-3">NUPTK</th>
                   <th className="px-4 py-3">Mata Pelajaran</th>
-                  <th className="px-4 py-3">Jabatan / Tugas</th>
                   <th className="px-4 py-3">Kontak Email / Telp</th>
                   <th className="px-4 py-3">Status Pegawai</th>
                   <th className="px-4 py-3 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {filteredGuru.map(g => (
-                  <tr key={g.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="px-4 py-3 font-semibold text-white flex items-center gap-3">
-                      <div 
-                        className="relative group cursor-pointer" 
-                        onClick={() => setQuickPhotoData({ type: 'guru', data: g })}
-                        title="Klik untuk Upload / Ganti Foto"
-                      >
-                        <img 
-                          src={g.fotoUrl || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&auto=format&fit=crop&q=80'} 
-                          alt={g.nama} 
-                          className="w-10 h-10 rounded-full object-cover border-2 border-slate-700 group-hover:border-purple-400 transition-all shadow-sm"
+                {filteredGuru.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                      Tidak ada data guru yang cocok.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredGuru.map(g => {
+                    const isSelected = selectedGuruIds.includes(g.id);
+                    return (
+                    <tr key={g.id} className={`border-b transition-colors ${isSelected ? 'bg-purple-950/25 border-purple-500/30' : 'hover:bg-slate-800/30 border-slate-800/40'}`}>
+                      <td className="px-3 py-3 text-center">
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected} 
+                          onChange={() => handleToggleSelectGuru(g.id)} 
+                          className="w-4 h-4 rounded border-slate-700 bg-[#181818] text-purple-600 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer accent-purple-600" 
                         />
-                        <div className="absolute inset-0 bg-slate-950/60 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-purple-400 transition-opacity">
-                          <Camera className="w-4 h-4" />
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-white">
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className="relative group cursor-pointer shrink-0" 
+                          onClick={() => setQuickPhotoData({ type: 'guru', data: g })}
+                          title="Klik untuk Upload / Ganti Foto"
+                        >
+                          <img 
+                            src={g.fotoUrl || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&auto=format&fit=crop&q=80'} 
+                            alt={g.nama} 
+                            className="w-10 h-10 shrink-0 aspect-square rounded-full object-cover border-2 border-slate-700/80 group-hover:border-purple-400 transition-all shadow-sm"
+                          />
+                          <div className="absolute inset-0 bg-slate-950/60 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-purple-400 transition-opacity">
+                            <Camera className="w-4 h-4" />
+                          </div>
                         </div>
+                        <div className="text-white font-bold leading-tight">{g.nama}</div>
                       </div>
-                      <div className="text-white font-bold">{g.nama}</div>
                     </td>
-                    <td className="px-4 py-3 font-mono text-slate-400">{g.nip}</td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-semibold">
-                        {g.mataPelajaran}
-                      </span>
+                      <div className="flex flex-wrap gap-1 max-w-[240px]">
+                        {g.mataPelajaran ? (
+                          g.mataPelajaran.split(',').map(m => m.trim()).filter(Boolean).map((mapelItem, mIdx) => (
+                            <span 
+                              key={mIdx} 
+                              className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20 font-semibold text-[11px] whitespace-nowrap shadow-sm inline-block"
+                            >
+                              {mapelItem}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-slate-500 italic text-[11px]">- Belum diatur -</span>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-300">{g.jabatan}</td>
                     <td className="px-4 py-3">
                       <div className="text-slate-200">{g.email}</div>
                       <div className="text-[10px] text-slate-500 font-mono">{g.telepon}</div>
@@ -1823,8 +2356,10 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
+                  );
+                })
+              )}
+            </tbody>
             </table>
           </div>
         )}
@@ -1834,6 +2369,16 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
             <table className="w-full text-left text-xs text-slate-300">
               <thead className="bg-[#181818] border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
                 <tr>
+                  <th className="px-3 py-3 w-10 text-center">
+                    <input 
+                      type="checkbox" 
+                      checked={isAllStafSelected} 
+                      ref={el => { if (el) el.indeterminate = isSomeStafSelected; }} 
+                      onChange={(e) => handleToggleSelectAllStaf(e.target.checked)} 
+                      title={isAllStafSelected ? "Batalkan pilihan semua" : "Pilih semua data staf"}
+                      className="w-4 h-4 rounded border-slate-700 bg-[#181818] text-amber-600 focus:ring-amber-500 focus:ring-offset-0 cursor-pointer accent-amber-600" 
+                    />
+                  </th>
                   <th className="px-4 py-3">Foto & Nama Staf</th>
                   <th className="px-4 py-3">NIK</th>
                   <th className="px-4 py-3">Bagian / Divisi</th>
@@ -1843,24 +2388,43 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {filteredStaf.map(st => (
-                  <tr key={st.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="px-4 py-3 font-semibold text-white flex items-center gap-3">
-                      <div 
-                        className="relative group cursor-pointer" 
-                        onClick={() => setQuickPhotoData({ type: 'staf', data: st })}
-                        title="Klik untuk Upload / Ganti Foto"
-                      >
-                        <img 
-                          src={st.fotoUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80'} 
-                          alt={st.nama} 
-                          className="w-10 h-10 rounded-full object-cover border-2 border-slate-700 group-hover:border-amber-400 transition-all shadow-sm"
+                {filteredStaf.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                      Tidak ada data staf yang cocok.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredStaf.map(st => {
+                    const isSelected = selectedStafIds.includes(st.id);
+                    return (
+                    <tr key={st.id} className={`border-b transition-colors ${isSelected ? 'bg-amber-950/25 border-amber-500/30' : 'hover:bg-slate-800/30 border-slate-800/40'}`}>
+                      <td className="px-3 py-3 text-center">
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected} 
+                          onChange={() => handleToggleSelectStaf(st.id)} 
+                          className="w-4 h-4 rounded border-slate-700 bg-[#181818] text-amber-600 focus:ring-amber-500 focus:ring-offset-0 cursor-pointer accent-amber-600" 
                         />
-                        <div className="absolute inset-0 bg-slate-950/60 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-amber-400 transition-opacity">
-                          <Camera className="w-4 h-4" />
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-white">
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className="relative group cursor-pointer" 
+                          onClick={() => setQuickPhotoData({ type: 'staf', data: st })}
+                          title="Klik untuk Upload / Ganti Foto"
+                        >
+                          <img 
+                            src={st.fotoUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80'} 
+                            alt={st.nama} 
+                            className="w-10 h-10 rounded-full object-cover border-2 border-slate-700 group-hover:border-amber-400 transition-all shadow-sm"
+                          />
+                          <div className="absolute inset-0 bg-slate-950/60 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-amber-400 transition-opacity">
+                            <Camera className="w-4 h-4" />
+                          </div>
                         </div>
+                        <div className="text-white font-bold">{st.nama}</div>
                       </div>
-                      <div className="text-white font-bold">{st.nama}</div>
                     </td>
                     <td className="px-4 py-3 font-mono text-slate-400">{st.nik}</td>
                     <td className="px-4 py-3">
@@ -1926,8 +2490,10 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
+                  );
+                })
+              )}
+            </tbody>
             </table>
           </div>
         )}
@@ -2661,7 +3227,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           type="text" 
                           required 
                           value={formSiswa.nisn} 
-                          onChange={e => setFormSiswa({ ...formSiswa, nisn: e.target.value })}
+                          onChange={e => setFormSiswa({ ...formSiswa, nisn: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                         />
                       </div>
@@ -2671,7 +3237,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           type="text" 
                           required 
                           value={formSiswa.nis} 
-                          onChange={e => setFormSiswa({ ...formSiswa, nis: e.target.value })}
+                          onChange={e => setFormSiswa({ ...formSiswa, nis: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                         />
                       </div>
@@ -2684,7 +3250,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           type="text" 
                           placeholder="NIK 16 digit"
                           value={formSiswa.nik || ''} 
-                          onChange={e => setFormSiswa({ ...formSiswa, nik: e.target.value })}
+                          onChange={e => setFormSiswa({ ...formSiswa, nik: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                         />
                       </div>
@@ -2694,7 +3260,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           type="email" 
                           placeholder="siswa@sekolah.sch.id"
                           value={formSiswa.email || ''} 
-                          onChange={e => setFormSiswa({ ...formSiswa, email: e.target.value })}
+                          onChange={e => setFormSiswa({ ...formSiswa, email: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                         />
                       </div>
@@ -2707,7 +3273,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           type="text" 
                           placeholder="username_siswa"
                           value={formSiswa.username || ''} 
-                          onChange={e => setFormSiswa({ ...formSiswa, username: e.target.value })}
+                          onChange={e => setFormSiswa({ ...formSiswa, username: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                         />
                       </div>
@@ -2717,7 +3283,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           type="text" 
                           placeholder="password"
                           value={formSiswa.password || ''} 
-                          onChange={e => setFormSiswa({ ...formSiswa, password: e.target.value })}
+                          onChange={e => setFormSiswa({ ...formSiswa, password: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                         />
                       </div>
@@ -2729,7 +3295,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         type="text" 
                         required 
                         value={formSiswa.nama} 
-                        onChange={e => setFormSiswa({ ...formSiswa, nama: e.target.value })}
+                        onChange={e => setFormSiswa({ ...formSiswa, nama: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                       />
                     </div>
@@ -2759,7 +3325,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         <label className="text-[11px] font-bold text-slate-400">Rombel / Sub-Kelas</label>
                         <select 
                           value={formSiswa.kelas} 
-                          onChange={e => setFormSiswa({ ...formSiswa, kelas: e.target.value })}
+                          onChange={e => setFormSiswa({ ...formSiswa, kelas: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
                         >
                           {activeRombelList
@@ -2784,7 +3350,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           type="text" 
                           required 
                           value={formSiswa.tempatLahir} 
-                          onChange={e => setFormSiswa({ ...formSiswa, tempatLahir: e.target.value })}
+                          onChange={e => setFormSiswa({ ...formSiswa, tempatLahir: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                         />
                       </div>
@@ -2795,7 +3361,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                             type="date" 
                             required 
                             value={formSiswa.tanggalLahir} 
-                            onChange={e => setFormSiswa({ ...formSiswa, tanggalLahir: e.target.value })}
+                            onChange={e => setFormSiswa({ ...formSiswa, tanggalLahir: e.target.value as any })}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
                           />
                           <div className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white flex justify-between items-center group focus-within:border-amber-500 transition-colors">
@@ -2826,7 +3392,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         <label className="text-[11px] font-bold text-slate-400">Agama</label>
                         <select 
                           value={formSiswa.agama || 'Islam'} 
-                          onChange={e => setFormSiswa({ ...formSiswa, agama: e.target.value })}
+                          onChange={e => setFormSiswa({ ...formSiswa, agama: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
                         >
                           <option value="Islam">Islam</option>
@@ -2847,7 +3413,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         required 
                         placeholder="contoh: Jl. Merdeka No. 12"
                         value={formSiswa.alamat} 
-                        onChange={e => setFormSiswa({ ...formSiswa, alamat: e.target.value, alamatLengkap: e.target.value })}
+                        onChange={e => setFormSiswa({ ...formSiswa, alamat: e.target.value, alamatLengkap: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                       />
                     </div>
@@ -2907,52 +3473,29 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   </div>
 
                   {/* BAGIAN III: IDENTITAS ORANG TUA / WALI */}
-                  <div className="border-t border-slate-800/80 pt-4 space-y-3">
+                  <div className="border-t border-slate-800/80 pt-4 space-y-4">
                     <h4 className="text-[11px] font-bold text-amber-500 uppercase tracking-wider flex items-center gap-1.5">
-                      <Home className="w-3.5 h-3.5" /> 3. Identitas Orang Tua / Wali
+                      <Home className="w-3.5 h-3.5" /> 3. Identitas Ayah Kandung
                     </h4>
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[11px] font-bold text-slate-400">Nama Ayah Kandung</label>
+                        <label className="text-[11px] font-bold text-slate-400">Nama Lengkap Ayah</label>
                         <input 
                           type="text" 
                           placeholder="Nama Lengkap Ayah"
                           value={formSiswa.namaAyah || ''} 
-                          onChange={e => setFormSiswa({ ...formSiswa, namaAyah: e.target.value })}
+                          onChange={e => setFormSiswa({ ...formSiswa, namaAyah: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                         />
                       </div>
                       <div>
-                        <label className="text-[11px] font-bold text-slate-400">Nama Ibu Kandung</label>
-                        <input 
-                          type="text" 
-                          placeholder="Nama Lengkap Ibu"
-                          value={formSiswa.namaIbu || ''} 
-                          onChange={e => setFormSiswa({ ...formSiswa, namaIbu: e.target.value })}
-                          className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-400">NIK Orang Tua (Ayah / Ibu)</label>
+                        <label className="text-[11px] font-bold text-slate-400">NIK Ayah (16 Digit)</label>
                         <input 
                           type="text" 
                           placeholder="NIK 16 digit"
-                          value={formSiswa.nikOrtu || ''} 
-                          onChange={e => setFormSiswa({ ...formSiswa, nikOrtu: e.target.value })}
-                          className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-400">Tempat Tanggal Lahir Ortu</label>
-                        <input 
-                          type="text" 
-                          placeholder="contoh: Bandung, 12 Mei 1980"
-                          value={formSiswa.tempatLahirOrtu || ''} 
-                          onChange={e => setFormSiswa({ ...formSiswa, tempatLahirOrtu: e.target.value })}
+                          value={formSiswa.nikAyah || ''} 
+                          onChange={e => setFormSiswa({ ...formSiswa, nikAyah: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                         />
                       </div>
@@ -2960,92 +3503,223 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[11px] font-bold text-slate-400">Pendidikan Terakhir Ortu</label>
-                        <select 
-                          value={formSiswa.pendidikanOrtu || 'SMA / Sederajat'} 
-                          onChange={e => setFormSiswa({ ...formSiswa, pendidikanOrtu: e.target.value })}
-                          className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
-                        >
-                          <option value="SD">SD / Sederajat</option>
-                          <option value="SMP">SMP / Sederajat</option>
-                          <option value="SMA / Sederajat">SMA / Sederajat</option>
-                          <option value="Diploma (D1/D2/D3)">Diploma (D1/D2/D3)</option>
-                          <option value="Sarjana (S1)">Sarjana (S1)</option>
-                          <option value="Magister (S2)">Magister (S2)</option>
-                          <option value="Doktor (S3)">Doktor (S3)</option>
-                          <option value="Tidak Sekolah">Tidak Sekolah</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-400">Pekerjaan Orang Tua</label>
+                        <label className="text-[11px] font-bold text-slate-400">Tempat Lahir Ayah</label>
                         <input 
                           type="text" 
-                          placeholder="contoh: PNS, Wiraswasta, Karyawan"
-                          value={formSiswa.pekerjaanOrtu || ''} 
-                          onChange={e => setFormSiswa({ ...formSiswa, pekerjaanOrtu: e.target.value })}
+                          placeholder="contoh: Bandung"
+                          value={formSiswa.tempatLahirAyah || ''} 
+                          onChange={e => setFormSiswa({ ...formSiswa, tempatLahirAyah: e.target.value as any })}
+                          className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-400">Tanggal Lahir Ayah</label>
+                        <input 
+                          type="date" 
+                          value={formSiswa.tanggalLahirAyah || ''} 
+                          onChange={e => setFormSiswa({ ...formSiswa, tanggalLahirAyah: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                         />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 border-t border-slate-800/40 pt-3">
+                    <div className="grid grid-cols-3 gap-2">
                       <div>
-                        <label className="text-[11px] font-bold text-slate-400">Nama Wali (Kontak Utama)</label>
+                        <label className="text-[10px] font-bold text-slate-400">Pendidikan Ayah</label>
+                        <select 
+                          value={formSiswa.pendidikanAyah || 'SMA / Sederajat'} 
+                          onChange={e => setFormSiswa({ ...formSiswa, pendidikanAyah: e.target.value as any })}
+                          className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
+                        >
+                          <option value="SD">SD</option>
+                          <option value="SMP">SMP</option>
+                          <option value="SMA / Sederajat">SMA / Sederajat</option>
+                          <option value="Diploma">Diploma</option>
+                          <option value="Sarjana (S1)">Sarjana (S1)</option>
+                          <option value="Magister (S2)/Doktor">Magister / Doktor</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400">Pekerjaan Ayah</label>
                         <input 
                           type="text" 
-                          required 
-                          placeholder="Nama lengkap wali / ayah / ibu"
-                          value={formSiswa.namaWali} 
-                          onChange={e => setFormSiswa({ ...formSiswa, namaWali: e.target.value })}
+                          placeholder="PNS / Wiraswasta"
+                          value={formSiswa.pekerjaanAyah || ''} 
+                          onChange={e => setFormSiswa({ ...formSiswa, pekerjaanAyah: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                         />
                       </div>
                       <div>
-                        <label className="text-[11px] font-bold text-slate-400">No. Telepon Wali (WhatsApp)</label>
+                        <label className="text-[10px] font-bold text-slate-400">No. Telepon Ayah</label>
                         <input 
                           type="text" 
-                          required 
-                          placeholder="contoh: 0812XXXXXXXX"
-                          value={formSiswa.teleponWali} 
-                          onChange={e => setFormSiswa({ ...formSiswa, teleponWali: e.target.value })}
+                          placeholder="0812..."
+                          value={formSiswa.teleponAyah || ''} 
+                          onChange={e => setFormSiswa({ ...formSiswa, teleponAyah: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                         />
                       </div>
                     </div>
+
+                    <div className="border-t border-slate-800/80 pt-4 space-y-4">
+                      <h4 className="text-[11px] font-bold text-amber-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <Home className="w-3.5 h-3.5" /> 4. Identitas Ibu Kandung
+                      </h4>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-400">Nama Lengkap Ibu</label>
+                          <input 
+                            type="text" 
+                            placeholder="Nama Lengkap Ibu"
+                            value={formSiswa.namaIbu || ''} 
+                            onChange={e => setFormSiswa({ ...formSiswa, namaIbu: e.target.value as any })}
+                            className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-400">NIK Ibu (16 Digit)</label>
+                          <input 
+                            type="text" 
+                            placeholder="NIK 16 digit"
+                            value={formSiswa.nikIbu || ''} 
+                            onChange={e => setFormSiswa({ ...formSiswa, nikIbu: e.target.value as any })}
+                            className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-400">Tempat Lahir Ibu</label>
+                          <input 
+                            type="text" 
+                            placeholder="contoh: Jakarta"
+                            value={formSiswa.tempatLahirIbu || ''} 
+                            onChange={e => setFormSiswa({ ...formSiswa, tempatLahirIbu: e.target.value as any })}
+                            className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-400">Tanggal Lahir Ibu</label>
+                          <input 
+                            type="date" 
+                            value={formSiswa.tanggalLahirIbu || ''} 
+                            onChange={e => setFormSiswa({ ...formSiswa, tanggalLahirIbu: e.target.value as any })}
+                            className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400">Pendidikan Ibu</label>
+                          <select 
+                            value={formSiswa.pendidikanIbu || 'SMA / Sederajat'} 
+                            onChange={e => setFormSiswa({ ...formSiswa, pendidikanIbu: e.target.value as any })}
+                            className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
+                          >
+                            <option value="SD">SD</option>
+                            <option value="SMP">SMP</option>
+                            <option value="SMA / Sederajat">SMA / Sederajat</option>
+                            <option value="Diploma">Diploma</option>
+                            <option value="Sarjana (S1)">Sarjana (S1)</option>
+                            <option value="Magister (S2)/Doktor">Magister / Doktor</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400">Pekerjaan Ibu</label>
+                          <input 
+                            type="text" 
+                            placeholder="Ibu Rumah Tangga / PNS"
+                            value={formSiswa.pekerjaanIbu || ''} 
+                            onChange={e => setFormSiswa({ ...formSiswa, pekerjaanIbu: e.target.value as any })}
+                            className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400">No. Telepon Ibu</label>
+                          <input 
+                            type="text" 
+                            placeholder="0812..."
+                            value={formSiswa.teleponIbu || ''} 
+                            onChange={e => setFormSiswa({ ...formSiswa, teleponIbu: e.target.value as any })}
+                            className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+
                   </div>
                 </>
               )}
 
               {subTab === 'guru' && (() => {
-                const availableMapelOptions = [
-                  'Matematika',
-                  'Matematika Tingkat Lanjut',
-                  'Bahasa Indonesia',
-                  'Bahasa Indonesia Fase E/F',
-                  'Bahasa Inggris',
-                  'Bahasa Inggris Komunikasi',
-                  'Fisika',
-                  'Fisika & Informatika',
-                  'Kimia',
-                  'Kimia Praktikum',
-                  'Biologi',
-                  'Biologi & Lingkungan',
-                  'Sains / IPA',
-                  'IPS / Ilmu Pengetahuan Sosial',
-                  'Informatika',
-                  'Pendidikan Agama Islam',
-                  'Pendidikan Pancasila / PKn',
-                  'PPKn & Pancasila',
-                  'Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)',
-                  'Seni Budaya',
-                  'Bimbingan Konseling (BK)',
-                  'Sejarah',
-                  'Sosiologi',
-                  'Sosiologi & Sejarah',
-                  'Ekonomi',
-                  'Ekonomi & Bisnis',
-                  'Geografi'
-                ];
+                // Combine master database mapel list + rich national curriculum subjects
+                const masterSchoolMapels = activeMapelList.map(m => m.namaMapel);
+
+                const nationalSubjectsGrouped: { [group: string]: string[] } = {
+                  'Pendidikan Agama & Budi Pekerti': [
+                    'Pendidikan Agama Islam',
+                    'Pendidikan Agama Kristen',
+                    'Pendidikan Agama Katolik',
+                    'Pendidikan Agama Hindu',
+                    'Pendidikan Agama Buddha',
+                    'Pendidikan Agama Konghucu',
+                    'Tahfidz & Tilawah Al-Qur\'an',
+                    'Fiqih',
+                    'Akidah Akhlak',
+                    'Sejarah Kebudayaan Islam (SKI)',
+                    'Al-Qur\'an Hadis'
+                  ],
+                  'Bahasa & Komunikasi': [
+                    'Bahasa Indonesia',
+                    'Bahasa Indonesia Tingkat Lanjut',
+                    'Bahasa Inggris',
+                    'Bahasa Inggris Komunikasi & TOEFL',
+                    'Bahasa Arab',
+                    'Bahasa Daerah / Sunda / Jawa',
+                    'Bahasa Mandarin',
+                    'Bahasa Jepang'
+                  ],
+                  'Matematika & Ilmu Pengetahuan Alam (MIPA)': [
+                    'Matematika',
+                    'Matematika Tingkat Lanjut',
+                    'Ilmu Pengetahuan Alam (IPA)',
+                    'Fisika',
+                    'Kimia',
+                    'Biologi',
+                    'Biologi & Lingkungan Hidup'
+                  ],
+                  'Ilmu Pengetahuan Sosial & Kewarganegaraan': [
+                    'Ilmu Pengetahuan Sosial (IPS)',
+                    'Pendidikan Pancasila / PKn',
+                    'Sejarah Indonesia',
+                    'Sejarah Peminatan',
+                    'Geografi',
+                    'Sosiologi',
+                    'Ekonomi & Bisnis',
+                    'Akuntansi'
+                  ],
+                  'Informatika, Vokasi & Prakarya': [
+                    'Informatika',
+                    'Teknologi Informasi & Komunikasi (TIK)',
+                    'Prakarya & Kewirausahaan (PKWU)',
+                    'Robotika & Coding',
+                    'Desain Komunikasi Visual (DKV)'
+                  ],
+                  'Seni, Olahraga & Bimbingan': [
+                    'Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)',
+                    'Seni Budaya',
+                    'Seni Musik',
+                    'Seni Rupa',
+                    'Seni Tari',
+                    'Seni Teater',
+                    'Bimbingan Konseling (BK)',
+                    'Guru Kelas / Tematik SD-SMP'
+                  ]
+                };
 
                 const availableJabatanOptions = [
                   'Kepala Sekolah',
@@ -3059,39 +3733,60 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   'Kepala Laboratorium IPA',
                   'Kepala Perpustakaan',
                   'Pembina OSIS',
-                  'Wali Kelas VIII - Al Biruni'
+                  'Koordinator BK'
                 ];
-
-                const mapelOptionsToRender = Array.from(new Set([
-                  ...(formGuru.mataPelajaran ? [formGuru.mataPelajaran] : []),
-                  ...availableMapelOptions
-                ])).filter(Boolean);
 
                 const jabatanOptionsToRender = Array.from(new Set([
                   ...(formGuru.jabatan ? [formGuru.jabatan] : []),
                   ...availableJabatanOptions
                 ])).filter(Boolean);
 
+                // Current selected mapels as array
+                const currentSelectedMapels = formGuru.mataPelajaran 
+                  ? formGuru.mataPelajaran.split(',').map(m => m.trim()).filter(Boolean)
+                  : [];
+
+                const handleAddSubject = (subjectName: string) => {
+                  const trimmed = subjectName.trim();
+                  if (!trimmed) return;
+                  if (!currentSelectedMapels.some(m => m.toLowerCase() === trimmed.toLowerCase())) {
+                    const updated = [...currentSelectedMapels, trimmed];
+                    setFormGuru({ ...formGuru, mataPelajaran: updated.join(', ') });
+                  }
+                  setCustomMapelInput('');
+                };
+
+                const handleRemoveSubject = (subjectName: string) => {
+                  const updated = currentSelectedMapels.filter(m => m.toLowerCase() !== subjectName.toLowerCase());
+                  setFormGuru({ ...formGuru, mataPelajaran: updated.join(', ') });
+                };
+
+                const handleQuickSelectSingle = (subjectName: string) => {
+                  setFormGuru({ ...formGuru, mataPelajaran: subjectName });
+                };
+
                 return (
                   <>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[11px] font-bold text-slate-400">NUPTK</label>
+                        <label className="text-[11px] font-bold text-slate-400">NUPTK / NIP</label>
                         <input 
                           type="text" 
                           required 
+                          placeholder="contoh: 19850115..."
                           value={formGuru.nip} 
-                          onChange={e => setFormGuru({ ...formGuru, nip: e.target.value })}
-                          className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
+                          onChange={e => setFormGuru({ ...formGuru, nip: e.target.value as any })}
+                          className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                         />
                       </div>
                       <div>
                         <label className="text-[11px] font-bold text-slate-400">NIK (Opsional)</label>
                         <input 
                           type="text" 
+                          placeholder="317101..."
                           value={formGuru.nik || ''} 
-                          onChange={e => setFormGuru({ ...formGuru, nik: e.target.value })}
-                          className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
+                          onChange={e => setFormGuru({ ...formGuru, nik: e.target.value as any })}
+                          className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                         />
                       </div>
                     </div>
@@ -3100,33 +3795,171 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       <input 
                         type="text" 
                         required 
+                        placeholder="contoh: Drs. Ahmad Dahlan, M.Pd."
                         value={formGuru.nama} 
-                        onChange={e => setFormGuru({ ...formGuru, nama: e.target.value })}
-                        className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
+                        onChange={e => setFormGuru({ ...formGuru, nama: e.target.value as any })}
+                        className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                       />
                     </div>
+
+                    {/* Enhanced Mata Pelajaran Selection Block */}
+                    <div className="bg-[#181818] p-3.5 rounded-xl border border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-xs font-bold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
+                            <BookOpen className="w-3.5 h-3.5 text-amber-400" /> Mata Pelajaran yang Diampu
+                          </label>
+                          <p className="text-[10px] text-slate-400 mt-0.5">
+                            Pilih dari master database sekolah, kurikulum nasional, atau ketik mapel kustom. Guru dapat mengampu lebih dari 1 mapel.
+                          </p>
+                        </div>
+                        {currentSelectedMapels.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setFormGuru({ ...formGuru, mataPelajaran: '' })}
+                            className="text-[10px] text-rose-400 hover:text-rose-300 font-semibold px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/20"
+                          >
+                            Reset Pilihan
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Selected Mapels Pills */}
+                      <div className="p-2.5 bg-[#121212] border border-slate-800/80 rounded-lg min-h-[44px] flex flex-wrap items-center gap-1.5">
+                        {currentSelectedMapels.length === 0 ? (
+                          <span className="text-xs text-slate-500 italic flex items-center gap-1.5">
+                            <BookOpen className="w-3.5 h-3.5 text-slate-600" /> Belum ada mata pelajaran dipilih. Pilih dari daftar di bawah atau ketik langsung.
+                          </span>
+                        ) : (
+                          currentSelectedMapels.map((subject, sIdx) => (
+                            <span 
+                              key={sIdx}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30 text-xs font-bold shadow-sm"
+                            >
+                              <span>{subject}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSubject(subject)}
+                                className="hover:bg-purple-500/30 text-purple-400 hover:text-white rounded-full p-0.5 transition-colors"
+                                title="Hapus Mata Pelajaran ini"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))
+                        )}
+                      </div>
+
+                      {/* Select from list & custom input */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                        {/* Dropdown Selector */}
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 block mb-1">
+                            Pilih dari Daftar Master Mapel:
+                          </label>
+                          <select 
+                            value=""
+                            onChange={e => {
+                              if (e.target.value) {
+                                handleAddSubject(e.target.value);
+                              }
+                            }}
+                            className="w-full p-2 bg-[#121212] border border-slate-700 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
+                          >
+                            <option value="">-- + Pilih & Tambahkan Mapel --</option>
+                            
+                            {/* Master School Mapels */}
+                            {masterSchoolMapels.length > 0 && (
+                              <optgroup label="⭐ Master Mapel Terdaftar di Sekolah">
+                                {Array.from(new Set(masterSchoolMapels)).map(m => (
+                                  <option key={`master-${m}`} value={m}>
+                                    {m} {currentSelectedMapels.includes(m) ? '(Sudah dipilih)' : ''}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+
+                            {/* Grouped National Subjects */}
+                            {Object.entries(nationalSubjectsGrouped).map(([groupTitle, subjects]) => (
+                              <optgroup key={groupTitle} label={`📚 ${groupTitle}`}>
+                                {subjects.map(subj => (
+                                  <option key={subj} value={subj}>
+                                    {subj} {currentSelectedMapels.includes(subj) ? '(Sudah dipilih)' : ''}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Custom Mapel Input */}
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 block mb-1">
+                            Atau Ketik Mapel Baru / Kustom:
+                          </label>
+                          <div className="flex gap-1.5">
+                            <input
+                              type="text"
+                              placeholder="Ketik nama mapel baru..."
+                              value={customMapelInput}
+                              onChange={e => setCustomMapelInput(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleAddSubject(customMapelInput);
+                                }
+                              }}
+                              className="w-full p-2 bg-[#121212] border border-slate-700 text-white rounded-lg text-xs focus:outline-none focus:border-amber-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddSubject(customMapelInput)}
+                              disabled={!customMapelInput.trim()}
+                              className="px-3 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:hover:bg-amber-600 text-white font-bold text-xs rounded-lg transition-all shrink-0 flex items-center gap-1"
+                            >
+                              <Plus className="w-3.5 h-3.5" /> Tambah
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick Chips of Master School Subjects */}
+                      {masterSchoolMapels.length > 0 && (
+                        <div className="pt-1 border-t border-slate-800/80">
+                          <p className="text-[10px] text-slate-500 mb-1.5 font-semibold">
+                            Rekomendasi Cepat (Klik untuk memilih):
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                            {Array.from(new Set(masterSchoolMapels)).slice(0, 8).map(m => {
+                              const isSelected = currentSelectedMapels.includes(m);
+                              return (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => isSelected ? handleRemoveSubject(m) : handleAddSubject(m)}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all ${
+                                    isSelected 
+                                      ? 'bg-purple-600 text-white border-purple-500 shadow-sm' 
+                                      : 'bg-slate-900/90 text-slate-400 border-slate-700 hover:border-slate-500 hover:text-slate-200'
+                                  }`}
+                                >
+                                  {isSelected ? '✓ ' : '+ '}{m}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[11px] font-bold text-slate-400">Mata Pelajaran</label>
-                        <select 
-                          required 
-                          value={formGuru.mataPelajaran} 
-                          onChange={e => setFormGuru({ ...formGuru, mataPelajaran: e.target.value })}
-                          className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white font-semibold" 
-                        >
-                          <option value="">-- Pilih Mata Pelajaran --</option>
-                          {mapelOptionsToRender.map(opt => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-400">Jabatan / Tugas</label>
+                        <label className="text-[11px] font-bold text-slate-400">Jabatan / Tugas Tambahan</label>
                         <select 
                           required 
                           value={formGuru.jabatan} 
-                          onChange={e => setFormGuru({ ...formGuru, jabatan: e.target.value })}
-                          className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white font-semibold" 
+                          onChange={e => setFormGuru({ ...formGuru, jabatan: e.target.value as any })}
+                          className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white font-semibold focus:outline-none focus:border-amber-500" 
                         >
                           <option value="">-- Pilih Jabatan / Tugas --</option>
                           {jabatanOptionsToRender.map(opt => (
@@ -3134,31 +3967,31 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           ))}
                         </select>
                       </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-[11px] font-bold text-slate-400">Status Pegawai</label>
                         <select 
                           value={formGuru.status} 
                           onChange={e => setFormGuru({ ...formGuru, status: e.target.value as any })}
-                          className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold"
+                          className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
                         >
                           <option value="PNS">PNS</option>
+                          <option value="PPPK">PPPK</option>
                           <option value="GTY">Guru Tetap Yayasan (GTY)</option>
                           <option value="GTT">Guru Tidak Tetap (GTT)</option>
+                          <option value="Honorer">Honorer</option>
                         </select>
                       </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-400">Jenis Kelamin</label>
-                        <select 
-                          value={formGuru.jenisKelamin || 'L'} 
-                          onChange={e => setFormGuru({ ...formGuru, jenisKelamin: e.target.value as 'L' | 'P' })}
-                          className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold"
-                        >
-                          <option value="L">Laki-laki (L)</option>
-                          <option value="P">Perempuan (P)</option>
-                        </select>
-                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400">Jenis Kelamin</label>
+                      <select 
+                        value={formGuru.jenisKelamin || 'L'} 
+                        onChange={e => setFormGuru({ ...formGuru, jenisKelamin: e.target.value as 'L' | 'P' })}
+                        className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold"
+                      >
+                        <option value="L">Laki-laki (L)</option>
+                        <option value="P">Perempuan (P)</option>
+                      </select>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -3167,7 +4000,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           type="email" 
                           required 
                           value={formGuru.email} 
-                          onChange={e => setFormGuru({ ...formGuru, email: e.target.value })}
+                          onChange={e => setFormGuru({ ...formGuru, email: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
                         />
                       </div>
@@ -3177,7 +4010,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           type="text" 
                           required 
                           value={formGuru.telepon} 
-                          onChange={e => setFormGuru({ ...formGuru, telepon: e.target.value })}
+                          onChange={e => setFormGuru({ ...formGuru, telepon: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
                         />
                       </div>
@@ -3189,7 +4022,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           type="text" 
                           placeholder="username_guru"
                           value={formGuru.username || ''} 
-                          onChange={e => setFormGuru({ ...formGuru, username: e.target.value })}
+                          onChange={e => setFormGuru({ ...formGuru, username: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
                         />
                       </div>
@@ -3199,7 +4032,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           type="text" 
                           placeholder="password"
                           value={formGuru.password || ''} 
-                          onChange={e => setFormGuru({ ...formGuru, password: e.target.value })}
+                          onChange={e => setFormGuru({ ...formGuru, password: e.target.value as any })}
                           className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
                         />
                       </div>
@@ -3217,7 +4050,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         type="text" 
                         required 
                         value={formStaf.nik} 
-                        onChange={e => setFormStaf({ ...formStaf, nik: e.target.value })}
+                        onChange={e => setFormStaf({ ...formStaf, nik: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
                       />
                     </div>
@@ -3239,7 +4072,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       type="text" 
                       required 
                       value={formStaf.nama} 
-                      onChange={e => setFormStaf({ ...formStaf, nama: e.target.value })}
+                      onChange={e => setFormStaf({ ...formStaf, nama: e.target.value as any })}
                       className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
                     />
                   </div>
@@ -3248,7 +4081,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       <label className="text-[11px] font-bold text-slate-400">Bagian / Divisi</label>
                       <select 
                         value={formStaf.bagian} 
-                        onChange={e => setFormStaf({ ...formStaf, bagian: e.target.value })}
+                        onChange={e => setFormStaf({ ...formStaf, bagian: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold"
                       >
                         <option value="Bendahara / Keuangan">Bendahara / Keuangan</option>
@@ -3280,7 +4113,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         type="email" 
                         required 
                         value={formStaf.email} 
-                        onChange={e => setFormStaf({ ...formStaf, email: e.target.value })}
+                        onChange={e => setFormStaf({ ...formStaf, email: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
                       />
                     </div>
@@ -3290,7 +4123,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         type="text" 
                         required 
                         value={formStaf.telepon} 
-                        onChange={e => setFormStaf({ ...formStaf, telepon: e.target.value })}
+                        onChange={e => setFormStaf({ ...formStaf, telepon: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
                       />
                     </div>
@@ -3302,7 +4135,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         type="text" 
                         placeholder="username_staf"
                         value={formStaf.username || ''} 
-                        onChange={e => setFormStaf({ ...formStaf, username: e.target.value })}
+                        onChange={e => setFormStaf({ ...formStaf, username: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
                       />
                     </div>
@@ -3312,7 +4145,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         type="text" 
                         placeholder="password"
                         value={formStaf.password || ''} 
-                        onChange={e => setFormStaf({ ...formStaf, password: e.target.value })}
+                        onChange={e => setFormStaf({ ...formStaf, password: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
                       />
                     </div>
@@ -3330,7 +4163,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         required 
                         placeholder="contoh: VIII - Al Biruni, 7-A"
                         value={formRombel.namaRombel} 
-                        onChange={e => setFormRombel({ ...formRombel, namaRombel: e.target.value })}
+                        onChange={e => setFormRombel({ ...formRombel, namaRombel: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
                       />
                     </div>
@@ -3338,7 +4171,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       <label className="text-[11px] font-bold text-slate-400">Tingkat Kelas</label>
                       <select 
                         value={formRombel.tingkatKelas} 
-                        onChange={e => setFormRombel({ ...formRombel, tingkatKelas: e.target.value })}
+                        onChange={e => setFormRombel({ ...formRombel, tingkatKelas: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold"
                       >
                         <option value="Kelas 7">Kelas 7</option>
@@ -3356,7 +4189,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         required 
                         placeholder="contoh: MIPA, IPS, Umum"
                         value={formRombel.jurusanPeminatan} 
-                        onChange={e => setFormRombel({ ...formRombel, jurusanPeminatan: e.target.value })}
+                        onChange={e => setFormRombel({ ...formRombel, jurusanPeminatan: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
                       />
                     </div>
@@ -3364,7 +4197,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       <label className="text-[11px] font-bold text-slate-400">Kurikulum</label>
                       <select 
                         value={formRombel.kurikulum} 
-                        onChange={e => setFormRombel({ ...formRombel, kurikulum: e.target.value })}
+                        onChange={e => setFormRombel({ ...formRombel, kurikulum: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold"
                       >
                         <option value="Kurikulum Merdeka">Kurikulum Merdeka</option>
@@ -3379,7 +4212,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       <label className="text-[11px] font-bold text-slate-400">Wali Kelas</label>
                       <select 
                         value={formRombel.waliKelasNama} 
-                        onChange={e => setFormRombel({ ...formRombel, waliKelasNama: e.target.value })}
+                        onChange={e => setFormRombel({ ...formRombel, waliKelasNama: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold"
                       >
                         <option value="">-- Pilih Wali Kelas --</option>
@@ -3395,7 +4228,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         required 
                         placeholder="contoh: Ruang R.101 (Gedung A)"
                         value={formRombel.ruangan} 
-                        onChange={e => setFormRombel({ ...formRombel, ruangan: e.target.value })}
+                        onChange={e => setFormRombel({ ...formRombel, ruangan: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
                       />
                     </div>
@@ -3408,7 +4241,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         type="text" 
                         required 
                         value={formRombel.tahunAjaran} 
-                        onChange={e => setFormRombel({ ...formRombel, tahunAjaran: e.target.value })}
+                        onChange={e => setFormRombel({ ...formRombel, tahunAjaran: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white" 
                       />
                     </div>
@@ -3548,7 +4381,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                     <label className="text-[11px] font-bold text-slate-400">Ketua Kelas (Opsional)</label>
                     <select 
                       value={formRombel.ketuaKelasNama || ''} 
-                      onChange={e => setFormRombel({ ...formRombel, ketuaKelasNama: e.target.value })}
+                      onChange={e => setFormRombel({ ...formRombel, ketuaKelasNama: e.target.value as any })}
                       className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
                     >
                       <option value="">-- Pilih Ketua Kelas --</option>
@@ -3568,7 +4401,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       rows={2}
                       placeholder="Catatan khusus rombel..."
                       value={formRombel.catatan || ''} 
-                      onChange={e => setFormRombel({ ...formRombel, catatan: e.target.value })}
+                      onChange={e => setFormRombel({ ...formRombel, catatan: e.target.value as any })}
                       className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white resize-none focus:outline-none" 
                     />
                   </div>
@@ -3585,7 +4418,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         required 
                         placeholder="contoh: MP-MAT-01"
                         value={formMapel.kodeMapel} 
-                        onChange={e => setFormMapel({ ...formMapel, kodeMapel: e.target.value })}
+                        onChange={e => setFormMapel({ ...formMapel, kodeMapel: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                       />
                     </div>
@@ -3596,7 +4429,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         required 
                         placeholder="contoh: Matematika Wajib"
                         value={formMapel.namaMapel} 
-                        onChange={e => setFormMapel({ ...formMapel, namaMapel: e.target.value })}
+                        onChange={e => setFormMapel({ ...formMapel, namaMapel: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500" 
                       />
                     </div>
@@ -3607,7 +4440,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       <label className="text-[11px] font-bold text-slate-400">Kategori Mapel</label>
                       <select 
                         value={formMapel.kategori} 
-                        onChange={e => setFormMapel({ ...formMapel, kategori: e.target.value })}
+                        onChange={e => setFormMapel({ ...formMapel, kategori: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
                       >
                         <option value="Wajib Umum">Wajib Umum</option>
@@ -3706,7 +4539,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       <label className="text-[11px] font-bold text-slate-400">Kurikulum</label>
                       <select 
                         value={formMapel.kurikulum} 
-                        onChange={e => setFormMapel({ ...formMapel, kurikulum: e.target.value })}
+                        onChange={e => setFormMapel({ ...formMapel, kurikulum: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-amber-500"
                       >
                         <option value="Kurikulum Merdeka">Kurikulum Merdeka</option>
@@ -3722,7 +4555,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       rows={2}
                       placeholder="Catatan mapel..."
                       value={formMapel.catatan || ''} 
-                      onChange={e => setFormMapel({ ...formMapel, catatan: e.target.value })}
+                      onChange={e => setFormMapel({ ...formMapel, catatan: e.target.value as any })}
                       className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white resize-none focus:outline-none focus:border-amber-500" 
                     />
                   </div>
@@ -3890,7 +4723,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         required 
                         placeholder="Contoh: EKS-PMR"
                         value={formEkskul.kodeEkskul} 
-                        onChange={e => setFormEkskul({ ...formEkskul, kodeEkskul: e.target.value })}
+                        onChange={e => setFormEkskul({ ...formEkskul, kodeEkskul: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white uppercase font-mono focus:outline-none focus:border-emerald-500" 
                       />
                     </div>
@@ -3900,7 +4733,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         required 
                         placeholder="Contoh: Palang Merah Remaja"
                         value={formEkskul.namaEkskul} 
-                        onChange={e => setFormEkskul({ ...formEkskul, namaEkskul: e.target.value })}
+                        onChange={e => setFormEkskul({ ...formEkskul, namaEkskul: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500" 
                       />
                     </div>
@@ -3911,7 +4744,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       <label className="text-[11px] font-bold text-slate-400">Kategori Bidang *</label>
                       <select 
                         value={formEkskul.kategori} 
-                        onChange={e => setFormEkskul({ ...formEkskul, kategori: e.target.value })}
+                        onChange={e => setFormEkskul({ ...formEkskul, kategori: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-emerald-500"
                       >
                         <option value="Olahraga">Olahraga</option>
@@ -3969,7 +4802,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           required
                           placeholder="Nama lengkap pembina"
                           value={formEkskul.pembinaNama}
-                          onChange={e => setFormEkskul({ ...formEkskul, pembinaNama: e.target.value })}
+                          onChange={e => setFormEkskul({ ...formEkskul, pembinaNama: e.target.value as any })}
                           className="w-full p-2 bg-[#121212] border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
                         />
                       </div>
@@ -3981,7 +4814,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         <input
                           placeholder="NIP jika guru tetap"
                           value={formEkskul.nipPembina || ''}
-                          onChange={e => setFormEkskul({ ...formEkskul, nipPembina: e.target.value })}
+                          onChange={e => setFormEkskul({ ...formEkskul, nipPembina: e.target.value as any })}
                           className="w-full p-2 bg-[#121212] border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
                         />
                       </div>
@@ -3990,7 +4823,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         <input
                           placeholder="081234567890"
                           value={formEkskul.kontakPembina || ''}
-                          onChange={e => setFormEkskul({ ...formEkskul, kontakPembina: e.target.value })}
+                          onChange={e => setFormEkskul({ ...formEkskul, kontakPembina: e.target.value as any })}
                           className="w-full p-2 bg-[#121212] border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
                         />
                       </div>
@@ -4002,7 +4835,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       <label className="text-[11px] font-bold text-slate-400">Hari Latihan *</label>
                       <select 
                         value={formEkskul.hariLatihan} 
-                        onChange={e => setFormEkskul({ ...formEkskul, hariLatihan: e.target.value })}
+                        onChange={e => setFormEkskul({ ...formEkskul, hariLatihan: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-emerald-500"
                       >
                         <option value="Senin">Senin</option>
@@ -4021,7 +4854,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         type="text"
                         placeholder="15:30"
                         value={formEkskul.jamMulai} 
-                        onChange={e => setFormEkskul({ ...formEkskul, jamMulai: e.target.value })}
+                        onChange={e => setFormEkskul({ ...formEkskul, jamMulai: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white font-mono text-center focus:outline-none focus:border-emerald-500" 
                       />
                     </div>
@@ -4032,7 +4865,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         type="text"
                         placeholder="17:00"
                         value={formEkskul.jamSelesai} 
-                        onChange={e => setFormEkskul({ ...formEkskul, jamSelesai: e.target.value })}
+                        onChange={e => setFormEkskul({ ...formEkskul, jamSelesai: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white font-mono text-center focus:outline-none focus:border-emerald-500" 
                       />
                     </div>
@@ -4045,7 +4878,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                         required 
                         placeholder="Contoh: Lapangan Utama, Ruang Musik"
                         value={formEkskul.tempat} 
-                        onChange={e => setFormEkskul({ ...formEkskul, tempat: e.target.value })}
+                        onChange={e => setFormEkskul({ ...formEkskul, tempat: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500" 
                       />
                     </div>
@@ -4053,7 +4886,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       <label className="text-[11px] font-bold text-slate-400">Tingkat Kelas Target</label>
                       <select 
                         value={formEkskul.tingkatTarget} 
-                        onChange={e => setFormEkskul({ ...formEkskul, tingkatTarget: e.target.value })}
+                        onChange={e => setFormEkskul({ ...formEkskul, tingkatTarget: e.target.value as any })}
                         className="w-full p-2 bg-[#181818] border border-slate-800 text-white rounded-lg text-xs font-semibold focus:outline-none focus:border-emerald-500"
                       >
                         <option value="Semua Tingkat (Kelas 7, 8, 9)">Semua Tingkat (Kelas 7, 8, 9)</option>
@@ -4097,7 +4930,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       rows={2}
                       placeholder="Uraian singkat program kegiatan, target lomba/prestasi..."
                       value={formEkskul.deskripsi || ''} 
-                      onChange={e => setFormEkskul({ ...formEkskul, deskripsi: e.target.value })}
+                      onChange={e => setFormEkskul({ ...formEkskul, deskripsi: e.target.value as any })}
                       className="w-full p-2 bg-[#181818] border border-slate-800 rounded-lg text-xs text-white resize-none focus:outline-none focus:border-emerald-500" 
                     />
                   </div>
@@ -4168,12 +5001,12 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   onChange={e => setStudentToAssign(e.target.value)}
                   className="flex-1 p-2 bg-[#121212] border border-slate-700 text-white rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 >
-                  <option value="">-- Pilih Siswa yang belum masuk / ganti kelas --</option>
+                  <option value="">-- Pilih Siswa yang belum masuk / belum ada rombel --</option>
                   {siswaList
-                    .filter(s => s.kelas.toLowerCase() !== activeRombelDetail.namaRombel.toLowerCase())
+                    .filter(s => !activeRombelList.some(r => r.namaRombel.toLowerCase() === (s.kelas || '').toLowerCase()))
                     .map(s => (
                       <option key={s.id} value={s.id}>
-                        {s.nama} (NISN: {s.nisn}) - Kelas Saat Ini: {s.kelas}
+                        {s.nama} (NISN: {s.nisn}) {s.kelas && s.kelas !== 'Belum Ada Kelas' ? `- Kelas: ${s.kelas}` : ''}
                       </option>
                     ))}
                 </select>
@@ -4584,11 +5417,25 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
                     Format resmi untuk pendataan biodata peserta didik baru, NISN, NIK, Wali, dan data kelas.
                   </p>
-                  <div className="mt-3 p-2 bg-slate-900 rounded border border-slate-800 font-mono text-[9px] text-slate-400 space-y-0.5">
-                    <div>Col: NISN; NIS; NIK; Nama; Rombel; JenisKelamin</div>
-                    <div>TempatLahir; TanggalLahir; Agama; Alamat</div>
-                    <div>NamaOrang tua/Wali; TeleponWali; AsalSekolah</div>
-                    <div>Anak Ke-; JumlahSaudara; BeratBadan; TinggiBadan</div>
+                  <div className="mt-3 p-2.5 bg-slate-900 rounded-lg border border-slate-800 space-y-1.5">
+                    <div className="text-[10px] font-bold text-blue-400 uppercase tracking-wide">Struktur Kolom (Kotak Rapi CSV):</div>
+                    <div className="grid grid-cols-3 gap-1 text-[9px] font-mono">
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">NISN</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">NIS</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">NIK</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">Nama</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">Rombel</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">L/P</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">TempatLahir</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">TglLahir</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">Agama</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">Alamat</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">NamaAyah</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">NamaIbu</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">NamaWali</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">TelpWali</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">AsalSekolah</div>
+                    </div>
                   </div>
                 </div>
 
@@ -4597,7 +5444,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                     onClick={() => handleDownloadTemplate('siswa')}
                     className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all"
                   >
-                    <Download className="w-3.5 h-3.5" /> Unduh Template CSV
+                    <Download className="w-3.5 h-3.5" /> Unduh Template CSV (Kotak Rapi)
                   </button>
                   <button
                     onClick={() => {
@@ -4621,10 +5468,16 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
                     Format resmi pendataan Tenaga Pendidik, NIP/NUPTK, Gelar, Mata Pelajaran, dan Sertifikasi.
                   </p>
-                  <div className="mt-3 p-2 bg-slate-900 rounded border border-slate-800 font-mono text-[9px] text-slate-400 space-y-0.5">
-                    <div>Col: NIP, NIK, Nama, GelarDepan</div>
-                    <div>GelarBelakang, MataPelajaran, Jabatan</div>
-                    <div>Email, Telepon, Pendidikan, Status</div>
+                  <div className="mt-3 p-2.5 bg-slate-900 rounded-lg border border-slate-800 space-y-1.5">
+                    <div className="text-[10px] font-bold text-purple-400 uppercase tracking-wide">Struktur Kolom (Kotak Rapi CSV):</div>
+                    <div className="grid grid-cols-2 gap-1 text-[9px] font-mono">
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">NIP / NIK</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">Nama Lengkap</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">Gelar Depan/Belakang</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">Mata Pelajaran</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">Email & Telepon</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">Pendidikan & Status</div>
+                    </div>
                   </div>
                 </div>
 
@@ -4657,10 +5510,14 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
                     Format resmi pendataan Tenaga Kependidikan, Tata Usaha, Keuangan, Perpustakaan & Laboran.
                   </p>
-                  <div className="mt-3 p-2 bg-slate-900 rounded border border-slate-800 font-mono text-[9px] text-slate-400 space-y-0.5">
-                    <div>Col: NIK, Nama, Bagian/Divisi</div>
-                    <div>Email, Telepon, JenisKelamin</div>
-                    <div>PendidikanTerakhir, StatusKaryawan</div>
+                  <div className="mt-3 p-2.5 bg-slate-900 rounded-lg border border-slate-800 space-y-1.5">
+                    <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">Struktur Kolom (Kotak Rapi CSV):</div>
+                    <div className="grid grid-cols-2 gap-1 text-[9px] font-mono">
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">NIK / ID Staf</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">Nama Lengkap</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">Bagian / Divisi</div>
+                      <div className="bg-slate-800/80 border border-slate-700/60 p-1 rounded text-center text-slate-200">Status Karyawan</div>
+                    </div>
                   </div>
                 </div>
 
@@ -5127,6 +5984,58 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* BULK DELETE CONFIRMATION MODAL */}
+      {bulkDeleteModal && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-[#121212] border border-rose-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-white">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-white">
+                  {bulkDeleteModal.mode === 'all' 
+                    ? `Konfirmasi Hapus Semua Data ${bulkDeleteModal.targetType.toUpperCase()}` 
+                    : `Konfirmasi Hapus ${bulkDeleteModal.count} Data ${bulkDeleteModal.targetType.toUpperCase()}`}
+                </h3>
+                <p className="text-xs text-rose-400 font-medium mt-0.5">
+                  Tindakan ini permanen dan tidak dapat dibatalkan!
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-[#181818] p-4 rounded-xl border border-slate-800/80 space-y-2 text-xs text-slate-300 leading-relaxed">
+              <p>
+                Apakah Anda yakin ingin menghapus <span className="font-extrabold text-rose-400 text-sm">{bulkDeleteModal.targetName}</span> dari database sekolah?
+              </p>
+              {bulkDeleteModal.mode === 'all' && (
+                <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-300 text-[11px] flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+                  <span>Semua catatan data {bulkDeleteModal.targetType} akan dihapus secara menyeluruh dari sistem.</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/60">
+              <button
+                type="button"
+                onClick={() => setBulkDeleteModal(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={executeBulkDelete}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-extrabold transition-all shadow-lg shadow-rose-600/30 flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" /> Ya, Hapus {bulkDeleteModal.count} Data Sekarang
+              </button>
+            </div>
           </div>
         </div>
       )}
