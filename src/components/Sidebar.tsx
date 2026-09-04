@@ -929,23 +929,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <button
                         onClick={() => {
                           setActiveTab('pengaturan');
-                          if (setPengaturanSubTab) setPengaturanSubTab('google_drive');
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
-                          pengaturanSubTab === 'google_drive'
-                            ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-sm'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Cloud className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Google Drive Sync</span>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setActiveTab('pengaturan');
                           if (setPengaturanSubTab) setPengaturanSubTab('fonnte');
                         }}
                         className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${

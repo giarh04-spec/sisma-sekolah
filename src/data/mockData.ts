@@ -685,8 +685,8 @@ export const INITIAL_SCHOOL_SETTINGS: SchoolSettings = {
     hariKerja: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'],
     autoSwitchScanMode: true
   },
-  googleSyncEmail: 'giar.hermawan4@guru.smp.belajar.id',
-  adminEmails: ['giar.hermawan4@guru.smp.belajar.id'],
+  googleSyncEmail: 'giarh0410@gmail.com',
+  adminEmails: ['giarh0410@gmail.com'],
   googleSyncEnabled: false,
   googleSyncSpreadsheetId: '',
   googleSyncSpreadsheetUrl: '',

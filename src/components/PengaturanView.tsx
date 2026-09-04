@@ -59,8 +59,8 @@ interface PengaturanViewProps {
   mapelList?: MataPelajaranItem[];
   absensiHarian?: AbsensiSiswaHarian[];
   absensiKelasList?: AbsensiSiswaKelas[];
-  activeSubTab: 'identitas' | 'logo' | 'google_drive' | 'fonnte' | 'jadwal' | 'sistem';
-  setActiveSubTab: (tab: 'identitas' | 'logo' | 'google_drive' | 'fonnte' | 'jadwal' | 'sistem') => void;
+  activeSubTab: 'identitas' | 'logo' | 'fonnte' | 'jadwal' | 'sistem';
+  setActiveSubTab: (tab: 'identitas' | 'logo' | 'fonnte' | 'jadwal' | 'sistem') => void;
 }
 
 export const PengaturanView: React.FC<PengaturanViewProps> = ({
@@ -513,6 +513,24 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                     className="w-full p-2.5 bg-[#181818] border border-slate-700 rounded-xl text-xs font-bold text-white focus:border-blue-500 focus:outline-none"
                   />
                 </div>
+
+                <div className="md:col-span-2 pt-2 border-t border-slate-800/80">
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={!!formData.hideQuickDemoLogin}
+                      onChange={e => {
+                        const val = e.target.checked;
+                        setFormData(prev => ({ ...prev, hideQuickDemoLogin: val }));
+                      }}
+                      className="w-4 h-4 rounded bg-[#181818] border-slate-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-zinc-900 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-white block">Sembunyikan Menu Akses Cepat / Akun Demo di Halaman Login</span>
+                      <span className="text-[11px] text-slate-400 block">Hilangkan tombol pilihan login cepat/demo (Kepala Sekolah, Admin, Guru, dll.) dari halaman utama login untuk keamanan produksi.</span>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -698,266 +716,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
         </div>
       )}
 
-      {activeSubTab === 'google_drive' && (
-        <div className="space-y-6">
-          <div className="bg-[#121212] border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-            <div>
-              <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-2 mb-3">
-                <Cloud className="w-4 h-4" /> Integrasi & Auto-Sync Google Drive
-              </h3>
-              <p className="text-xs text-slate-400">
-                Hubungkan sistem informasi sekolah dengan Google Drive Anda. Setiap ada perubahan data siswa atau data sekolah lainnya, sistem akan secara otomatis mensinkronkan data tersebut ke file Google Sheets di Drive Anda secara aman.
-              </p>
-            </div>
 
-            {/* Sync Configuration Panel */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Account Authorization Card */}
-              <div className="bg-[#181818] border border-slate-800 rounded-2xl p-5 space-y-4 flex flex-col justify-between">
-                <div className="space-y-2">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase block">1. Akun Google Tersambung</span>
-                  {schoolSettings.googleSyncEmail ? (
-                    <div className="flex items-center gap-3 p-3 bg-blue-950/20 border border-blue-500/20 rounded-xl">
-                      <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400">
-                        <Check className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-white truncate">{schoolSettings.googleSyncEmail}</p>
-                        <p className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Google Drive Terhubung
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3 p-3 bg-amber-950/10 border border-amber-500/20 rounded-xl">
-                      <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500">
-                        <AlertCircle className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-white">Akun Belum Terhubung</p>
-                        <p className="text-[10px] text-slate-500">Hubungkan akun Gmail Anda untuk mengaktifkan sinkronisasi otomatis.</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-2">
-                  {schoolSettings.googleSyncEmail ? (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const confirmed = window.confirm('Apakah Anda yakin ingin memutuskan sambungan Google Drive?');
-                        if (!confirmed) return;
-                        setFormData(prev => ({
-                          ...prev,
-                          googleSyncEmail: '',
-                          googleSyncEnabled: false,
-                          googleSyncSpreadsheetId: '',
-                          googleSyncSpreadsheetUrl: ''
-                        }));
-                        setSchoolSettings(prev => ({
-                          ...prev,
-                          googleSyncEmail: '',
-                          googleSyncEnabled: false,
-                          googleSyncSpreadsheetId: '',
-                          googleSyncSpreadsheetUrl: ''
-                        }));
-                        if (setUserGoogleToken) setUserGoogleToken('');
-                        if (setUserEmail) setUserEmail('');
-                        await googleSignOut();
-                      }}
-                      className="w-full py-2.5 bg-red-950/30 hover:bg-red-950/60 text-red-400 hover:text-red-300 font-bold rounded-xl text-xs transition-all border border-red-500/20"
-                    >
-                      Putuskan Akun Google
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          const res = await googleSignIn();
-                          if (res) {
-                            const { user, accessToken } = res;
-                            setFormData(prev => ({
-                              ...prev,
-                              googleSyncEmail: user.email || 'giar.hermawan4@guru.smp.belajar.id',
-                              googleSyncEnabled: true
-                            }));
-                            setSchoolSettings(prev => ({
-                              ...prev,
-                              googleSyncEmail: user.email || 'giar.hermawan4@guru.smp.belajar.id',
-                              googleSyncEnabled: true
-                            }));
-                            if (setUserGoogleToken) setUserGoogleToken(accessToken);
-                            if (setUserEmail) setUserEmail(user.email || 'giar.hermawan4@guru.smp.belajar.id');
-                          }
-                        } catch (e) {
-                          alert('Gagal menghubungkan akun Google. Mohon coba lagi.');
-                        }
-                      }}
-                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30"
-                    >
-                      <LogIn className="w-4 h-4" /> Hubungkan Akun Google Drive (Gmail)
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Auto Sync Toggle Card */}
-              <div className="bg-[#181818] border border-slate-800 rounded-2xl p-5 space-y-4 flex flex-col justify-between">
-                <div className="space-y-2">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase block">2. Status Sinkronisasi Otomatis</span>
-                  <div className="flex items-center justify-between p-3 bg-[#121212] border border-slate-800 rounded-xl">
-                    <div>
-                      <h4 className="text-xs font-bold text-white">Auto-Sync Google Drive</h4>
-                      <p className="text-[10px] text-slate-500">Sinkronkan data ke Drive secara berkala saat disimpan.</p>
-                    </div>
-                    <div>
-                      <button
-                        type="button"
-                        disabled={!schoolSettings.googleSyncEmail}
-                        onClick={() => {
-                          const nextVal = !formData.googleSyncEnabled;
-                          setFormData(prev => ({ ...prev, googleSyncEnabled: nextVal }));
-                          setSchoolSettings(prev => ({ ...prev, googleSyncEnabled: nextVal }));
-                        }}
-                        className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none ${
-                          formData.googleSyncEnabled ? 'bg-blue-600' : 'bg-slate-700 opacity-60'
-                        } ${!schoolSettings.googleSyncEmail ? 'cursor-not-allowed opacity-40' : ''}`}
-                      >
-                        <div
-                          className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ${
-                            formData.googleSyncEnabled ? 'translate-x-6' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-[10px] text-slate-500 italic">
-                  * Memerlukan akun Google yang terhubung. Ketika diaktifkan, seluruh perubahan data secara otomatis disinkronkan ke dokumen Google Sheets.
-                </div>
-              </div>
-            </div>
-
-            {/* Spreadsheet Sync Info Card */}
-            {schoolSettings.googleSyncEmail && (
-              <div className="bg-[#181818] border border-slate-800 rounded-2xl p-5 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-3">
-                  <div>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <Database className="w-4 h-4 text-blue-400" /> Dokumen Spreadsheet di Google Drive
-                    </h4>
-                    <p className="text-[10px] text-slate-500 mt-0.5">
-                      Spreadsheet berisi seluruh tabel database: Siswa, Guru, Staf, Kelas, Mapel, Absensi, dan Jurnal.
-                    </p>
-                  </div>
-
-                  {schoolSettings.googleSyncSpreadsheetUrl && (
-                    <a
-                      href={schoolSettings.googleSyncSpreadsheetUrl}
-                      target="_blank"
-                      referrerPolicy="no-referrer"
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0 self-start sm:self-center"
-                    >
-                      Buka Spreadsheet <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-                  <div className="p-3 bg-[#121212] border border-slate-800 rounded-xl space-y-0.5">
-                    <span className="text-[10px] text-slate-500 uppercase font-semibold">Tipe File</span>
-                    <p className="font-bold text-white">Google Sheets (Spreadsheet)</p>
-                  </div>
-                  <div className="p-3 bg-[#121212] border border-slate-800 rounded-xl space-y-0.5">
-                    <span className="text-[10px] text-slate-500 uppercase font-semibold">Sinkronisasi Terakhir</span>
-                    <p className="font-bold text-white">{schoolSettings.googleSyncLastTime || 'Belum pernah'}</p>
-                  </div>
-                  <div className="p-3 bg-[#121212] border border-slate-800 rounded-xl space-y-0.5">
-                    <span className="text-[10px] text-slate-500 uppercase font-semibold">Status</span>
-                    <p className={`font-bold uppercase ${
-                      schoolSettings.googleSyncStatus === 'success' ? 'text-emerald-400' :
-                      schoolSettings.googleSyncStatus === 'syncing' ? 'text-blue-400' :
-                      schoolSettings.googleSyncStatus === 'failed' ? 'text-red-400' : 'text-slate-400'
-                    }`}>
-                      {schoolSettings.googleSyncStatus === 'success' ? 'Berhasil' :
-                       schoolSettings.googleSyncStatus === 'syncing' ? 'Mensinkronkan...' :
-                       schoolSettings.googleSyncStatus === 'failed' ? 'Gagal' : 'Idle'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-2">
-                  <button
-                    type="button"
-                    disabled={isSyncingManual}
-                    onClick={async () => {
-                      setIsSyncingManual(true);
-                      setSchoolSettings(prev => ({ ...prev, googleSyncStatus: 'syncing' }));
-                      try {
-                        const syncData = {
-                          siswaList: siswaList || [],
-                          guruList: guruList || [],
-                          stafList: stafList || [],
-                          rombelList: rombelList || [],
-                          mapelList: mapelList || [],
-                          absensiHarian: absensiHarian || [],
-                          absensiKelasList: absensiKelasList || []
-                        };
-                        const res = await exportAllToGoogleSheets(
-                          userGoogleToken || 'demo_workspace_token_active',
-                          syncData,
-                          schoolSettings.googleSyncSpreadsheetId
-                        );
-
-                        const nowStr = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
-                        if (res.success) {
-                          setFormData(prev => ({
-                            ...prev,
-                            googleSyncSpreadsheetId: res.spreadsheetId || '',
-                            googleSyncSpreadsheetUrl: res.url || '',
-                            googleSyncLastTime: nowStr,
-                            googleSyncStatus: 'success'
-                          }));
-                          setSchoolSettings(prev => ({
-                            ...prev,
-                            googleSyncSpreadsheetId: res.spreadsheetId || '',
-                            googleSyncSpreadsheetUrl: res.url || '',
-                            googleSyncLastTime: nowStr,
-                            googleSyncStatus: 'success'
-                          }));
-                          alert(res.message);
-                        } else {
-                          setSchoolSettings(prev => ({ ...prev, googleSyncStatus: 'failed' }));
-                          alert('Gagal sinkronisasi: ' + res.message);
-                        }
-                      } catch (e: any) {
-                        setSchoolSettings(prev => ({ ...prev, googleSyncStatus: 'failed' }));
-                        alert('Error saat sinkronisasi: ' + e.message);
-                      } finally {
-                        setIsSyncingManual(false);
-                      }
-                    }}
-                    className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-2 shadow-md shrink-0"
-                  >
-                    {isSyncingManual ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" /> Mensinkronkan...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-4 h-4" /> Sinkronkan Sekarang
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* SUBTAB 4: TOKEN FONNTE (WHATSAPP GATEWAY) */}
       {activeSubTab === 'fonnte' && (

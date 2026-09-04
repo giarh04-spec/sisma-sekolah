@@ -19,7 +19,7 @@ export type AbsensiSubTab = 'scan_barcode' | 'harian_siswa' | 'absensi_guru' | '
 export type CbtSubTab = 'bank_soal' | 'jadwal_kartu' | 'ai_generator' | 'simulasi_ujian' | 'hasil_ujian';
 export type KeuanganSubTab = 'pembayaran' | 'pengaturan_biaya' | 'rekap' | 'redaksi' | 'gaji';
 export type AdministrasiSubTab = 'modul_ajar' | 'cp' | 'atp' | 'kktp' | 'prota' | 'prosem' | 'jadwal' | 'kalender' | 'jurnal_guru';
-export type PengaturanSubTab = 'identitas' | 'logo' | 'google_drive' | 'fonnte' | 'jadwal' | 'sistem';
+export type PengaturanSubTab = 'identitas' | 'logo' | 'fonnte' | 'jadwal' | 'sistem';
 
 export interface TarifBiaya {
   id: string;
@@ -548,6 +548,7 @@ export interface SchoolSettings {
   bankVaNumber?: string;
   bankVaOwner?: string;
   qrisUrl?: string;
+  hideQuickDemoLogin?: boolean;
 }
 
 export interface GajiPembayaran {

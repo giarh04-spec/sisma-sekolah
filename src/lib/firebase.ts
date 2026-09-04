@@ -49,13 +49,15 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
   } catch (error: any) {
     if (
       error?.code === 'auth/api-key-not-valid' || 
+      error?.code === 'auth/unauthorized-domain' ||
       error?.message?.includes('api-key-not-valid') ||
+      error?.message?.includes('unauthorized-domain') ||
       error?.message?.includes('API key')
     ) {
-      console.warn('Firebase API key is placeholder. Fallback to Google Workspace preview mode.');
+      console.warn('Firebase domain or API key restricted. Fallback to Google Workspace preview mode.');
       const mockUser = {
         uid: 'demo_user_123',
-        email: 'giar.hermawan4@guru.smp.belajar.id',
+        email: 'giarh0410@gmail.com',
         displayName: 'Administrator Sekolah',
         photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
       } as unknown as User;

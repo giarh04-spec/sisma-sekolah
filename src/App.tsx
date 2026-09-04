@@ -137,7 +137,11 @@ export default function App() {
   // Google OAuth Auth State
   const [userGoogleToken, setUserGoogleToken] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>(() => {
-    return localStorage.getItem('edu_userEmail') || '';
+    const email = localStorage.getItem('edu_userEmail') || '';
+    if (!email || email.includes('belajar.id') || email.includes('giar.hermawan4')) {
+      return 'giarh0410@gmail.com';
+    }
+    return email;
   });
   const [isDbLoaded, setIsDbLoaded] = useState<boolean>(false);
   const [firebaseSyncStatus, setFirebaseSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -176,17 +180,29 @@ export default function App() {
   // School Identity & Settings State
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings>(() => {
     const saved = getSavedData('edu_schoolSettings', INITIAL_SCHOOL_SETTINGS);
-    if (!saved || !saved.namaSekolah || saved.namaSekolah === 'SEKOLAH MENENGAH ATAS WORKSPACE 2026' || saved.namaSekolah === 'My App' || saved.namaSekolah === 'Untitled' || saved.namaSekolah === 'SMP Modern Al Fakhir') {
-      return INITIAL_SCHOOL_SETTINGS;
-    }
-    return {
+    const hasSyncEmailKey = saved && 'googleSyncEmail' in saved;
+    const rawSyncEmail = hasSyncEmailKey ? saved.googleSyncEmail : 'giarh0410@gmail.com';
+    const syncEmail = rawSyncEmail && (rawSyncEmail.includes('belajar.id') || rawSyncEmail.includes('giar.hermawan4')) 
+      ? 'giarh0410@gmail.com' 
+      : rawSyncEmail;
+    const admins = saved.adminEmails && saved.adminEmails.length > 0 
+      ? saved.adminEmails.map(e => (e.includes('belajar.id') || e.includes('giar.hermawan4') ? 'giarh0410@gmail.com' : e))
+      : ['giarh0410@gmail.com'];
+
+    const normalizedSettings = {
       ...INITIAL_SCHOOL_SETTINGS,
-      ...saved,
-      namaSekolah: saved.namaSekolah === 'Sekolah Islam Modern Al Fakhir' ? INITIAL_SCHOOL_SETTINGS.namaSekolah : (saved.namaSekolah || INITIAL_SCHOOL_SETTINGS.namaSekolah),
-      npsn: saved.npsn || INITIAL_SCHOOL_SETTINGS.npsn,
-      akreditasi: saved.akreditasi || INITIAL_SCHOOL_SETTINGS.akreditasi,
-      logoUrl: saved.logoUrl && !saved.logoUrl.includes('unsplash') ? saved.logoUrl : INITIAL_SCHOOL_SETTINGS.logoUrl,
+      ...(saved || {}),
+      googleSyncEmail: syncEmail,
+      adminEmails: admins,
+      namaSekolah: (!saved || !saved.namaSekolah || saved.namaSekolah === 'SEKOLAH MENENGAH ATAS WORKSPACE 2026' || saved.namaSekolah === 'My App' || saved.namaSekolah === 'Untitled' || saved.namaSekolah === 'SMP Modern Al Fakhir' || saved.namaSekolah === 'Sekolah Islam Modern Al Fakhir') 
+        ? INITIAL_SCHOOL_SETTINGS.namaSekolah 
+        : saved.namaSekolah,
+      logoUrl: saved && saved.logoUrl && !saved.logoUrl.includes('unsplash') ? saved.logoUrl : INITIAL_SCHOOL_SETTINGS.logoUrl,
     };
+    try {
+      localStorage.setItem('edu_schoolSettings', JSON.stringify(normalizedSettings));
+    } catch (e) {}
+    return normalizedSettings;
   });
   const [theme, setTheme] = useState<'dark' | 'light'>(() => getSavedData('edu_theme', 'dark'));
 
@@ -666,7 +682,7 @@ export default function App() {
           return;
         }
         setUserGoogleToken(token || '');
-        setUserEmail(user.email || 'giar.hermawan4@guru.smp.belajar.id');
+        setUserEmail(user.email || 'giarh0410@gmail.com');
         setIsLoggedIn(true);
         setCurrentRole('admin');
       },

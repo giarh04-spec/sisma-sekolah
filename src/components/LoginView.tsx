@@ -138,8 +138,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
       const adminEmails = (schoolSettings.adminEmails || []).map(e => e.toLowerCase());
       const isAdminUser = 
         inputIdOrEmail === 'admin' ||
-        inputIdOrEmail === 'giar.hermawan4' ||
-        inputIdOrEmail === 'giar.hermawan4@guru.smp.belajar.id' ||
+        inputIdOrEmail === 'giarh0410' ||
+        inputIdOrEmail === 'giarh0410@gmail.com' ||
         adminEmails.includes(inputIdOrEmail) ||
         inputIdOrEmail.includes('giarh0410');
 
@@ -177,7 +177,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
           return;
         }
 
-        onLoginSuccess('giar.hermawan4@guru.smp.belajar.id', 'gmail_oauth_token_active', 'admin');
+        onLoginSuccess('giarh0410@gmail.com', 'gmail_oauth_token_active', 'admin');
         setLoading(false);
         return;
       }
@@ -298,109 +298,111 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
 
         {/* Quick Role Selection Helper */}
-        <div className="space-y-2">
-          <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
-            <span>Pilih Akun Demo / Akses Cepat</span>
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+        {!schoolSettings.hideQuickDemoLogin && (
+          <div className="space-y-2">
+            <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+              <span>Pilih Akun Demo / Akses Cepat</span>
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                onClick={() => handleFillDemo('kepsek')}
+                className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
+                  selectedRole === 'kepsek'
+                    ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-200 ring-1 ring-indigo-500/30'
+                    : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+                }`}
+              >
+                <div className="text-[11px] font-bold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                  <span>Kepala Sekolah</span>
+                </div>
+                <div className="text-[10px] text-zinc-500 font-mono mt-0.5">kepsek / kepsek123</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleFillDemo('admin')}
+                className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
+                  selectedRole === 'admin'
+                    ? 'bg-blue-600/20 border-blue-500/50 text-blue-200 ring-1 ring-blue-500/30'
+                    : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+                }`}
+              >
+                <div className="text-[11px] font-bold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                  <span>Administrator</span>
+                </div>
+                <div className="text-[10px] text-zinc-500 font-mono mt-0.5">admin / admin</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleFillDemo('guru')}
+                className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
+                  selectedRole === 'guru'
+                    ? 'bg-purple-600/20 border-purple-500/50 text-purple-200 ring-1 ring-purple-500/30'
+                    : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+                }`}
+              >
+                <div className="text-[11px] font-bold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                  <span>Guru / Mapel</span>
+                </div>
+                <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{demoGuruUser}</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleFillDemo('staf')}
+                className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
+                  selectedRole === 'staf'
+                    ? 'bg-amber-600/20 border-amber-500/50 text-amber-200 ring-1 ring-amber-500/30'
+                    : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+                }`}
+              >
+                <div className="text-[11px] font-bold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                  <span>Staf / Keuangan</span>
+                </div>
+                <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{demoStafUser}</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleFillDemo('petugas_absensi')}
+                className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
+                  selectedRole === 'petugas_absensi'
+                    ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-200 ring-1 ring-cyan-500/30'
+                    : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+                }`}
+              >
+                <div className="text-[11px] font-bold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                  <span>Petugas Absensi</span>
+                </div>
+                <div className="text-[10px] text-zinc-500 font-mono mt-0.5">petugas / petugas123</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleFillDemo('siswa')}
+                className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer col-span-2 sm:col-span-1 ${
+                  selectedRole === 'siswa'
+                    ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-200 ring-1 ring-emerald-500/30'
+                    : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+                }`}
+              >
+                <div className="text-[11px] font-bold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <span>Siswa / Wali</span>
+                </div>
+                <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{demoSiswaUser}</div>
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-            <button
-              type="button"
-              onClick={() => handleFillDemo('kepsek')}
-              className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
-                selectedRole === 'kepsek'
-                  ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-200 ring-1 ring-indigo-500/30'
-                  : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
-              }`}
-            >
-              <div className="text-[11px] font-bold flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
-                <span>Kepala Sekolah</span>
-              </div>
-              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">kepsek / kepsek123</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleFillDemo('admin')}
-              className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
-                selectedRole === 'admin'
-                  ? 'bg-blue-600/20 border-blue-500/50 text-blue-200 ring-1 ring-blue-500/30'
-                  : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
-              }`}
-            >
-              <div className="text-[11px] font-bold flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-                <span>Administrator</span>
-              </div>
-              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">admin / admin</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleFillDemo('guru')}
-              className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
-                selectedRole === 'guru'
-                  ? 'bg-purple-600/20 border-purple-500/50 text-purple-200 ring-1 ring-purple-500/30'
-                  : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
-              }`}
-            >
-              <div className="text-[11px] font-bold flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
-                <span>Guru / Mapel</span>
-              </div>
-              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{demoGuruUser}</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleFillDemo('staf')}
-              className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
-                selectedRole === 'staf'
-                  ? 'bg-amber-600/20 border-amber-500/50 text-amber-200 ring-1 ring-amber-500/30'
-                  : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
-              }`}
-            >
-              <div className="text-[11px] font-bold flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                <span>Staf / Keuangan</span>
-              </div>
-              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{demoStafUser}</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleFillDemo('petugas_absensi')}
-              className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
-                selectedRole === 'petugas_absensi'
-                  ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-200 ring-1 ring-cyan-500/30'
-                  : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
-              }`}
-            >
-              <div className="text-[11px] font-bold flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-                <span>Petugas Absensi</span>
-              </div>
-              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">petugas / petugas123</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleFillDemo('siswa')}
-              className={`px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer col-span-2 sm:col-span-1 ${
-                selectedRole === 'siswa'
-                  ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-200 ring-1 ring-emerald-500/30'
-                  : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800/40'
-              }`}
-            >
-              <div className="text-[11px] font-bold flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                <span>Siswa / Wali</span>
-              </div>
-              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{demoSiswaUser}</div>
-            </button>
-          </div>
-        </div>
+        )}
 
         {/* Error Alert */}
         {errorMessage && (
