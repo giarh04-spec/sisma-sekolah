@@ -30,11 +30,12 @@ import {
   Trophy,
   Coins,
   FolderOpen,
-  LayoutList
+  LayoutList,
+  Store
 } from 'lucide-react';
 import { Role, SubTab, AbsensiSubTab, CbtSubTab, KeuanganSubTab, AdministrasiSubTab, PengaturanSubTab } from '../types/school';
 
-export type TabType = 'dashboard' | 'database' | 'absensi' | 'cbt' | 'administrasi' | 'keuangan' | 'pengaturan';
+export type TabType = 'dashboard' | 'database' | 'absensi' | 'cbt' | 'administrasi' | 'keuangan' | 'pengaturan' | 'kasir';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -133,6 +134,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Pengaturan Sekolah',
       icon: <Settings className="w-5 h-5" />,
       desc: 'Identitas & Logo'
+    },
+    {
+      id: 'kasir',
+      label: 'Kasir Toko (POS)',
+      icon: <Store className="w-5 h-5" />,
+      badge: 'Minimarket',
+      desc: 'Penjualan & Stok Kasir'
     },
   ];
 

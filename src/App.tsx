@@ -10,6 +10,27 @@ import { KeuanganView } from './components/KeuanganView';
 import { PengaturanView } from './components/PengaturanView';
 import { LoginView } from './components/LoginView';
 import { PublicSlipGajiView } from './components/PublicSlipGajiView';
+import { KasirPOSView } from './components/pos/KasirPOSView';
+import { TransaksiView as PosTransaksiView } from './components/pos/TransaksiView';
+import { ProdukView as PosProdukView } from './components/pos/ProdukView';
+import { KatalogView as PosKatalogView } from './components/pos/KatalogView';
+import { StokView as PosStokView } from './components/pos/StokView';
+import { PelangganView as PosPelangganView } from './components/pos/PelangganView';
+import { SupplierView as PosSupplierView } from './components/pos/SupplierView';
+import { LaporanView as PosLaporanView } from './components/pos/LaporanView';
+import { PengaturanView as PosPengaturanView } from './components/pos/PengaturanView';
+
+import {
+  INITIAL_PRODUCTS,
+  INITIAL_CATEGORIES,
+  INITIAL_SUPPLIERS,
+  INITIAL_CUSTOMERS,
+  INITIAL_USERS,
+  INITIAL_BRANCHES,
+  INITIAL_TRANSACTIONS,
+  INITIAL_SETTINGS
+} from './data/posMockData';
+import { Product, Transaction, StockMovement, Customer, Supplier, StoreSettings } from './types/pos';
 
 import { 
   Role, 
@@ -145,6 +166,61 @@ export default function App() {
   });
   const [isDbLoaded, setIsDbLoaded] = useState<boolean>(false);
   const [firebaseSyncStatus, setFirebaseSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+  // POS State
+  const [posTab, setPosTab] = useState('kasir');
+  const [products, setProducts] = useState<Product[]>(() => getSavedData('pos_products', INITIAL_PRODUCTS));
+  const [categories] = useState(INITIAL_CATEGORIES);
+  const [suppliers, setSuppliers] = useState<Supplier[]>(() => getSavedData('pos_suppliers', INITIAL_SUPPLIERS));
+  const [customers, setCustomers] = useState<Customer[]>(() => getSavedData('pos_customers', INITIAL_CUSTOMERS));
+  const [transactions, setTransactions] = useState<Transaction[]>(() => getSavedData('pos_transactions', INITIAL_TRANSACTIONS));
+  const [stockMovements, setStockMovements] = useState<StockMovement[]>(() => getSavedData('pos_stockMovements', []));
+  const [posSettings, setPosSettings] = useState<StoreSettings>(() => getSavedData('pos_settings', INITIAL_SETTINGS));
+  const [posUsers] = useState(INITIAL_USERS);
+  const [posBranches] = useState(INITIAL_BRANCHES);
+
+  const handleCompleteTransaction = (trx: Transaction) => {
+    setTransactions(prev => [trx, ...prev]);
+    if (trx.customerId && trx.customerId !== 'cust-gen') {
+      const earnedPoints = Math.floor(trx.total / 10000);
+      setCustomers(prev => prev.map(c => {
+        if (c.id === trx.customerId) {
+          return {
+            ...c,
+            points: c.points + earnedPoints,
+            totalSpent: c.totalSpent + trx.total
+          };
+        }
+        return c;
+      }));
+    }
+  };
+
+  const handleUpdateStock = (productId: string, qtyChange: number, note: string) => {
+    setProducts(prev => prev.map(p => {
+      if (p.id === productId) {
+        const before = p.stock;
+        const after = Math.max(0, before + qtyChange);
+        const movement: StockMovement = {
+          id: `m-${Date.now()}`,
+          productId: p.id,
+          productName: p.name,
+          type: qtyChange > 0 ? 'in' : 'out',
+          qtyChange,
+          stockBefore: before,
+          stockAfter: after,
+          note,
+          date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+          userId: currentRole,
+          userName: userEmail || 'Admin',
+          branchId: posSettings.activeBranchId
+        };
+        setStockMovements(mPrev => [movement, ...mPrev]);
+        return { ...p, stock: after };
+      }
+      return p;
+    }));
+  };
 
   // Main School Master Data
   const [rombelList, setRombelList] = useState<RombelKelas[]>(() => getSavedData('edu_rombelList', INITIAL_ROMBEL));
@@ -984,6 +1060,112 @@ export default function App() {
                 setGajiList(getSavedData('edu_gajiList', []));
               }}
             />
+          )}
+
+          {activeTab === 'kasir' && (
+            <div className="space-y-6">
+              {/* POS Sub-Navigation Header */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
+                <div className="flex items-center gap-2">
+                  <span className="p-2 rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/30 font-bold">🛒</span>
+                  <div>
+                    <h2 className="text-base font-black text-white">KASIR TOKO / KOPERASI MINIMARKET</h2>
+                    <p className="text-xs text-slate-400">Kelola penjualan kasir, stok barang, katalog, dan laporan harian.</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                  {[
+                    { id: 'kasir', label: 'Kasir POS' },
+                    { id: 'transaksi', label: 'Transaksi' },
+                    { id: 'produk', label: 'Produk' },
+                    { id: 'katalog', label: 'Katalog' },
+                    { id: 'stok', label: 'Stok' },
+                    { id: 'pelanggan', label: 'Pelanggan' },
+                    { id: 'supplier', label: 'Supplier' },
+                    { id: 'laporan', label: 'Laporan' },
+                    { id: 'pengaturan', label: 'Pengaturan' }
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setPosTab(tab.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        posTab === tab.id
+                          ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* POS Views */}
+              {posTab === 'kasir' && (
+                <KasirPOSView
+                  products={products}
+                  customers={customers}
+                  settings={posSettings}
+                  onCompleteTransaction={handleCompleteTransaction}
+                  currentUser={{ id: 'user-1', name: userEmail || 'Administrator' }}
+                  onUpdateStock={handleUpdateStock}
+                />
+              )}
+              {posTab === 'transaksi' && (
+                <PosTransaksiView transactions={transactions} settings={posSettings} />
+              )}
+              {posTab === 'produk' && (
+                <PosProdukView
+                  products={products}
+                  categories={categories}
+                  suppliers={suppliers}
+                  onAddProduct={(p) => setProducts([p, ...products])}
+                  onUpdateProduct={(p) => setProducts(products.map(item => item.id === p.id ? p : item))}
+                  onDeleteProduct={(id) => setProducts(products.filter(item => item.id !== id))}
+                />
+              )}
+              {posTab === 'katalog' && (
+                <PosKatalogView
+                  products={products}
+                  categories={categories}
+                  onAddToCart={() => setPosTab('kasir')}
+                />
+              )}
+              {posTab === 'stok' && (
+                <PosStokView
+                  products={products}
+                  stockMovements={stockMovements}
+                  onUpdateStock={handleUpdateStock}
+                />
+              )}
+              {posTab === 'pelanggan' && (
+                <PosPelangganView
+                  customers={customers}
+                  onAddCustomer={(c) => setCustomers([c, ...customers])}
+                />
+              )}
+              {posTab === 'supplier' && (
+                <PosSupplierView
+                  suppliers={suppliers}
+                  onAddSupplier={(s) => setSuppliers([s, ...suppliers])}
+                />
+              )}
+              {posTab === 'laporan' && (
+                <PosLaporanView
+                  transactions={transactions}
+                  products={products}
+                  categories={categories}
+                  stockMovements={stockMovements}
+                />
+              )}
+              {posTab === 'pengaturan' && (
+                <PosPengaturanView
+                  settings={posSettings}
+                  onUpdateSettings={setPosSettings}
+                  branches={posBranches}
+                />
+              )}
+            </div>
           )}
 
           {activeTab === 'pengaturan' && (

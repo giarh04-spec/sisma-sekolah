@@ -1,6 +1,6 @@
 {
   "name": "Sistem Informasi Sekolah",
-  "description": "Aplikasi manajemen sekolah terlengkap: Database Siswa/Guru/Staf, Absensi Harian & Mapel, CBT Ujian & Template Soal, Administrasi Guru (Modul Ajar, ATP, CP, Jurnal, Prota, Prosem, Kaldik, Jadwal), Keuangan (SPP, UKT, Ekskul), dan Ekspor Spreadsheet Google Drive.",
+  "description": "Sistem Informasi Sekolah terpadu dengan Kasir Toko / Koperasi Minimarket modern: Manajemen Produk, Katalog, Stok, Kasir POS dengan Scan Barcode Kamera, Transaksi, Laporan Penjualan, Database Siswa/Guru/Staf, Absensi, CBT Ujian, Administrasi Guru, dan Keuangan.",
   "requestFramePermissions": [
     "camera",
     "geolocation"
