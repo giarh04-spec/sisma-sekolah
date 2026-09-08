@@ -166,7 +166,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-      <div className="bg-[#18181b] border border-slate-800 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="bg-[#18181b] border border-slate-800 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[95vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#121214]">
           <div className="flex items-center gap-2">
@@ -196,7 +196,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         {/* Content */}
         <div className="p-6 space-y-5 overflow-y-auto">
           {/* Camera Viewport */}
-          <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center shadow-inner">
+          <div className="relative w-full h-[380px] bg-black rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center shadow-inner">
             <video
               ref={videoRef}
               className="w-full h-full object-cover"
@@ -205,8 +205,8 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             />
 
             {/* Viewfinder overlay */}
-            <div className="absolute inset-0 border-2 border-dashed border-red-500/70 m-12 rounded-xl pointer-events-none flex items-center justify-center">
-              <div className="w-full h-0.5 bg-red-500 animate-pulse absolute shadow-[0_0_10px_#ef4444]"></div>
+            <div className="absolute inset-0 border-2 border-dashed border-red-500/70 m-16 rounded-xl pointer-events-none flex items-center justify-center">
+              <div className="w-full h-0.5 bg-red-500 animate-pulse absolute shadow-[0_0_12px_#ef4444]"></div>
             </div>
 
             <div className="absolute top-3 right-3 bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-lg flex items-center gap-1 text-[11px] text-emerald-400 font-bold">
