@@ -901,6 +901,7 @@ export default function App() {
       <div className="flex-1 max-w-[1400px] w-full mx-auto flex flex-col md:flex-row my-4 px-3 sm:px-6 gap-6">
         
         {/* Navigation Sidebar */}
+        {!(activeTab === 'cbt' && cbtSubTab === 'simulasi_ujian') && (
           <Sidebar
             activeTab={activeTab}
             setActiveTab={setActiveTab}
@@ -926,6 +927,7 @@ export default function App() {
             ekskulCount={ekskulList.length}
             bankSoalCount={bankSoalList.length}
           />
+        )}
 
         {/* Content View Area */}
         <main className={`flex-1 min-w-0 ${theme === 'light' ? 'bg-white text-slate-900 border-slate-200' : 'bg-[#0A0A0A] text-slate-200 border-slate-800'} rounded-2xl p-4 sm:p-6 border shadow-2xl transition-colors`}>
