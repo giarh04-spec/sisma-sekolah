@@ -1863,17 +1863,17 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                      {guruList.filter(g => {
-                        if (rekapSearch && !g.nama.toLowerCase().includes(rekapSearch.toLowerCase())) return false;
+                      {[...guruList, ...stafList].filter(p => {
+                        if (rekapSearch && !p.nama.toLowerCase().includes(rekapSearch.toLowerCase())) return false;
                         return true;
-                      }).map((g, idx) => {
-                        const record = absensiGuruList.find(a => a.guruId === g.id);
+                      }).map((p, idx) => {
+                        const record = absensiGuruList.find(a => a.guruId === p.id);
                         const status = record ? record.status : 'Belum Absen';
                         return (
-                          <tr key={g.id} className="hover:bg-slate-900/50 transition-colors">
+                          <tr key={p.id} className="hover:bg-slate-900/50 transition-colors">
                             <td className="px-4 py-3 font-mono text-slate-500">{idx + 1}</td>
-                            <td className="px-4 py-3 font-mono text-slate-400">{g.nip || '-'}</td>
-                            <td className="px-4 py-3 font-bold text-white">{g.nama}</td>
+                            <td className="px-4 py-3 font-mono text-slate-400">{(p as any).nip || (p as any).nik || '-'}</td>
+                            <td className="px-4 py-3 font-bold text-white">{p.nama}</td>
                             <td className="px-4 py-3">
                               <span className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold ${
                                 status === 'Hadir' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
