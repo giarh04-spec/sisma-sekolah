@@ -409,7 +409,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                       
                       {/* Perizinan / Persetujuan Kepala Sekolah */}
-                      {currentRole !== 'petugas_absensi' && (
+                      {currentRole !== 'petugas_absensi' && currentRole !== 'siswa' && (
                         <button
                           onClick={() => {
                             setActiveTab('absensi');
