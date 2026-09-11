@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Printer, Barcode as BarcodeIcon, Check } from 'lucide-react';
+import { X, Printer, Barcode as BarcodeIcon, Check, Download } from 'lucide-react';
 import { Product } from '../../types/pos';
-import { BarcodeSvg, generateBarcodeHtml } from './BarcodeSvg';
+import { BarcodeSvg, generateBarcodeHtml, getBarcodeBars } from './BarcodeSvg';
 
 interface ProductBarcodeModalProps {
   isOpen: boolean;
@@ -51,6 +51,81 @@ export const ProductBarcodeModal: React.FC<ProductBarcodeModalProps> = ({
       </html>
     `);
     printWindow.document.close();
+  };
+
+  const handleDownloadImage = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 380;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Background white
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Border
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+    // Header
+    ctx.fillStyle = '#475569';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('KOPERASI SEKOLAH / KASIR MART', canvas.width / 2, 42);
+
+    // Product Name
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText(product.name, canvas.width / 2, 70);
+
+    // Price
+    ctx.fillStyle = '#059669';
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillText(`Rp ${product.sellingPrice.toLocaleString('id-ID')} / ${product.unit}`, canvas.width / 2, 95);
+
+    // Barcode Container Box
+    const startX = 50;
+    const startY = 115;
+    const barWidth = 500;
+    const barHeight = 175;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(startX, startY, barWidth, barHeight);
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(startX, startY, barWidth, barHeight);
+
+    // Draw actual bars
+    const barcodeStr = product.barcode || '8990001';
+    let currX = startX + 25;
+    const svgBars = getBarcodeBars(barcodeStr);
+    const scaleX = 3.0;
+
+    svgBars.forEach(bar => {
+      if (bar.isBlack) {
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(currX, startY + 15, bar.width * scaleX, barHeight - 55);
+      }
+      currX += bar.width * scaleX;
+    });
+
+    // Barcode number text
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 15px monospace';
+    ctx.fillText(`*${barcodeStr}*`, canvas.width / 2, startY + barHeight - 16);
+
+    // Stock
+    ctx.fillStyle = '#64748b';
+    ctx.font = '11px sans-serif';
+    ctx.fillText(`Stok Tersedia: ${product.stock} ${product.unit}`, canvas.width / 2, canvas.height - 22);
+
+    // Trigger download
+    const link = document.createElement('a');
+    link.download = `Barcode-${product.sku || product.name}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
   };
 
   const handleCopyBarcode = () => {
@@ -133,21 +208,31 @@ export const ProductBarcodeModal: React.FC<ProductBarcodeModalProps> = ({
           </div>
         </div>
 
-        <div className="p-4 bg-[#121214] border-t border-slate-800 flex justify-end gap-3">
+        <div className="p-4 bg-[#121214] border-t border-slate-800 flex justify-between items-center gap-3">
           <button
-            onClick={onClose}
-            className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-all"
+            onClick={handleDownloadImage}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-lg transition-all"
+            title="Download PNG"
           >
-            Tutup
+            <Download className="w-4 h-4" /> Download PNG
           </button>
-          <button
-            onClick={handlePrint}
-            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-lg transition-all"
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-all"
+            >
+              Tutup
+            </button>
+            <button
+              onClick={handlePrint}
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-lg transition-all"
           >
-            <Printer className="w-4 h-4" /> Cetak Label ({copies} pcs)
+            <Printer className="w-4 h-4" /> Cetak ({copies})
           </button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
+

@@ -113,7 +113,7 @@ interface AbsensiViewProps {
   setSchoolSettings?: React.Dispatch<React.SetStateAction<SchoolSettings>>;
 }
 
-type SubTabAbsensi = 'scan_barcode' | 'harian_siswa' | 'absensi_guru' | 'redaksi' | 'jurnal_guru' | 'perizinan';
+type SubTabAbsensi = 'scan_barcode' | 'harian_siswa' | 'absensi_guru' | 'rekap_absensi' | 'redaksi' | 'jurnal_guru' | 'perizinan';
 
 // Helper to resolve coordinates to known school locations or format nicely
 const getFriendlyLocationName = (lat: number, lng: number): string => {
@@ -186,6 +186,10 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
 
   // Selection state for bulk actions
   const [selectedGuruIds, setSelectedGuruIds] = useState<string[]>([]);
+  const [rekapTarget, setRekapTarget] = useState<'siswa' | 'guru'>('siswa');
+  const [rekapKelasFilter, setRekapKelasFilter] = useState('Semua Kelas');
+  const [rekapStatusFilter, setRekapStatusFilter] = useState('Semua Status');
+  const [rekapSearch, setRekapSearch] = useState('');
 
   useEffect(() => {
     if (schoolSettings?.jadwalPresensi) {
@@ -1170,6 +1174,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
               {subTab === 'harian_siswa' && <><CalendarCheck className="w-3.5 h-3.5" /> Absensi Harian Siswa</>}
               {subTab === 'jurnal_guru' && <><BookOpen className="w-3.5 h-3.5" /> Jurnal Guru</>}
               {subTab === 'absensi_guru' && <><UserCheck className="w-3.5 h-3.5" /> Presensi Guru</>}
+              {subTab === 'rekap_absensi' && <><FileSpreadsheet className="w-3.5 h-3.5" /> Rekap Absensi Siswa & Guru</>}
               {subTab === 'redaksi' && <><MessageSquare className="w-3.5 h-3.5" /> Redaksi Notifikasi WA</>}
               {subTab === 'perizinan' && <><FileSignature className="w-3.5 h-3.5" /> Pengajuan Izin / Cuti</>}
             </span>
@@ -1555,324 +1560,344 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
         </div>
       )}
 
-      {/* SUBTAB 1: ABSENSI HARIAN SISWA */}
-      {subTab === 'harian_siswa' && (
-        <div className="space-y-4">
-          
-          {/* Controls Bar */}
-          <div className="bg-[#121212] p-4 rounded-xl border border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <div>
-                <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Pilih Kelas</label>
-                <select
-                  value={selectedKelas}
-                  onChange={e => setSelectedKelas(e.target.value)}
-                  className="bg-[#181818] border border-slate-800 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
-                >
-                  {availableKelasOptions.map(k => (
-                    <option key={k} value={k}>{k}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Tanggal</label>
-                <div className="relative w-full min-w-[140px]">
-                  <input
-                    type="date"
-                    value={selectedTanggal}
-                    onChange={e => setSelectedTanggal(e.target.value)}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                  />
-                  <div className="bg-[#181818] border border-slate-800 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-200 flex justify-between items-center group focus-within:border-blue-500 transition-colors">
-                    <span>
-                      {selectedTanggal
-                        ? selectedTanggal.split('-').reverse().join('/')
-                        : <span className="text-slate-500">dd/mm/yyyy</span>}
-                    </span>
-                    <Calendar className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-500 transition-colors ml-2" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={handleSaveHarian}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition-all flex items-center gap-2 shadow-sm"
-            >
-              <Save className="w-4 h-4" /> Simpan Absensi Harian
-            </button>
-          </div>
-
-          {savedSuccess && (
-            <div className="p-3 bg-emerald-950/80 text-emerald-200 rounded-xl text-xs font-bold flex items-center gap-2 border border-emerald-800">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              Absensi harian siswa kelas {selectedKelas} tanggal {selectedTanggal} berhasil disimpan!
-            </div>
-          )}
-
-          {/* Table Attendance Grid */}
-          <div className="bg-[#121212] rounded-xl border border-slate-800 shadow-sm overflow-hidden">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-[#181818] border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
-                <tr>
-                  <th className="px-4 py-3">No</th>
-                  <th className="px-4 py-3">NISN / NIS</th>
-                  <th className="px-4 py-3">Nama Siswa</th>
-                  <th className="px-4 py-3 text-center">Status Kehadiran</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {classSiswaList.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
-                      Tidak ada siswa di kelas ini.
-                    </td>
-                  </tr>
-                ) : (
-                  classSiswaList.map((s, idx) => {
-                    const currentStatus = localHarianState[s.id] || 'Hadir';
-                    return (
-                      <tr key={s.id} className="hover:bg-slate-800/30 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-slate-500">{idx + 1}</td>
-                        <td className="px-4 py-3 font-mono text-slate-400">{s.nisn}</td>
-                        <td className="px-4 py-3 font-bold text-white">{s.nama}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center gap-1.5">
-                            {(['Hadir', 'Sakit', 'Izin', 'Alpha'] as StatusAbsensi[]).map(st => (
-                              <button
-                                key={st}
-                                onClick={() => setLocalHarianState(prev => ({ ...prev, [s.id]: st }))}
-                                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                                  currentStatus === st
-                                    ? st === 'Hadir' ? 'bg-green-500/20 text-green-400 border border-green-500/30 shadow-sm'
-                                      : st === 'Sakit' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 shadow-sm'
-                                      : st === 'Izin' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30 shadow-sm'
-                                      : 'bg-red-500/20 text-red-400 border border-red-500/30 shadow-sm'
-                                    : 'bg-[#181818] text-slate-400 hover:bg-slate-800 border border-slate-800'
-                                }`}
-                              >
-                                {st}
-                              </button>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-        </div>
-      )}
 
 
-      {/* SUBTAB 3: ABSENSI GURU CLOCK IN/OUT & IZIN */}
-      {subTab === 'absensi_guru' && (
-        <div className="space-y-6">
-          
-          {guruClockStatus && (
-            <div className="p-4 bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-sm">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              {guruClockStatus}
-            </div>
-          )}
-
-          {/* Clock In / Out Banner */}
-          <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-6 text-white border border-slate-800 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
-            <div>
-              <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider block mb-1">
-                Real-Time Presensi Kehadiran Guru
-              </span>
-              <h3 className="text-xl font-bold">Clock-IN & Clock-OUT Guru</h3>
-              <p className="text-xs text-slate-300 mt-1">
-                Catat jam kedatangan dan jam pulang harian guru dengan geotagging lokasi sekolah.
+      
+      {/* SUBTAB REKAP ABSENSI TERPADU (SISWA & GURU/STAF) */}
+      {subTab === 'rekap_absensi' && (
+        <div className="space-y-6 animate-fade-in text-left">
+          {/* Header & Dropdown Switcher */}
+          <div className="bg-[#121212] border border-slate-800 p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+            <div className="space-y-1">
+              <h2 className="text-lg font-black text-white flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-amber-400" />
+                Rekap Absensi Terpadu Siswa dan Guru/Staf
+              </h2>
+              <p className="text-xs text-slate-400">
+                Laporan dan rekapitulasi kehadiran harian lengkap dengan statistik kehadiran, filter kelas, dan ekspor data.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => handleClockIn('gur-01')}
-                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+            {/* Dropdown Selector */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-slate-300">Pilih Kategori Rekap:</span>
+              <select
+                value={rekapTarget}
+                onChange={(e) => setRekapTarget(e.target.value as 'siswa' | 'guru')}
+                className="px-4 py-2 bg-[#18181b] border border-slate-700 text-white font-bold text-xs rounded-xl focus:outline-none focus:border-amber-500 shadow-md cursor-pointer"
               >
-                <Clock className="w-4 h-4" /> Clock-IN (Masuk)
-              </button>
-              <button
-                onClick={() => handleClockOut('gur-01')}
-                className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-2 border border-slate-600"
-              >
-                <Clock className="w-4 h-4 text-emerald-400" /> Clock-OUT (Pulang)
-              </button>
-              <button
-                onClick={() => setShowFormIzin(true)}
-                className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all flex items-center gap-2"
-              >
-                <Send className="w-4 h-4" /> Pengajuan Izin / Cuti
-              </button>
+                <option value="siswa">👥 Rekap Absensi Siswa</option>
+                <option value="guru">👨‍🏫 Rekap Presensi Guru & Staf</option>
+              </select>
             </div>
           </div>
 
-          {/* Form Modal Izin Guru */}
-          {showFormIzin && (
-            <div className="bg-white p-6 rounded-2xl border border-amber-200 shadow-md space-y-3">
-              <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2 text-amber-700">
-                <Send className="w-4 h-4" /> Form Pengajuan Izin / Cuti / Dinas Outer Guru
-              </h4>
-              <form onSubmit={handlePengajuanIzin} className="space-y-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-700">Pilih Nama Guru</label>
+          {/* Filters & Summary Cards */}
+          {rekapTarget === 'siswa' ? (
+            <div className="space-y-6">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-[#121212] border border-slate-800 p-4 rounded-2xl shadow-sm">
+                  <p className="text-xs text-slate-400">Total Siswa Terdaftar</p>
+                  <p className="text-2xl font-black text-white mt-1">{siswaList.length}</p>
+                </div>
+                <div className="bg-[#121212] border border-slate-800 p-4 rounded-2xl shadow-sm">
+                  <p className="text-xs text-emerald-400 font-semibold">Hadir Hari Ini</p>
+                  <p className="text-2xl font-black text-emerald-400 mt-1">
+                    {absensiHarian.filter(a => a.status === 'Hadir').length}
+                  </p>
+                </div>
+                <div className="bg-[#121212] border border-slate-800 p-4 rounded-2xl shadow-sm">
+                  <p className="text-xs text-blue-400 font-semibold">Sakit / Izin</p>
+                  <p className="text-2xl font-black text-blue-400 mt-1">
+                    {absensiHarian.filter(a => a.status === 'Sakit' || a.status === 'Izin').length}
+                  </p>
+                </div>
+                <div className="bg-[#121212] border border-slate-800 p-4 rounded-2xl shadow-sm">
+                  <p className="text-xs text-rose-400 font-semibold">Alpha / Tanpa Ket.</p>
+                  <p className="text-2xl font-black text-rose-400 mt-1">
+                    {absensiHarian.filter(a => a.status === 'Alpha').length}
+                  </p>
+                </div>
+              </div>
+
+              {/* Filter Bar */}
+              <div className="bg-[#121212] border border-slate-800 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    type="text"
+                    placeholder="Cari nama siswa atau NIS..."
+                    value={rekapSearch}
+                    onChange={(e) => setRekapSearch(e.target.value)}
+                    className="px-3.5 py-2 bg-[#18181b] border border-slate-800 rounded-xl text-white text-xs w-64 focus:outline-none focus:border-amber-500"
+                  />
                   <select
-                    value={formIzinGuruId}
-                    onChange={e => setFormIzinGuruId(e.target.value)}
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:text-slate-950 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    value={rekapKelasFilter}
+                    onChange={(e) => setRekapKelasFilter(e.target.value)}
+                    className="px-3.5 py-2 bg-[#18181b] border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-amber-500"
                   >
-                    {guruList.map(g => (
-                      <option key={g.id} value={g.id}>{g.nama} ({g.mataPelajaran})</option>
+                    <option value="Semua Kelas">Semua Kelas</option>
+                    {rombelList.map(r => (
+                      <option key={r.id} value={r.namaRombel}>{r.namaRombel}</option>
                     ))}
+                  </select>
+                  <select
+                    value={rekapStatusFilter}
+                    onChange={(e) => setRekapStatusFilter(e.target.value)}
+                    className="px-3.5 py-2 bg-[#18181b] border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="Semua Status">Semua Status</option>
+                    <option value="Hadir">Hadir</option>
+                    <option value="Sakit">Sakit</option>
+                    <option value="Izin">Izin</option>
+                    <option value="Alpha">Alpha</option>
                   </select>
                 </div>
 
-                <div>
-                  <label className="text-[11px] font-bold text-slate-700">Alasan & Keterangan Izin</label>
-                  <textarea
-                    required
-                    rows={2}
-                    value={formIzinKet}
-                    onChange={e => setFormIzinKet(e.target.value)}
-                    placeholder="Contoh: Mengikuti Pelatihan Kurikulum Merdeka atau Sakit..."
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:text-slate-950 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const printWin = window.open('', '_blank', 'width=800,height=600');
+                      if (!printWin) return;
+                      printWin.document.write(`
+                        <html>
+                          <head><title>Rekap Absensi Siswa</title>
+                          <style>
+                            body { font-family: sans-serif; padding: 20px; }
+                            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                            th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 12px; }
+                            th { background: #f1f5f9; }
+                          </style>
+                          </head>
+                          <body onload="window.print(); window.close();">
+                            <h2>Rekapitulasi Absensi Harian Siswa</h2>
+                            <p>Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}</p>
+                            <table>
+                              <thead>
+                                <tr><th>No</th><th>NIS</th><th>Nama Siswa</th><th>Kelas</th><th>Status</th><th>Waktu</th><th>Keterangan</th></tr>
+                              </thead>
+                              <tbody>
+                                ${siswaList.filter(s => {
+                                  if (rekapKelasFilter !== 'Semua Kelas' && s.kelas !== rekapKelasFilter) return false;
+                                  if (rekapSearch && !s.nama.toLowerCase().includes(rekapSearch.toLowerCase())) return false;
+                                  return true;
+                                }).map((s, idx) => {
+                                  const record = absensiHarian.find(a => a.siswaId === s.id);
+                                  const status = record ? record.status : 'Hadir';
+                                  if (rekapStatusFilter !== 'Semua Status' && status !== rekapStatusFilter) return '';
+                                  return `<tr>
+                                    <td>${idx + 1}</td>
+                                    <td>${s.nis || '-'}</td>
+                                    <td>${s.nama}</td>
+                                    <td>${s.kelas || '-'}</td>
+                                    <td>${status}</td>
+                                    <td>${record?.jamScan || record?.jamMasuk || '-'}</td>
+                                    <td>${record?.keterangan || '-'}</td>
+                                  </tr>`;
+                                }).join('')}
+                              </tbody>
+                            </table>
+                          </body>
+                        </html>
+                      `);
+                      printWin.document.close();
+                    }}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all shadow-md"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" /> Cetak / Export Rekap Siswa
+                  </button>
+                </div>
+              </div>
+
+              {/* Table Siswa */}
+              <div className="bg-[#121212] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#18181b] text-slate-400 uppercase font-bold border-b border-slate-800">
+                      <tr>
+                        <th className="px-4 py-3">No</th>
+                        <th className="px-4 py-3">NIS</th>
+                        <th className="px-4 py-3">Nama Siswa</th>
+                        <th className="px-4 py-3">Kelas</th>
+                        <th className="px-4 py-3">Status Kehadiran</th>
+                        <th className="px-4 py-3">Waktu Masuk</th>
+                        <th className="px-4 py-3">Keterangan</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                      {siswaList.filter(s => {
+                        if (rekapKelasFilter !== 'Semua Kelas' && s.kelas !== rekapKelasFilter) return false;
+                        if (rekapSearch && !s.nama.toLowerCase().includes(rekapSearch.toLowerCase())) return false;
+                        return true;
+                      }).map((s, idx) => {
+                        const record = absensiHarian.find(a => a.siswaId === s.id);
+                        const status = record ? record.status : 'Hadir';
+                        if (rekapStatusFilter !== 'Semua Status' && status !== rekapStatusFilter) return null;
+                        return (
+                          <tr key={s.id} className="hover:bg-slate-900/50 transition-colors">
+                            <td className="px-4 py-3 font-mono text-slate-500">{idx + 1}</td>
+                            <td className="px-4 py-3 font-mono text-slate-400">{s.nis || '-'}</td>
+                            <td className="px-4 py-3 font-bold text-white">{s.nama}</td>
+                            <td className="px-4 py-3">{s.kelas || '-'}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold ${
+                                status === 'Hadir' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                                status === 'Sakit' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                                status === 'Izin' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                                'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                              }`}>
+                                {status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 font-mono">{record?.jamScan || record?.jamMasuk || '-'}</td>
+                            <td className="px-4 py-3 text-slate-400">{record?.keterangan || '-'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Summary Cards Guru */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-[#121212] border border-slate-800 p-4 rounded-2xl shadow-sm">
+                  <p className="text-xs text-slate-400">Total Guru & Staf</p>
+                  <p className="text-2xl font-black text-white mt-1">{guruList.length + (stafList?.length || 0)}</p>
+                </div>
+                <div className="bg-[#121212] border border-slate-800 p-4 rounded-2xl shadow-sm">
+                  <p className="text-xs text-purple-400 font-semibold">Hadir Presensi</p>
+                  <p className="text-2xl font-black text-purple-400 mt-1">
+                    {absensiGuruList.filter(a => a.status === 'Hadir').length}
+                  </p>
+                </div>
+                <div className="bg-[#121212] border border-slate-800 p-4 rounded-2xl shadow-sm">
+                  <p className="text-xs text-amber-400 font-semibold">Izin / Dinas</p>
+                  <p className="text-2xl font-black text-amber-400 mt-1">
+                    {absensiGuruList.filter(a => a.status === 'Izin' || a.status === 'Sakit').length}
+                  </p>
+                </div>
+                <div className="bg-[#121212] border border-slate-800 p-4 rounded-2xl shadow-sm">
+                  <p className="text-xs text-rose-400 font-semibold">Belum Absen</p>
+                  <p className="text-2xl font-black text-rose-400 mt-1">
+                    {Math.max(0, (guruList.length + (stafList?.length || 0)) - absensiGuruList.length)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Filter Bar Guru */}
+              <div className="bg-[#121212] border border-slate-800 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    type="text"
+                    placeholder="Cari nama guru atau NIP..."
+                    value={rekapSearch}
+                    onChange={(e) => setRekapSearch(e.target.value)}
+                    className="px-3.5 py-2 bg-[#18181b] border border-slate-800 rounded-xl text-white text-xs w-64 focus:outline-none focus:border-amber-500"
                   />
                 </div>
 
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowFormIzin(false)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-1.5 rounded-lg text-xs font-bold text-slate-950 bg-amber-500 hover:bg-amber-400"
-                  >
-                    Kirim Izin
-                  </button>
+                <button
+                  onClick={() => {
+                    const printWin = window.open('', '_blank', 'width=800,height=600');
+                    if (!printWin) return;
+                    printWin.document.write(`
+                      <html>
+                        <head><title>Rekap Presensi Guru & Staf</title>
+                        <style>
+                          body { font-family: sans-serif; padding: 20px; }
+                          table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                          th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 12px; }
+                          th { background: #f1f5f9; }
+                        </style>
+                        </head>
+                        <body onload="window.print(); window.close();">
+                          <h2>Rekapitulasi Presensi Guru & Staf</h2>
+                          <p>Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}</p>
+                          <table>
+                            <thead>
+                              <tr><th>No</th><th>NIP</th><th>Nama Guru/Staf</th><th>Status</th><th>Jam Masuk</th><th>Jam Pulang</th><th>Lokasi</th></tr>
+                            </thead>
+                            <tbody>
+                              ${guruList.map((g, idx) => {
+                                const record = absensiGuruList.find(a => a.guruId === g.id);
+                                const status = record ? record.status : 'Belum Absen';
+                                return `<tr>
+                                  <td>${idx + 1}</td>
+                                  <td>${g.nip || '-'}</td>
+                                  <td>${g.nama}</td>
+                                  <td>${status}</td>
+                                  <td>${record?.jamMasuk || '-'}</td>
+                                  <td>${record?.jamKeluar || '-'}</td>
+                                  <td>${record?.lokasiIn || '-'}</td>
+                                </tr>`;
+                              }).join('')}
+                            </tbody>
+                          </table>
+                        </body>
+                      </html>
+                    `);
+                    printWin.document.close();
+                  }}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all shadow-md"
+                >
+                  <FileSpreadsheet className="w-4 h-4" /> Cetak / Export Rekap Guru
+                </button>
+              </div>
+
+              {/* Table Guru */}
+              <div className="bg-[#121212] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#18181b] text-slate-400 uppercase font-bold border-b border-slate-800">
+                      <tr>
+                        <th className="px-4 py-3">No</th>
+                        <th className="px-4 py-3">NIP / ID</th>
+                        <th className="px-4 py-3">Nama Guru & Staf</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Jam Masuk</th>
+                        <th className="px-4 py-3">Jam Pulang</th>
+                        <th className="px-4 py-3">Lokasi / GPS</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                      {guruList.filter(g => {
+                        if (rekapSearch && !g.nama.toLowerCase().includes(rekapSearch.toLowerCase())) return false;
+                        return true;
+                      }).map((g, idx) => {
+                        const record = absensiGuruList.find(a => a.guruId === g.id);
+                        const status = record ? record.status : 'Belum Absen';
+                        return (
+                          <tr key={g.id} className="hover:bg-slate-900/50 transition-colors">
+                            <td className="px-4 py-3 font-mono text-slate-500">{idx + 1}</td>
+                            <td className="px-4 py-3 font-mono text-slate-400">{g.nip || '-'}</td>
+                            <td className="px-4 py-3 font-bold text-white">{g.nama}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold ${
+                                status === 'Hadir' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
+                                status === 'Izin' || status === 'Sakit' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                                'bg-slate-800 text-slate-400 border border-slate-700'
+                              }`}>
+                                {status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 font-mono text-emerald-400">{record?.jamMasuk || '-'}</td>
+                            <td className="px-4 py-3 font-mono text-amber-400">{record?.jamKeluar || '-'}</td>
+                            <td className="px-4 py-3 text-slate-400">{record?.lokasiIn || '-'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              </form>
+              </div>
             </div>
           )}
-
-          {/* Daftar Kehadiran Guru Hari Ini */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Rekap Kehadiran Guru (Hari Ini)</h3>
-                {selectedGuruIds.length > 0 && (
-                  <button
-                    onClick={() => handleDeleteGuruRecords(selectedGuruIds, true)}
-                    className="flex items-center gap-1.5 px-3 py-1 bg-rose-600 text-white rounded-lg text-[10px] font-bold hover:bg-rose-700 transition-colors shadow-sm"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    Hapus ({selectedGuruIds.length})
-                  </button>
-                )}
-              </div>
-              <span className="text-xs text-slate-500 font-semibold">Total: {absensiGuruList.length} Record</span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600">
-                <thead className="bg-slate-100 text-slate-700 font-semibold uppercase tracking-wider text-[11px]">
-                  <tr>
-                    <th className="px-4 py-3 w-10">
-                      <button 
-                        onClick={toggleSelectAllGuru}
-                        className="text-slate-400 hover:text-indigo-600 transition-colors"
-                      >
-                        {selectedGuruIds.length === absensiGuruList.length && absensiGuruList.length > 0 ? (
-                          <CheckSquare className="w-4 h-4 text-indigo-600" />
-                        ) : (
-                          <Square className="w-4 h-4" />
-                        )}
-                      </button>
-                    </th>
-                    <th className="px-4 py-3">Nama Guru</th>
-                    <th className="px-4 py-3">Tanggal</th>
-                    <th className="px-4 py-3">Jam Masuk</th>
-                    <th className="px-4 py-3">Jam Keluar</th>
-                    <th className="px-4 py-3">Status Masuk</th>
-                    <th className="px-4 py-3">Status Pulang</th>
-                    <th className="px-4 py-3">Lokasi</th>
-                    <th className="px-4 py-3 text-right">AKSI</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {absensiGuruList.map(a => (
-                    <tr key={a.id} className={`hover:bg-slate-50/80 transition-colors ${selectedGuruIds.includes(a.id) ? 'bg-indigo-50/30' : ''}`}>
-                      <td className="px-4 py-3">
-                        <button 
-                          onClick={() => toggleSelectGuru(a.id)}
-                          className="text-slate-400 hover:text-indigo-600 transition-colors"
-                        >
-                          {selectedGuruIds.includes(a.id) ? (
-                            <CheckSquare className="w-4 h-4 text-indigo-600" />
-                          ) : (
-                            <Square className="w-4 h-4" />
-                          )}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 font-bold text-slate-900">{a.guruNama}</td>
-                      <td className="px-4 py-3 font-mono">{a.tanggal}</td>
-                      <td className="px-4 py-3 font-mono font-semibold text-emerald-700">{a.jamMasuk || '-'}</td>
-                      <td className="px-4 py-3 font-mono font-semibold text-blue-700">{a.jamKeluar || '-'}</td>
-                      <td className="px-4 py-3">
-                        {(() => {
-                          const { masuk } = getDualStatus(a);
-                          return (
-                            <span className={`inline-block px-2 py-0.5 rounded-full font-bold text-[9px] ${masuk.color}`}>
-                              {masuk.label}
-                            </span>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-4 py-3">
-                        {(() => {
-                          const { pulang } = getDualStatus(a);
-                          return (
-                            <span className={`inline-block px-2 py-0.5 rounded-full font-bold text-[9px] ${pulang.color}`}>
-                              {pulang.label}
-                            </span>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 max-w-xs truncate">
-                        <LocationWithMapLink text={a.lokasiIn || a.lokasiOut || '-'} />
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end">
-                          <button
-                            onClick={() => handleDeleteGuruRecords([a.id])}
-                            className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all border border-transparent hover:border-rose-100 flex items-center justify-center cursor-pointer"
-                            title="Hapus Data"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
         </div>
       )}
 
-      
       {/* SUBTAB 5: PERIZINAN */}
       {subTab === 'perizinan' && (
         <PerizinanView

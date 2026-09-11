@@ -556,6 +556,7 @@ export const CbtView: React.FC<CbtViewProps> = ({
   const activeBank = bankSoalList.find(b => b.id === selectedBankId) || bankSoalList[0];
 
   const [showAddSoalModal, setShowAddSoalModal] = useState(false);
+  const [editingSoalId, setEditingSoalId] = useState<string | null>(null);
   const [newTipe, setNewTipe] = useState<TipeSoal>('pg');
   const [newPertanyaan, setNewPertanyaan] = useState('');
   const [newOpsiA, setNewOpsiA] = useState('');
@@ -571,6 +572,54 @@ export const CbtView: React.FC<CbtViewProps> = ({
   const [newImageUrl, setNewImageUrl] = useState('');
   const [newVideoUrl, setNewVideoUrl] = useState('');
 
+  const handleOpenEditSoal = (soal: SoalCBT) => {
+    setEditingSoalId(soal.id);
+    setNewTipe(soal.tipe);
+    setNewPertanyaan(soal.pertanyaan);
+    setNewBobot(soal.bobot || 25);
+    setNewPembahasan(soal.pembahasan || '');
+    setNewImageUrl(soal.imageUrl || '');
+    setNewVideoUrl(soal.videoUrl || '');
+    if (soal.opsi && soal.opsi.length >= 4) {
+      setNewOpsiA(soal.opsi[0]?.teks || '');
+      setNewOpsiB(soal.opsi[1]?.teks || '');
+      setNewOpsiC(soal.opsi[2]?.teks || '');
+      setNewOpsiD(soal.opsi[3]?.teks || '');
+    } else {
+      setNewOpsiA('');
+      setNewOpsiB('');
+      setNewOpsiC('');
+      setNewOpsiD('');
+    }
+    if (soal.tipe === 'pg') {
+      setNewKunciPg(Array.isArray(soal.kunciJawaban) ? soal.kunciJawaban[0] || 'A' : String(soal.kunciJawaban || 'A'));
+    } else if (soal.tipe === 'multiple_choice') {
+      setNewKunciMultipleChoice(Array.isArray(soal.kunciJawaban) ? soal.kunciJawaban : ['A']);
+    } else if (soal.tipe === 'isian') {
+      setNewKunciIsian(String(soal.kunciJawaban || ''));
+    } else if (soal.tipe === 'esai') {
+      setNewKunciEsai(String(soal.kunciJawaban || ''));
+    }
+    setShowAddSoalModal(true);
+  };
+
+  const handleDeleteSoal = (soalId: string) => {
+    if (!activeBank) return;
+    if (!window.confirm('Apakah Anda yakin ingin menghapus soal ini dari Bank Soal?')) return;
+
+    setBankSoalList(prev => prev.map(b => {
+      if (b.id === activeBank.id) {
+        const updatedDaftarSoal = b.daftarSoal.filter(s => s.id !== soalId);
+        return {
+          ...b,
+          daftarSoal: updatedDaftarSoal,
+          jumlahSoal: updatedDaftarSoal.length
+        };
+      }
+      return b;
+    }));
+  };
+
   const handleAddSoal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeBank) return;
@@ -580,8 +629,8 @@ export const CbtView: React.FC<CbtViewProps> = ({
     if (newTipe === 'isian') kunci = newKunciIsian;
     if (newTipe === 'esai') kunci = newKunciEsai;
 
-    const newSoal: SoalCBT = {
-      id: `soal-${Date.now()}`,
+    const payloadSoal: SoalCBT = {
+      id: editingSoalId || `soal-${Date.now()}`,
       tipe: newTipe,
       pertanyaan: newPertanyaan,
       opsi: (newTipe === 'pg' || newTipe === 'multiple_choice') ? [
@@ -599,20 +648,28 @@ export const CbtView: React.FC<CbtViewProps> = ({
 
     setBankSoalList(prev => prev.map(b => {
       if (b.id === activeBank.id) {
+        let updatedDaftarSoal = [...b.daftarSoal];
+        if (editingSoalId) {
+          updatedDaftarSoal = updatedDaftarSoal.map(s => s.id === editingSoalId ? payloadSoal : s);
+        } else {
+          updatedDaftarSoal.push(payloadSoal);
+        }
         return {
           ...b,
-          daftarSoal: [...b.daftarSoal, newSoal],
-          jumlahSoal: b.daftarSoal.length + 1
+          daftarSoal: updatedDaftarSoal,
+          jumlahSoal: updatedDaftarSoal.length
         };
       }
       return b;
     }));
 
     setShowAddSoalModal(false);
+    setEditingSoalId(null);
     setNewPertanyaan('');
     setNewImageUrl('');
     setNewVideoUrl('');
-    alert('Soal baru berhasil ditambahkan ke Bank Soal!');
+    setNewPembahasan('');
+    alert(editingSoalId ? 'Soal berhasil diperbarui!' : 'Soal baru berhasil ditambahkan ke Bank Soal!');
   };
 
   // --- AI Generator State ---
@@ -1316,7 +1373,23 @@ export const CbtView: React.FC<CbtViewProps> = ({
                     <p className="text-xs text-slate-500">{activeBank.mataPelajaran} - Kelas {activeBank.kelas} | Durasi: {activeBank.durasiMenit} Menit</p>
                   </div>
                   <button
-                    onClick={() => setShowAddSoalModal(true)}
+                    onClick={() => {
+                      setEditingSoalId(null);
+                      setNewTipe('pg');
+                      setNewPertanyaan('');
+                      setNewOpsiA('');
+                      setNewOpsiB('');
+                      setNewOpsiC('');
+                      setNewOpsiD('');
+                      setNewKunciPg('A');
+                      setNewKunciIsian('');
+                      setNewKunciEsai('');
+                      setNewPembahasan('');
+                      setNewBobot(25);
+                      setNewImageUrl('');
+                      setNewVideoUrl('');
+                      setShowAddSoalModal(true);
+                    }}
                     className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-sm"
                   >
                     <Plus className="w-4 h-4" /> Tambah Soal Manual
@@ -1328,10 +1401,28 @@ export const CbtView: React.FC<CbtViewProps> = ({
                   {activeBank.daftarSoal.map((soal, idx) => (
                     <div key={soal.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="px-2 py-0.5 bg-slate-200 text-slate-800 font-mono font-bold rounded text-[10px]">
-                          Soal #{idx + 1} • {soal.tipe.toUpperCase()}
-                        </span>
-                        <span className="text-[11px] font-bold text-emerald-700">Bobot: {soal.bobot} Poin</span>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 bg-slate-200 text-slate-800 font-mono font-bold rounded text-[10px]">
+                            Soal #{idx + 1} • {soal.tipe.toUpperCase()}
+                          </span>
+                          <span className="text-[11px] font-bold text-emerald-700">Bobot: {soal.bobot} Poin</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenEditSoal(soal)}
+                            className="px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shadow-sm"
+                            title="Edit Soal"
+                          >
+                            <Edit2 className="w-3 h-3" /> Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSoal(soal.id)}
+                            className="px-2.5 py-1 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shadow-sm"
+                            title="Hapus Soal"
+                          >
+                            <Trash2 className="w-3 h-3" /> Hapus
+                          </button>
+                        </div>
                       </div>
                       <p className="font-bold text-slate-900 text-xs leading-relaxed">{soal.pertanyaan}</p>
 
@@ -1378,6 +1469,31 @@ export const CbtView: React.FC<CbtViewProps> = ({
                       </div>
                     </div>
                   ))}
+                </div>
+
+                <div className="pt-2 flex justify-center">
+                  <button
+                    onClick={() => {
+                      setEditingSoalId(null);
+                      setNewTipe('pg');
+                      setNewPertanyaan('');
+                      setNewOpsiA('');
+                      setNewOpsiB('');
+                      setNewOpsiC('');
+                      setNewOpsiD('');
+                      setNewKunciPg('A');
+                      setNewKunciIsian('');
+                      setNewKunciEsai('');
+                      setNewPembahasan('');
+                      setNewBobot(25);
+                      setNewImageUrl('');
+                      setNewVideoUrl('');
+                      setShowAddSoalModal(true);
+                    }}
+                    className="w-full py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 border border-emerald-200 shadow-sm cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" /> Tambah Soal Baru
+                  </button>
                 </div>
               </>
             ) : (
@@ -1980,7 +2096,7 @@ export const CbtView: React.FC<CbtViewProps> = ({
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-black text-slate-900 text-base">Input Soal Baru Manual</h3>
+              <h3 className="font-black text-slate-900 text-base">{editingSoalId ? 'Edit Soal Ujian' : 'Input Soal Baru Manual'}</h3>
               <button 
                 type="button" 
                 onClick={() => setShowAddSoalModal(false)}
@@ -2168,7 +2284,7 @@ export const CbtView: React.FC<CbtViewProps> = ({
 
               <div className="flex justify-end gap-2.5 p-4 bg-slate-50 border-t border-slate-100">
                 <button type="button" onClick={() => setShowAddSoalModal(false)} className="px-5 py-2.5 rounded-xl text-xs font-black bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors cursor-pointer">Batal</button>
-                <button type="submit" className="px-6 py-2.5 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/15 transition-all cursor-pointer">Simpan Soal</button>
+                <button type="submit" className="px-6 py-2.5 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/15 transition-all cursor-pointer">{editingSoalId ? 'Simpan Perubahan' : 'Simpan Soal'}</button>
               </div>
             </form>
           </div>

@@ -15,7 +15,7 @@ export interface RombelKelas {
 
 export type Role = 'admin' | 'guru' | 'siswa' | 'staf' | 'kepsek' | 'petugas_absensi';
 export type SubTab = 'siswa' | 'guru' | 'staf' | 'rombel' | 'mapel' | 'ekskul';
-export type AbsensiSubTab = 'scan_barcode' | 'harian_siswa' | 'absensi_guru' | 'redaksi' | 'perizinan' | 'jurnal_guru';
+export type AbsensiSubTab = 'scan_barcode' | 'harian_siswa' | 'absensi_guru' | 'rekap_absensi' | 'redaksi' | 'perizinan' | 'jurnal_guru';
 export type CbtSubTab = 'bank_soal' | 'jadwal_kartu' | 'ai_generator' | 'simulasi_ujian' | 'hasil_ujian';
 export type KeuanganSubTab = 'pembayaran' | 'pengaturan_biaya' | 'rekap' | 'redaksi' | 'gaji';
 export type AdministrasiSubTab = 'modul_ajar' | 'cp' | 'atp' | 'kktp' | 'prota' | 'prosem' | 'jadwal' | 'kalender' | 'jurnal_guru';
