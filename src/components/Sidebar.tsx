@@ -522,7 +522,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       )}
 
                       {/* 2. Jadwal & Kartu Ujian */}
-                      {currentRole !== 'guru' && (
+                      {currentRole !== 'guru' && currentRole !== 'siswa' && (
                         <button
                           onClick={() => {
                             setActiveTab('cbt');
@@ -560,22 +560,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </button>
 
                       {/* 4. Hasil Ujian (Firebase) */}
-                      <button
-                        onClick={() => {
-                          setActiveTab('cbt');
-                          if (setCbtSubTab) setCbtSubTab('hasil_ujian');
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
-                          cbtSubTab === 'hasil_ujian'
-                            ? 'bg-amber-600/10 text-amber-400 border border-amber-500/20 shadow-sm'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Hasil Ujian (Firebase)</span>
-                        </div>
-                      </button>
+                      {currentRole !== 'siswa' && (
+                        <button
+                          onClick={() => {
+                            setActiveTab('cbt');
+                            if (setCbtSubTab) setCbtSubTab('hasil_ujian');
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-between transition-all ${
+                            cbtSubTab === 'hasil_ujian'
+                              ? 'bg-amber-600/10 text-amber-400 border border-amber-500/20 shadow-sm'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Hasil Ujian (Firebase)</span>
+                          </div>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
