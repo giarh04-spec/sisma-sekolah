@@ -812,6 +812,9 @@ export const CbtView: React.FC<CbtViewProps> = ({
   };
 
   // --- Simulasi Ujian Student State ---
+  const [isExamStarted, setIsExamStarted] = useState(false);
+  const [selectedExamBank, setSelectedExamBank] = useState<BankSoal | null>(null);
+  const [examMapelFilter, setExamMapelFilter] = useState<string>('');
   const [soalIndex, setSoalIndex] = useState(0);
   const [siswaJawaban, setSiswaJawaban] = useState<Record<string, JawabanSiswa>>({});
   const [examFinished, setExamFinished] = useState(false);
@@ -1035,7 +1038,7 @@ export const CbtView: React.FC<CbtViewProps> = ({
     };
   }, [subTab, examFinished]);
 
-  const currentExam = activeBank;
+  const currentExam = selectedExamBank || activeBank;
   const currentSoal = currentExam?.daftarSoal[soalIndex];
 
   const handleAnswerSelect = (soalId: string, answer: string | string[]) => {
@@ -1663,7 +1666,128 @@ export const CbtView: React.FC<CbtViewProps> = ({
           )}
 
           {!examFinished ? (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            !isExamStarted ? (
+              /* Selection Screen: Choose Subject & Bank Soal */
+              <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-8">
+                  <div className="text-center space-y-2">
+                    <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+                      <BookOpen className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">Persiapan Ujian CBT</h3>
+                    <p className="text-sm text-slate-500 font-medium">Silakan pilih mata pelajaran dan paket soal untuk memulai simulasi ujian.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Subject Selection */}
+                    <div className="space-y-4">
+                      <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                        <Layers className="w-3.5 h-3.5" /> 1. Pilih Mata Pelajaran
+                      </label>
+                      <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                        {availableMapelList.map(m => {
+                          const count = bankSoalList.filter(b => b.mataPelajaran === m).length;
+                          return (
+                            <button
+                              key={m}
+                              onClick={() => {
+                                setExamMapelFilter(m);
+                                setSelectedExamBank(null);
+                              }}
+                              className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left ${
+                                examMapelFilter === m
+                                  ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-md'
+                                  : 'bg-slate-50 border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              <span className="text-xs font-bold">{m}</span>
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                examMapelFilter === m ? 'bg-blue-200 text-blue-800' : 'bg-slate-200 text-slate-500'
+                              }`}>
+                                {count} Soal
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Bank Soal Selection */}
+                    <div className="space-y-4">
+                      <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                        <CheckSquare className="w-3.5 h-3.5" /> 2. Pilih Paket Soal
+                      </label>
+                      <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                        {!examMapelFilter ? (
+                          <div className="h-[200px] flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
+                            <AlertCircle className="w-8 h-8 text-slate-300 mb-2" />
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Mata Pelajaran Terlebih Dahulu</p>
+                          </div>
+                        ) : (
+                          bankSoalList.filter(b => b.mataPelajaran === examMapelFilter).length === 0 ? (
+                            <div className="h-[200px] flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
+                              <X className="w-8 h-8 text-rose-300 mb-2" />
+                              <p className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">Belum Ada Paket Soal Tersedia</p>
+                            </div>
+                          ) : (
+                            bankSoalList.filter(b => b.mataPelajaran === examMapelFilter).map(b => (
+                              <button
+                                key={b.id}
+                                onClick={() => setSelectedExamBank(b)}
+                                className={`flex flex-col p-4 rounded-2xl border-2 transition-all text-left ${
+                                  selectedExamBank?.id === b.id
+                                    ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-md'
+                                    : 'bg-slate-50 border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-100'
+                                }`}
+                              >
+                                <span className="text-xs font-black">{b.judul}</span>
+                                <div className="flex items-center gap-3 mt-2 text-[10px] font-bold opacity-70">
+                                  <span className="flex items-center gap-1"><FileText className="w-3 h-3" /> {b.jumlahSoal} Soal</span>
+                                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {b.durasiMenit} Menit</span>
+                                </div>
+                              </button>
+                            ))
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-6 border-t border-slate-100">
+                    <button
+                      disabled={!selectedExamBank}
+                      onClick={() => {
+                        setIsExamStarted(true);
+                        setSoalIndex(0);
+                        setSiswaJawaban({});
+                        setTimeLeft((selectedExamBank?.durasiMenit || 60) * 60);
+                      }}
+                      className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl text-sm transition-all shadow-xl shadow-blue-600/20 disabled:opacity-50 disabled:grayscale disabled:pointer-events-none flex items-center justify-center gap-3 uppercase tracking-widest cursor-pointer group"
+                    >
+                      <Play className="w-5 h-5 group-hover:scale-110 transition-transform" /> Mulai Kerjakan Soal Sekarang
+                    </button>
+                  </div>
+                </div>
+
+                {/* Info Panel */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[
+                    { icon: <ShieldAlert className="w-5 h-5" />, title: 'Anti-Cheat', desc: 'Sistem memantau perpindahan tab & aplikasi.' },
+                    { icon: <Clock className="w-5 h-5" />, title: 'Timer Realtime', desc: 'Ujian otomatis terhenti saat waktu habis.' },
+                    { icon: <CheckCircle2 className="w-5 h-5" />, title: 'Autosave', desc: 'Jawaban tersimpan otomatis ke cloud database.' }
+                  ].map((info, i) => (
+                    <div key={i} className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 p-4 rounded-2xl flex items-start gap-3">
+                      <div className="text-blue-400 mt-0.5">{info.icon}</div>
+                      <div>
+                        <h5 className="text-[11px] font-black text-white uppercase tracking-wider">{info.title}</h5>
+                        <p className="text-[10px] text-slate-400 font-medium leading-relaxed mt-0.5">{info.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               
               {/* Main Question Display - Left side (8 Cols to accommodate the 4-col sidebar perfectly) */}
               <div className="lg:col-span-8 bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
@@ -1672,7 +1796,7 @@ export const CbtView: React.FC<CbtViewProps> = ({
                 <div className="flex items-center justify-between border-b border-slate-200 pb-4">
                   <span className="text-xl font-extrabold text-slate-800 tracking-tight">Soal No.{soalIndex + 1}</span>
                   <span className="text-xs font-bold text-[#4f46e5] bg-[#eef2ff] px-4 py-1.5 rounded-full border border-indigo-100 uppercase tracking-wider">
-                    {currentExam?.mapel || "Matematika"}
+                    {currentExam?.mataPelajaran || currentExam?.mapel || "Matematika"}
                   </span>
                 </div>
 
@@ -1934,9 +2058,9 @@ export const CbtView: React.FC<CbtViewProps> = ({
                 </div>
 
               </div>
-
             </div>
-          ) : (
+          )
+        ) : (
             /* Result Screen */
             <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-md max-w-xl mx-auto text-center space-y-4">
               <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto font-bold">
@@ -1953,7 +2077,14 @@ export const CbtView: React.FC<CbtViewProps> = ({
               </div>
 
               <button
-                onClick={() => setExamFinished(false)}
+                onClick={() => {
+                  setExamFinished(false);
+                  setIsExamStarted(false);
+                  setSelectedExamBank(null);
+                  setExamMapelFilter('');
+                  setSoalIndex(0);
+                  setSiswaJawaban({});
+                }}
                 className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs"
               >
                 Kembali ke Simulasi
